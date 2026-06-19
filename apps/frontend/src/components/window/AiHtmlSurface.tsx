@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import { sanitizeAiHtml } from "@/lib/sanitize";
-import { wsClient } from "@/lib/ws";
+import { wsClient, API_BASE } from "@/lib/ws";
 import { useDelegatedEvents } from "@/hooks/useDelegatedEvents";
 import { useWindowStore } from "@/stores/windowStore";
 
@@ -61,6 +61,20 @@ export function AiHtmlSurface({ windowId, html }: Props) {
   );
 
   useDelegatedEvents(ref, onOp);
+
+  // Inject the sanitized HTML ONLY when it actually changes — never on a plain
+  // re-render (window drag / focus / z-order). Setting innerHTML rebuilds the
+  // whole DOM subtree (which resets scroll and costs CPU), so gating it on
+  // [html] keeps drags smooth and scroll stable, and means other windows
+  // re-rendering can't disturb this one. /api/img paths are rewritten to the
+  // backend origin (in dev the backend is on a different port than Vite).
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let out = html ? sanitizeAiHtml(html) : "";
+    if (API_BASE && out) out = out.replace(/(["'])\/api\/img\//g, `$1${API_BASE}/api/img/`);
+    el.innerHTML = out;
+  }, [html]);
 
   // Remember the scroll position as the user scrolls.
   const onScroll = useCallback(() => {
@@ -139,8 +153,6 @@ export function AiHtmlSurface({ windowId, html }: Props) {
     }
   }, [html]);
 
-  const safe = html ? sanitizeAiHtml(html) : "";
-
   return (
     <div className="relative h-full w-full overflow-hidden" onDragOver={onDragOver} onDrop={onDrop}>
       {/* OS-style loading bar pinned to the top while the AI is working.
@@ -156,13 +168,7 @@ export function AiHtmlSurface({ windowId, html }: Props) {
           h-full (not min-h-full) gives the AI root a *definite* parent height,
           so its `height:100%` resolves and fills the window vertically.
           overflow-auto here is the scroll fallback if the AI content is taller. */}
-      <div
-        ref={ref}
-        onScroll={onScroll}
-        className="ai-surface h-full w-full overflow-auto"
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: safe }}
-      />
+      <div ref={ref} onScroll={onScroll} className="ai-surface h-full w-full overflow-auto" />
     </div>
   );
 }

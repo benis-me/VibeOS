@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { memo, useLayoutEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { Minus, Square, X, Copy, Save } from "lucide-react";
 import type { WindowState } from "@vibeos/shared";
@@ -15,7 +15,9 @@ import { cn } from "@/lib/utils";
 import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { windowMenu, appContentMenu } from "@/components/contextmenu/menus";
 
-export function Window({ win }: { win: WindowState }) {
+// Memoized so dragging/focusing one window doesn't re-render every other
+// window's surface (which would re-inject HTML and stutter the drag).
+export const Window = memo(function Window({ win }: { win: WindowState }) {
   const html = useWindowStore((s) => s.snapshots[win.id] ?? "");
   const app = useAppStore((s) => s.apps[win.appId]);
   const { onMoveHandle, onResize } = useWindowDrag(win.id);
@@ -198,7 +200,7 @@ export function Window({ win }: { win: WindowState }) {
       )}
     </motion.div>
   );
-}
+});
 
 function TitleButton({
   children,

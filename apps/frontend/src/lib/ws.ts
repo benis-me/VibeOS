@@ -17,6 +17,22 @@ const WS_URL =
   import.meta.env.VITE_WS_URL ??
   `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`;
 
+/**
+ * Backend HTTP origin, derived from the WS URL. In dev the backend is on a
+ * different port (e.g. 7720) than Vite (7730), so backend assets like
+ * /api/img/:id must be addressed absolutely. Empty when same-origin (prod),
+ * so URLs stay relative.
+ */
+export const API_BASE = (() => {
+  try {
+    const u = new URL(WS_URL, location.href);
+    const origin = `${u.protocol === "wss:" ? "https:" : "http:"}//${u.host}`;
+    return origin === location.origin ? "" : origin;
+  } catch {
+    return "";
+  }
+})();
+
 class WsClient {
   private ws: WebSocket | null = null;
   private handlers = new Map<string, Set<AnyHandler>>();
