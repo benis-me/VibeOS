@@ -78,6 +78,28 @@ function nextOrder(): number {
   return (row?.m ?? 0) + 1;
 }
 
+type Geo = { x: number; y: number; w: number; h: number };
+
+/** Last known window geometry for an app, so reopening restores it. */
+export function getGeometry(appId: string): Geo | null {
+  const db = getDb();
+  return (
+    db.query<Geo, [string]>("SELECT x, y, w, h FROM app_geometry WHERE app_id = ?").get(appId) ?? null
+  );
+}
+
+/** Remember an app's window geometry (called on move/resize). */
+export function rememberGeometry(appId: string, r: Geo): Promise<void> {
+  return enqueue(() => {
+    getDb()
+      .query(
+        `INSERT INTO app_geometry (app_id, x, y, w, h, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(app_id) DO UPDATE SET x = excluded.x, y = excluded.y, w = excluded.w, h = excluded.h, updated_at = excluded.updated_at`,
+      )
+      .run(appId, Math.round(r.x), Math.round(r.y), Math.round(r.w), Math.round(r.h), Date.now());
+  });
+}
+
 /** Persist a new Dock order (the window ids in left→right order). */
 export function reorderWindows(ids: string[]): Promise<void> {
   return enqueue(() => {
@@ -103,10 +125,13 @@ export function openWindow(input: {
     const id = ulid(now);
     const z = nextZ();
     const order = nextOrder();
+    // Resolve geometry: explicit rect → remembered (per-app) → cascaded default.
+    const remembered = input.rect ? null : getGeometry(input.appId);
     const w = input.size?.w ?? 760;
     const h = input.size?.h ?? 520;
     const r =
       input.rect ??
+      remembered ??
       {
         // cascade so multiple windows don't stack exactly on top of each other
         x: 70 + (z % 8) * 30,

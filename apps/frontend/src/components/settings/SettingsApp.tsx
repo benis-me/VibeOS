@@ -16,6 +16,7 @@ import {
   Eye,
   EyeOff,
   Plus,
+  Pencil,
   X,
   User,
 } from "lucide-react";
@@ -26,6 +27,7 @@ import type {
   RoleConfig,
   ProviderId,
   ApiProviderConfig,
+  ProviderModel,
   ModelCapability,
   Locale,
   Skin,
@@ -43,6 +45,7 @@ type CategoryId = "providers" | "models" | "general" | "profile" | "about";
 const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh"];
 const THINKING_MODES: ThinkingMode[] = ["disabled", "adaptive", "enabled"];
 const ROLES: AgentRole[] = ["ui-generation", "system-event", "maintenance"];
+const CAPS: ModelCapability[] = ["text", "vision", "image", "reasoning", "tools"];
 
 /**
  * Settings is the one app rendered natively (not AI-hallucinated): it controls
@@ -257,7 +260,8 @@ function ProvidersPane() {
   const apiProviders = AI_PROVIDERS.filter((p) => p.kind === "api");
   const [selected, setSelected] = useState<ProviderId>(apiProviders[0]?.id ?? "openai");
   const [fetching, setFetching] = useState<ProviderId | null>(null);
-  const [customModel, setCustomModel] = useState("");
+  type Draft = { original?: string; id: string; name: string; caps: ModelCapability[] };
+  const [draft, setDraft] = useState<Draft | null>(null);
 
   const cat = AI_PROVIDERS.find((p) => p.id === selected);
   const cfg = settings.apiProviders[selected] ?? {};
@@ -269,21 +273,30 @@ function ProvidersPane() {
     const tmo = setTimeout(() => setFetching(null), 8000);
     return () => clearTimeout(tmo);
   }, [fetching, settings.apiProviders]);
+  // Drop any in-progress model edit when switching providers.
+  useEffect(() => setDraft(null), [selected]);
 
   const patch = (id: ProviderId, partial: Partial<ApiProviderConfig>) =>
     wsClient.send("c2s.settings.update", { partial: { apiProviders: { [id]: partial } } });
 
-  const addModel = () => {
-    const id = customModel.trim();
-    if (!id || models.some((m) => m.id === id)) {
-      setCustomModel("");
-      return;
-    }
-    const caps: ModelCapability[] = /image|imagen|flux|dall|nano-banana|ideogram|recraft|seedream|qwen-image/i.test(id)
-      ? ["image"]
-      : ["text", "vision"];
-    patch(selected, { models: [...models, { id, name: id, capabilities: caps }] });
-    setCustomModel("");
+  const startAdd = () => setDraft({ id: "", name: "", caps: ["text", "vision"] });
+  const startEdit = (m: ProviderModel) =>
+    setDraft({ original: m.id, id: m.id, name: m.name, caps: [...(m.capabilities ?? [])] });
+  const toggleCap = (c: ModelCapability) =>
+    setDraft((d) =>
+      d ? { ...d, caps: d.caps.includes(c) ? d.caps.filter((x) => x !== c) : [...d.caps, c] } : d,
+    );
+  const saveDraft = () => {
+    if (!draft) return;
+    const id = draft.id.trim();
+    if (!id) return;
+    const entry: ProviderModel = { id, name: draft.name.trim() || id, capabilities: draft.caps };
+    const key = draft.original ?? id;
+    const next = models.some((m) => m.id === key)
+      ? models.map((m) => (m.id === key ? entry : m))
+      : [...models, entry];
+    patch(selected, { models: next });
+    setDraft(null);
   };
   const removeModel = (id: string) => patch(selected, { models: models.filter((m) => m.id !== id) });
 
@@ -394,43 +407,103 @@ function ProvidersPane() {
                   </button>
                 )}
               </div>
-              <Group>
-                {models.map((m) => (
-                  <div key={m.id} className="group/m flex items-center gap-3 px-3.5 py-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px]">{m.name}</div>
-                      <div className="truncate text-[11px] text-muted-foreground">{m.id}</div>
+              {models.length > 0 && (
+                <Group>
+                  {models.map((m) => (
+                    <div key={m.id} className="group/m flex items-center gap-3 px-3.5 py-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px]">{m.name}</div>
+                        <div className="truncate text-[11px] text-muted-foreground">{m.id}</div>
+                      </div>
+                      <Caps caps={m.capabilities} t={t} />
+                      <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover/m:opacity-100">
+                        <button
+                          onClick={() => startEdit(m)}
+                          title={t("settings.providers.edit")}
+                          className="text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          <Pencil className="size-3.5" />
+                        </button>
+                        <button
+                          onClick={() => removeModel(m.id)}
+                          title={t("settings.providers.remove")}
+                          className="text-muted-foreground transition-colors hover:text-destructive"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <Caps caps={m.capabilities} t={t} />
+                  ))}
+                </Group>
+              )}
+
+              {draft ? (
+                <div className="mt-2.5 space-y-2.5 rounded-xl border bg-card p-3.5">
+                  <div className="text-[13px] font-medium">
+                    {draft.original ? t("settings.providers.edit") : t("settings.providers.addModelBtn")}
+                  </div>
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] text-muted-foreground">{t("settings.providers.modelName")}</span>
+                    <input
+                      value={draft.name}
+                      onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                      placeholder={t("settings.providers.modelName")}
+                      className="vibe-input w-full rounded-lg border bg-background px-2.5 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-[11px] text-muted-foreground">{t("settings.providers.modelId")}</span>
+                    <input
+                      value={draft.id}
+                      onChange={(e) => setDraft({ ...draft, id: e.target.value })}
+                      placeholder={t("settings.providers.modelId")}
+                      spellCheck={false}
+                      className="vibe-input w-full rounded-lg border bg-background px-2.5 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    />
+                  </label>
+                  <div>
+                    <span className="mb-1.5 block text-[11px] text-muted-foreground">{t("settings.providers.capabilities")}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {CAPS.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => toggleCap(c)}
+                          className={cn(
+                            "rounded-md border px-2 py-1 text-[11px] transition-colors",
+                            draft.caps.includes(c)
+                              ? "border-brand bg-brand/10 text-foreground"
+                              : "text-muted-foreground hover:bg-accent/50",
+                          )}
+                        >
+                          {t(`settings.cap.${c}`)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-1">
                     <button
-                      onClick={() => removeModel(m.id)}
-                      title={t("settings.providers.remove")}
-                      className="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/m:opacity-100"
+                      onClick={() => setDraft(null)}
+                      className="rounded-lg px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent/50"
                     >
-                      <X className="size-3.5" />
+                      {t("settings.providers.cancel")}
+                    </button>
+                    <button
+                      onClick={saveDraft}
+                      className="vibe-btn rounded-lg border bg-card px-2.5 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-accent"
+                    >
+                      {t("settings.providers.save")}
                     </button>
                   </div>
-                ))}
-                {/* Add a custom model id (for models not in the seeded/fetched list). */}
-                <div className="flex items-center gap-2 px-2.5 py-2">
-                  <input
-                    value={customModel}
-                    onChange={(e) => setCustomModel(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addModel()}
-                    placeholder={t("settings.providers.addModel")}
-                    spellCheck={false}
-                    className="vibe-input min-w-0 flex-1 rounded-lg border bg-background py-1.5 px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40"
-                  />
-                  <button
-                    onClick={addModel}
-                    title={t("settings.providers.add")}
-                    className="vibe-btn flex shrink-0 items-center gap-1 rounded-lg border bg-card px-2.5 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-accent"
-                  >
-                    <Plus className="size-3.5" />
-                    {t("settings.providers.add")}
-                  </button>
                 </div>
-              </Group>
+              ) : (
+                <button
+                  onClick={startAdd}
+                  className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                >
+                  <Plus className="size-3.5" />
+                  {t("settings.providers.addModelBtn")}
+                </button>
+              )}
             </>
           )}
         </div>
@@ -446,17 +519,23 @@ function DefaultModelsPane() {
   const discovered = useConnectionStore((s) => s.models);
   const available = useConnectionStore((s) => s.availableProviders);
 
-  const usable = (p: (typeof AI_PROVIDERS)[number]) =>
-    available.includes(p.id) || !!settings.apiProviders[p.id]?.apiKey || p.id === settings.provider;
+  // A provider contributes models when it's enabled: CLIs need their binary
+  // (only the active one can enumerate models); API providers just need to be
+  // toggled on (default on) — NOT gated on a key, so the picker shows every
+  // enabled provider's models, not only the active/keyed one.
+  const enabled = (p: (typeof AI_PROVIDERS)[number]) =>
+    p.kind === "cli"
+      ? available.includes(p.id) || p.id === settings.provider
+      : settings.apiProviders[p.id]?.enabled !== false;
   const providerLabel = (id?: string) => AI_PROVIDERS.find((p) => p.id === id)?.label ?? id ?? "";
 
-  // Every usable model across all providers, grouped by provider, for ONE picker.
+  // Every model across all enabled providers, grouped by provider, for ONE picker.
   // The option value encodes provider+model so a pick implies its provider.
   const buildOptions = (imageOnly: boolean): ComboOption[] => {
     const out: ComboOption[] = [];
     for (const p of AI_PROVIDERS) {
       if (imageOnly ? !p.imageCapable : p.textCapable === false) continue;
-      if (!usable(p)) continue;
+      if (!enabled(p)) continue;
       let models: { id: string; name: string; image?: boolean }[] = [];
       if (p.kind === "api") {
         models = (settings.apiProviders[p.id]?.models ?? p.seedModels ?? []).map((m) => ({

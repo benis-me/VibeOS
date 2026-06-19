@@ -22,6 +22,7 @@ import {
   setWindowState,
   moveWindow,
   reorderWindows,
+  rememberGeometry,
   findOpenWindowByApp,
   getWindow,
 } from "../db/repositories/WindowRepo.ts";
@@ -119,7 +120,14 @@ async function dispatch(
     case "c2s.window.move": {
       const { windowId, x, y, w, h } = msg.payload;
       const win = await moveWindow(windowId, { x, y, w, h });
-      if (win) broadcast("s2c.window.moved", { window: win });
+      if (win) {
+        broadcast("s2c.window.moved", { window: win });
+        // Remember geometry per real app (not transient launches or widgets) so
+        // reopening the app restores its last size + position.
+        if (win.kind !== "widget" && win.appId !== "__transient__") {
+          await rememberGeometry(win.appId, { x, y, w, h });
+        }
+      }
       return;
     }
 
@@ -402,12 +410,12 @@ async function ensureOpenWindow(appId: string): Promise<string | null> {
     if (w) broadcast("s2c.window.focused", { windowId: w.id });
     return existing.id;
   }
-  const size = app.manifest.defaultSize;
+  // No explicit rect → openWindow restores remembered geometry, else cascades.
   const w = await openWindow({
     appId,
     title: app.name,
     kind: app.presetId ? "system" : "app",
-    rect: size ? { x: 120, y: 90, w: size.w, h: size.h } : undefined,
+    size: app.manifest.defaultSize,
   });
   await ensureMemory(w.id, appId);
   broadcast("s2c.window.opened", { window: w });
