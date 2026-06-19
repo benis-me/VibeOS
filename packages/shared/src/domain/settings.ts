@@ -200,11 +200,19 @@ export interface RoleConfig {
 
 export type ModelPolicyOverrides = Partial<Record<AgentRole, RoleConfig>>;
 
+/** Which provider+model generates images for UIs (Default Models page). */
+export interface ImageModelRef {
+  provider?: string;
+  model?: string;
+}
+
 export interface Preferences {
   /** Disable proactive system-event agent. */
   proactiveAgents?: boolean;
   /** Wallpaper identifier. */
   wallpaper?: string;
+  /** Model used for in-UI image generation. */
+  imageModel?: ImageModelRef;
   [key: string]: unknown;
 }
 

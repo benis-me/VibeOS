@@ -3,7 +3,8 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import {
   SlidersHorizontal,
-  Cpu,
+  Server,
+  Boxes,
   Info,
   Sun,
   Moon,
@@ -12,9 +13,21 @@ import {
   RefreshCw,
   Search,
   Check,
+  Eye,
+  EyeOff,
   User,
 } from "lucide-react";
-import type { AgentRole, Effort, ThinkingMode, RoleConfig, ProviderId, Locale, Skin } from "@vibeos/shared";
+import type {
+  AgentRole,
+  Effort,
+  ThinkingMode,
+  RoleConfig,
+  ProviderId,
+  ApiProviderConfig,
+  ModelCapability,
+  Locale,
+  Skin,
+} from "@vibeos/shared";
 import { AI_PROVIDERS } from "@vibeos/shared";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -23,7 +36,7 @@ import { useT, useLocale } from "@/lib/i18n";
 import { EASE_OUT, usePopoverMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-type CategoryId = "general" | "ai" | "profile" | "about";
+type CategoryId = "providers" | "models" | "general" | "profile" | "about";
 
 const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh"];
 const THINKING_MODES: ThinkingMode[] = ["disabled", "adaptive", "enabled"];
@@ -37,12 +50,13 @@ const ROLES: AgentRole[] = ["ui-generation", "system-event", "maintenance"];
 export function SettingsApp() {
   const t = useT();
   const settings = useSettingsStore((s) => s.settings);
-  const [category, setCategory] = useState<CategoryId>("general");
+  const [category, setCategory] = useState<CategoryId>("providers");
   if (!settings) return null;
 
   const CATEGORIES: { id: CategoryId; icon: React.ReactNode; label: string }[] = [
+    { id: "providers", icon: <Server className="size-3.5" />, label: t("settings.cat.providers") },
+    { id: "models", icon: <Boxes className="size-3.5" />, label: t("settings.cat.models") },
     { id: "general", icon: <SlidersHorizontal className="size-3.5" />, label: t("settings.cat.general") },
-    { id: "ai", icon: <Cpu className="size-3.5" />, label: t("settings.cat.ai") },
     { id: "profile", icon: <User className="size-3.5" />, label: t("settings.cat.profile") },
     { id: "about", icon: <Info className="size-3.5" />, label: t("settings.cat.about") },
   ];
@@ -76,7 +90,7 @@ export function SettingsApp() {
       </nav>
 
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-[34rem] px-7 py-6">
+        <div className={cn("mx-auto px-7 py-6", category === "providers" ? "max-w-[48rem]" : "max-w-[34rem]")}>
           <AnimatePresence mode="wait">
             <motion.div
               key={category}
@@ -85,8 +99,9 @@ export function SettingsApp() {
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15, ease: EASE_OUT }}
             >
+              {category === "providers" && <ProvidersPane />}
+              {category === "models" && <DefaultModelsPane />}
               {category === "general" && <GeneralPane />}
-              {category === "ai" && <AiEnginePane />}
               {category === "profile" && <ProfilePane />}
               {category === "about" && <AboutPane />}
             </motion.div>
@@ -149,80 +164,334 @@ function GeneralPane() {
   );
 }
 
-function AiEnginePane() {
-  const t = useT();
-  const settings = useSettingsStore((s) => s.settings);
-  const models = useConnectionStore((s) => s.models);
-  const available = useConnectionStore((s) => s.availableProviders);
-  const [scanning, setScanning] = useState(false);
-
-  // Clear the scanning state once fresh availability/models arrive (or time out).
-  useEffect(() => {
-    if (!scanning) return;
-    const tmo = setTimeout(() => setScanning(false), 10_000);
-    return () => clearTimeout(tmo);
-  }, [scanning, models, available]);
-
-  if (!settings) return null;
-
-  const provider = settings.provider;
-  // Show only providers usable on this host, but never drop the active one.
-  const providerOptions = AI_PROVIDERS.filter(
-    (p) => available.includes(p.id) || p.id === provider,
+/** Capability chips shown next to a model id. */
+function Caps({ caps, t }: { caps?: ModelCapability[]; t: (k: string) => string }) {
+  if (!caps?.length) return null;
+  return (
+    <span className="flex shrink-0 gap-1">
+      {caps.map((c) => (
+        <span
+          key={c}
+          className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground"
+        >
+          {t(`settings.cap.${c}`)}
+        </span>
+      ))}
+    </span>
   );
-  const setProvider = (id: ProviderId) =>
-    wsClient.send("c2s.settings.update", { partial: { provider: id } });
-  const patchRole = (role: AgentRole, cfg: Partial<RoleConfig>) =>
-    wsClient.send("c2s.settings.update", { partial: { modelOverrides: { [role]: cfg } } });
-  const scan = () => {
-    setScanning(true);
-    wsClient.send("c2s.provider.scan", {});
+}
+
+/** Masked credential input that saves on blur. */
+function KeyInput({
+  value,
+  onSave,
+  placeholder,
+}: {
+  value: string;
+  onSave: (v: string) => void;
+  placeholder: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative inline-flex w-[16rem]">
+      <input
+        key={value}
+        type={show ? "text" : "password"}
+        defaultValue={value}
+        autoComplete="off"
+        spellCheck={false}
+        onBlur={(e) => {
+          if (e.target.value !== value) onSave(e.target.value.trim());
+        }}
+        placeholder={placeholder}
+        className="vibe-input w-full rounded-lg border bg-background py-1.5 pl-2.5 pr-8 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40"
+      />
+      <button
+        type="button"
+        onClick={() => setShow((s) => !s)}
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+      >
+        {show ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+      </button>
+    </div>
+  );
+}
+
+function TextInput({
+  value,
+  onSave,
+  placeholder,
+}: {
+  value: string;
+  onSave: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <input
+      key={value}
+      defaultValue={value}
+      autoComplete="off"
+      spellCheck={false}
+      onBlur={(e) => {
+        if (e.target.value !== value) onSave(e.target.value.trim());
+      }}
+      placeholder={placeholder}
+      className="vibe-input w-[16rem] rounded-lg border bg-background py-1.5 px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40"
+    />
+  );
+}
+
+/** 模型服务 — configure Local Agents (CLI) + API Providers (key/baseURL/models). */
+function ProvidersPane() {
+  const t = useT();
+  const settings = useSettingsStore((s) => s.settings)!;
+  const available = useConnectionStore((s) => s.availableProviders);
+  const cliProviders = AI_PROVIDERS.filter((p) => p.kind === "cli");
+  const apiProviders = AI_PROVIDERS.filter((p) => p.kind === "api");
+  const [selected, setSelected] = useState<ProviderId>(apiProviders[0]?.id ?? "openai");
+  const [fetching, setFetching] = useState<ProviderId | null>(null);
+
+  const cat = AI_PROVIDERS.find((p) => p.id === selected);
+  const cfg = settings.apiProviders[selected] ?? {};
+  const models = cfg.models ?? cat?.seedModels ?? [];
+
+  // Clear the fetching spinner once models arrive (or after a timeout).
+  useEffect(() => {
+    if (!fetching) return;
+    const tmo = setTimeout(() => setFetching(null), 8000);
+    return () => clearTimeout(tmo);
+  }, [fetching, settings.apiProviders]);
+
+  const patch = (id: ProviderId, partial: Partial<ApiProviderConfig>) =>
+    wsClient.send("c2s.settings.update", { partial: { apiProviders: { [id]: partial } } });
+
+  const ProviderButton = ({ id, label }: { id: ProviderId; label: string }) => {
+    const isCli = AI_PROVIDERS.find((p) => p.id === id)?.kind === "cli";
+    const on = isCli ? available.includes(id) : settings.apiProviders[id]?.enabled !== false && !!(settings.apiProviders[id]?.apiKey || available.includes(id));
+    return (
+      <button
+        onClick={() => setSelected(id)}
+        className={cn(
+          "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors",
+          selected === id ? "bg-accent text-foreground" : "text-foreground/80 hover:bg-accent/50",
+        )}
+      >
+        <span className={cn("size-1.5 shrink-0 rounded-full", on ? "bg-run" : "bg-muted-foreground/30")} />
+        <span className="flex-1 truncate">{label}</span>
+      </button>
+    );
   };
 
-  const baseModelOptions = [
-    { value: "", label: t("settings.model.auto") },
-    ...models.map((m) => ({ value: m.modelId, label: m.name })),
-  ];
+  return (
+    <Pane title={t("settings.cat.providers")}>
+      <div className="flex gap-5">
+        <div className="w-44 shrink-0 space-y-4">
+          <div>
+            <GroupLabel>{t("settings.providers.local")}</GroupLabel>
+            <div className="space-y-0.5">
+              {cliProviders.map((p) => (
+                <ProviderButton key={p.id} id={p.id} label={p.label} />
+              ))}
+            </div>
+          </div>
+          <div>
+            <GroupLabel>{t("settings.providers.api")}</GroupLabel>
+            <div className="space-y-0.5">
+              {apiProviders.map((p) => (
+                <ProviderButton key={p.id} id={p.id} label={p.label} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-[15px] font-semibold">{cat?.label}</h2>
+            {cat?.kind === "api" && (
+              <Switch
+                checked={cfg.enabled !== false}
+                onChange={(v) => patch(selected, { enabled: v })}
+              />
+            )}
+          </div>
+
+          {cat?.kind === "cli" ? (
+            <Group>
+              <Row label={t("settings.providers.status")}>
+                <span className="flex items-center gap-1.5 text-[13px]">
+                  <span
+                    className={cn(
+                      "size-1.5 rounded-full",
+                      available.includes(selected) ? "bg-run" : "bg-muted-foreground/40",
+                    )}
+                  />
+                  {t(available.includes(selected) ? "settings.providers.installed" : "settings.providers.notFound")}
+                </span>
+              </Row>
+              <div className="px-3.5 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                {t("settings.providers.cliHint")}
+              </div>
+            </Group>
+          ) : (
+            <>
+              <Group>
+                {cat?.fields?.includes("apiKey") && (
+                  <Row label={t("settings.providers.apiKey")}>
+                    <KeyInput
+                      value={cfg.apiKey ?? ""}
+                      onSave={(v) => patch(selected, { apiKey: v || undefined })}
+                      placeholder={t("settings.providers.apiKey.placeholder")}
+                    />
+                  </Row>
+                )}
+                {cat?.fields?.includes("baseUrl") && (
+                  <Row label={t("settings.providers.baseUrl")}>
+                    <TextInput
+                      value={cfg.baseUrl ?? ""}
+                      onSave={(v) => patch(selected, { baseUrl: v || undefined })}
+                      placeholder={cat?.defaultBaseUrl ?? ""}
+                    />
+                  </Row>
+                )}
+              </Group>
+
+              <div className="mb-2 ml-1 mt-7 flex items-center justify-between">
+                <h2 className="text-[13px] font-medium text-foreground/70">
+                  {t("settings.providers.models")} · {models.length}
+                </h2>
+                {cat?.modelsEndpoint && (
+                  <button
+                    onClick={() => {
+                      setFetching(selected);
+                      wsClient.send("c2s.provider.fetchModels", { providerId: selected });
+                    }}
+                    className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-[12px] text-foreground/80 transition-colors hover:bg-accent"
+                  >
+                    <RefreshCw className={cn("size-3.5", fetching === selected && "animate-spin")} />
+                    {t(fetching === selected ? "settings.providers.fetching" : "settings.providers.fetch")}
+                  </button>
+                )}
+              </div>
+              {models.length === 0 ? (
+                <div className="rounded-xl border bg-card px-3.5 py-6 text-center text-[12px] text-muted-foreground">
+                  {t("settings.providers.noModels")}
+                </div>
+              ) : (
+                <Group>
+                  {models.map((m) => (
+                    <div key={m.id} className="flex items-center gap-3 px-3.5 py-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[13px]">{m.name}</div>
+                        <div className="truncate text-[11px] text-muted-foreground">{m.id}</div>
+                      </div>
+                      <Caps caps={m.capabilities} t={t} />
+                    </div>
+                  ))}
+                </Group>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </Pane>
+  );
+}
+
+/** 默认模型 — pick provider+model per task, plus the image-generation model. */
+function DefaultModelsPane() {
+  const t = useT();
+  const settings = useSettingsStore((s) => s.settings)!;
+  const discovered = useConnectionStore((s) => s.models);
+  const available = useConnectionStore((s) => s.availableProviders);
+
+  const usable = (p: (typeof AI_PROVIDERS)[number]) =>
+    available.includes(p.id) || !!settings.apiProviders[p.id]?.apiKey || p.id === settings.provider;
+  const textProviders = AI_PROVIDERS.filter((p) => p.textCapable !== false && usable(p));
+  const imageProviders = AI_PROVIDERS.filter((p) => p.imageCapable && usable(p));
+
+  // Models offered by a provider, optionally filtered to image-capable ones.
+  const modelsFor = (providerId: string, imageOnly = false): ComboOption[] => {
+    const cat = AI_PROVIDERS.find((p) => p.id === providerId);
+    let list: { value: string; label: string }[] = [];
+    if (cat?.kind === "api") {
+      const ms = settings.apiProviders[providerId]?.models ?? cat.seedModels ?? [];
+      list = ms
+        .filter((m) => (imageOnly ? m.capabilities?.includes("image") : !m.capabilities?.includes("image")))
+        .map((m) => ({ value: m.id, label: m.name }));
+    } else if (providerId === settings.provider) {
+      list = discovered.map((m) => ({ value: m.modelId, label: m.name }));
+    }
+    return list;
+  };
+
+  const patchRole = (role: AgentRole, cfg: Partial<RoleConfig>) =>
+    wsClient.send("c2s.settings.update", { partial: { modelOverrides: { [role]: cfg } } });
+
+  const ProviderSelect = ({
+    value,
+    onChange,
+    list,
+    includeAuto,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    list: typeof AI_PROVIDERS;
+    includeAuto?: boolean;
+  }) => {
+    const cli = list.filter((p) => p.kind === "cli");
+    const api = list.filter((p) => p.kind === "api");
+    return (
+      <Select value={value} onChange={onChange}>
+        {includeAuto && <option value="">{t("settings.model.auto")}</option>}
+        {cli.length > 0 && (
+          <optgroup label={t("settings.providers.local")}>
+            {cli.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </optgroup>
+        )}
+        {api.length > 0 && (
+          <optgroup label={t("settings.providers.api")}>
+            {api.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </optgroup>
+        )}
+      </Select>
+    );
+  };
+
+  const img = settings.prefs.imageModel ?? {};
+  const setImage = (partial: { provider?: string; model?: string }) =>
+    wsClient.send("c2s.settings.update", {
+      partial: { prefs: { imageModel: { ...img, ...partial } } },
+    });
 
   return (
-    <Pane
-      title={t("settings.cat.ai")}
-      action={
-        <button
-          onClick={scan}
-          title={t("settings.scan.hint")}
-          className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-accent"
-        >
-          <RefreshCw className={cn("size-3.5", scanning && "animate-spin")} />
-          {t(scanning ? "settings.scanning" : "settings.scan")}
-        </button>
-      }
-    >
-      <Group>
-        <Row label={t("settings.provider")}>
-          <Select value={provider} onChange={(v) => setProvider(v as ProviderId)}>
-            {providerOptions.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </Select>
-        </Row>
-      </Group>
-
-      <GroupLabel>{t("settings.models")}</GroupLabel>
+    <Pane title={t("settings.cat.models")}>
       {ROLES.map((role) => {
         const cfg: RoleConfig = settings.modelOverrides[role] ?? {};
-        // Keep a stored model id selectable even if it isn't in the current list.
-        const modelOptions =
-          cfg.model && !models.some((m) => m.modelId === cfg.model)
-            ? [...baseModelOptions, { value: cfg.model, label: cfg.model }]
-            : baseModelOptions;
+        const provider = cfg.provider || settings.provider;
+        const opts = modelsFor(provider);
+        const modelOptions: ComboOption[] = [
+          { value: "", label: t("settings.model.auto") },
+          ...opts,
+          ...(cfg.model && !opts.some((o) => o.value === cfg.model)
+            ? [{ value: cfg.model, label: cfg.model }]
+            : []),
+        ];
         return (
           <Group key={role} className="mb-2.5">
             <div className="px-3.5 py-2.5">
               <div className="text-[13px] font-medium">{t(`settings.role.${role}.label`)}</div>
             </div>
+            <Row label={t("settings.role.provider")}>
+              <ProviderSelect
+                value={provider}
+                list={textProviders}
+                onChange={(v) => patchRole(role, { provider: v, model: undefined })}
+              />
+            </Row>
             <Row label={t("settings.role.model")}>
               <Combobox
                 value={cfg.model ?? ""}
@@ -239,9 +508,7 @@ function AiEnginePane() {
               >
                 <option value="">{t("settings.effort.default")}</option>
                 {EFFORTS.map((ef) => (
-                  <option key={ef} value={ef}>
-                    {ef}
-                  </option>
+                  <option key={ef} value={ef}>{ef}</option>
                 ))}
               </Select>
             </Row>
@@ -252,15 +519,46 @@ function AiEnginePane() {
               >
                 <option value="">{t("settings.thinking.default")}</option>
                 {THINKING_MODES.map((tm) => (
-                  <option key={tm} value={tm}>
-                    {t(`settings.thinking.${tm}`)}
-                  </option>
+                  <option key={tm} value={tm}>{t(`settings.thinking.${tm}`)}</option>
                 ))}
               </Select>
             </Row>
           </Group>
         );
       })}
+
+      <GroupLabel>{t("settings.models.image")}</GroupLabel>
+      <Group>
+        <div className="px-3.5 pt-2.5 text-[11px] leading-relaxed text-muted-foreground">
+          {t("settings.models.imageHint")}
+        </div>
+        <Row label={t("settings.role.provider")}>
+          {imageProviders.length === 0 ? (
+            <span className="text-[12px] text-muted-foreground">{t("settings.models.noImageProvider")}</span>
+          ) : (
+            <ProviderSelect
+              value={img.provider ?? ""}
+              list={imageProviders}
+              includeAuto
+              onChange={(v) => setImage({ provider: v || undefined, model: undefined })}
+            />
+          )}
+        </Row>
+        {img.provider && (
+          <Row label={t("settings.role.model")}>
+            <Combobox
+              value={img.model ?? ""}
+              options={[
+                { value: "", label: t("settings.model.auto") },
+                ...modelsFor(img.provider, true),
+              ]}
+              onChange={(v) => setImage({ model: v || undefined })}
+              searchPlaceholder={t("settings.model.search")}
+              emptyLabel={t("settings.model.none")}
+            />
+          </Row>
+        )}
+      </Group>
     </Pane>
   );
 }
