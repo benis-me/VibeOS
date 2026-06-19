@@ -24,6 +24,8 @@ export interface AppManifest {
   category?: string;
   /** Default window size hint. */
   defaultSize?: { w: number; h: number };
+  /** Minimum window size — resize is clamped to this (falls back to global min). */
+  minSize?: { w: number; h: number };
   /**
    * If true, only ONE window of this app may exist — opening it again focuses
    * the existing window (e.g. Settings, Recycle Bin). If false/undefined, the

@@ -2,6 +2,7 @@ import { useCallback, useRef } from "react";
 import type { Rect } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
 import { useWindowStore } from "@/stores/windowStore";
+import { useAppStore } from "@/stores/appStore";
 
 /** Resize direction: any combination of edges. "" = move. */
 export type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
@@ -21,6 +22,10 @@ export function useWindowDrag(windowId: string) {
       // root so clicking the titlebar/edges also focuses the window.
       const w = useWindowStore.getState().windows[windowId];
       if (!w) return;
+      // Per-app minimum size (e.g. Settings = 850 wide), falling back to global.
+      const ms = useAppStore.getState().apps[w.appId]?.manifest?.minSize;
+      const minW = ms?.w ?? MIN_W;
+      const minH = ms?.h ?? MIN_H;
       const start = { px: e.clientX, py: e.clientY, ...w.rect };
       (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
 
@@ -38,15 +43,15 @@ export function useWindowDrag(windowId: string) {
           };
         } else {
           let { x, y, w: width, h: height } = start;
-          if (dir.includes("e")) width = Math.max(MIN_W, start.w + dx);
-          if (dir.includes("s")) height = Math.max(MIN_H, start.h + dy);
+          if (dir.includes("e")) width = Math.max(minW, start.w + dx);
+          if (dir.includes("s")) height = Math.max(minH, start.h + dy);
           if (dir.includes("w")) {
-            const nw = Math.max(MIN_W, start.w - dx);
+            const nw = Math.max(minW, start.w - dx);
             x = start.x + (start.w - nw);
             width = nw;
           }
           if (dir.includes("n")) {
-            const nh = Math.max(MIN_H, start.h - dy);
+            const nh = Math.max(minH, start.h - dy);
             y = start.y + (start.h - nh);
             height = nh;
           }

@@ -15,6 +15,8 @@ import {
   Check,
   Eye,
   EyeOff,
+  Plus,
+  X,
   User,
 } from "lucide-react";
 import type {
@@ -90,7 +92,7 @@ export function SettingsApp() {
       </nav>
 
       <div className="flex-1 overflow-auto">
-        <div className={cn("mx-auto px-7 py-6", category === "providers" ? "max-w-[48rem]" : "max-w-[34rem]")}>
+        <div className="px-7 py-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={category}
@@ -128,6 +130,7 @@ function GeneralPane() {
 
   return (
     <Pane title={t("settings.cat.general")}>
+      <GroupLabel>{t("settings.sec.appearance")}</GroupLabel>
       <Group>
         <Row label={t("settings.theme")}>
           <Segmented
@@ -146,6 +149,10 @@ function GeneralPane() {
             <option value="aqua">Mac Aqua</option>
           </Select>
         </Row>
+      </Group>
+
+      <GroupLabel>{t("settings.sec.prefs")}</GroupLabel>
+      <Group>
         <Row label={t("settings.language")} hint={t("settings.language.hint")}>
           <Segmented
             value={locale}
@@ -250,6 +257,7 @@ function ProvidersPane() {
   const apiProviders = AI_PROVIDERS.filter((p) => p.kind === "api");
   const [selected, setSelected] = useState<ProviderId>(apiProviders[0]?.id ?? "openai");
   const [fetching, setFetching] = useState<ProviderId | null>(null);
+  const [customModel, setCustomModel] = useState("");
 
   const cat = AI_PROVIDERS.find((p) => p.id === selected);
   const cfg = settings.apiProviders[selected] ?? {};
@@ -264,6 +272,20 @@ function ProvidersPane() {
 
   const patch = (id: ProviderId, partial: Partial<ApiProviderConfig>) =>
     wsClient.send("c2s.settings.update", { partial: { apiProviders: { [id]: partial } } });
+
+  const addModel = () => {
+    const id = customModel.trim();
+    if (!id || models.some((m) => m.id === id)) {
+      setCustomModel("");
+      return;
+    }
+    const caps: ModelCapability[] = /image|imagen|flux|dall|nano-banana|ideogram|recraft|seedream|qwen-image/i.test(id)
+      ? ["image"]
+      : ["text", "vision"];
+    patch(selected, { models: [...models, { id, name: id, capabilities: caps }] });
+    setCustomModel("");
+  };
+  const removeModel = (id: string) => patch(selected, { models: models.filter((m) => m.id !== id) });
 
   const ProviderButton = ({ id, label }: { id: ProviderId; label: string }) => {
     const isCli = AI_PROVIDERS.find((p) => p.id === id)?.kind === "cli";
@@ -372,23 +394,43 @@ function ProvidersPane() {
                   </button>
                 )}
               </div>
-              {models.length === 0 ? (
-                <div className="rounded-xl border bg-card px-3.5 py-6 text-center text-[12px] text-muted-foreground">
-                  {t("settings.providers.noModels")}
-                </div>
-              ) : (
-                <Group>
-                  {models.map((m) => (
-                    <div key={m.id} className="flex items-center gap-3 px-3.5 py-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13px]">{m.name}</div>
-                        <div className="truncate text-[11px] text-muted-foreground">{m.id}</div>
-                      </div>
-                      <Caps caps={m.capabilities} t={t} />
+              <Group>
+                {models.map((m) => (
+                  <div key={m.id} className="group/m flex items-center gap-3 px-3.5 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px]">{m.name}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">{m.id}</div>
                     </div>
-                  ))}
-                </Group>
-              )}
+                    <Caps caps={m.capabilities} t={t} />
+                    <button
+                      onClick={() => removeModel(m.id)}
+                      title={t("settings.providers.remove")}
+                      className="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/m:opacity-100"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {/* Add a custom model id (for models not in the seeded/fetched list). */}
+                <div className="flex items-center gap-2 px-2.5 py-2">
+                  <input
+                    value={customModel}
+                    onChange={(e) => setCustomModel(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addModel()}
+                    placeholder={t("settings.providers.addModel")}
+                    spellCheck={false}
+                    className="vibe-input min-w-0 flex-1 rounded-lg border bg-background py-1.5 px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40"
+                  />
+                  <button
+                    onClick={addModel}
+                    title={t("settings.providers.add")}
+                    className="vibe-btn flex shrink-0 items-center gap-1 rounded-lg border bg-card px-2.5 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-accent"
+                  >
+                    <Plus className="size-3.5" />
+                    {t("settings.providers.add")}
+                  </button>
+                </div>
+              </Group>
             </>
           )}
         </div>
@@ -406,97 +448,75 @@ function DefaultModelsPane() {
 
   const usable = (p: (typeof AI_PROVIDERS)[number]) =>
     available.includes(p.id) || !!settings.apiProviders[p.id]?.apiKey || p.id === settings.provider;
-  const textProviders = AI_PROVIDERS.filter((p) => p.textCapable !== false && usable(p));
-  const imageProviders = AI_PROVIDERS.filter((p) => p.imageCapable && usable(p));
+  const providerLabel = (id?: string) => AI_PROVIDERS.find((p) => p.id === id)?.label ?? id ?? "";
 
-  // Models offered by a provider, optionally filtered to image-capable ones.
-  const modelsFor = (providerId: string, imageOnly = false): ComboOption[] => {
-    const cat = AI_PROVIDERS.find((p) => p.id === providerId);
-    let list: { value: string; label: string }[] = [];
-    if (cat?.kind === "api") {
-      const ms = settings.apiProviders[providerId]?.models ?? cat.seedModels ?? [];
-      list = ms
-        .filter((m) => (imageOnly ? m.capabilities?.includes("image") : !m.capabilities?.includes("image")))
-        .map((m) => ({ value: m.id, label: m.name }));
-    } else if (providerId === settings.provider) {
-      list = discovered.map((m) => ({ value: m.modelId, label: m.name }));
+  // Every usable model across all providers, grouped by provider, for ONE picker.
+  // The option value encodes provider+model so a pick implies its provider.
+  const buildOptions = (imageOnly: boolean): ComboOption[] => {
+    const out: ComboOption[] = [];
+    for (const p of AI_PROVIDERS) {
+      if (imageOnly ? !p.imageCapable : p.textCapable === false) continue;
+      if (!usable(p)) continue;
+      let models: { id: string; name: string; image?: boolean }[] = [];
+      if (p.kind === "api") {
+        models = (settings.apiProviders[p.id]?.models ?? p.seedModels ?? []).map((m) => ({
+          id: m.id,
+          name: m.name,
+          image: m.capabilities?.includes("image"),
+        }));
+      } else if (p.id === settings.provider) {
+        models = discovered.map((m) => ({ id: m.modelId, name: m.name }));
+      }
+      for (const m of models) {
+        if (imageOnly ? !m.image : m.image) continue;
+        out.push({ value: `${p.id}::${m.id}`, label: m.name, sub: m.id, group: p.label });
+      }
     }
-    return list;
+    return out;
+  };
+
+  // Build a picker's options, keeping the current selection visible even if its
+  // provider/model isn't in the live list.
+  const withCurrent = (opts: ComboOption[], provider?: string, model?: string) => {
+    const value = provider && model ? `${provider}::${model}` : "";
+    const options: ComboOption[] = [{ value: "", label: t("settings.model.auto") }, ...opts];
+    if (value && !opts.some((o) => o.value === value)) {
+      options.push({ value, label: model!, sub: model, group: providerLabel(provider) });
+    }
+    return { value, options };
+  };
+
+  const parse = (v: string): { provider?: string; model?: string } => {
+    if (!v) return { provider: undefined, model: undefined };
+    const i = v.indexOf("::");
+    return { provider: v.slice(0, i), model: v.slice(i + 2) };
   };
 
   const patchRole = (role: AgentRole, cfg: Partial<RoleConfig>) =>
     wsClient.send("c2s.settings.update", { partial: { modelOverrides: { [role]: cfg } } });
 
-  const ProviderSelect = ({
-    value,
-    onChange,
-    list,
-    includeAuto,
-  }: {
-    value: string;
-    onChange: (v: string) => void;
-    list: typeof AI_PROVIDERS;
-    includeAuto?: boolean;
-  }) => {
-    const cli = list.filter((p) => p.kind === "cli");
-    const api = list.filter((p) => p.kind === "api");
-    return (
-      <Select value={value} onChange={onChange}>
-        {includeAuto && <option value="">{t("settings.model.auto")}</option>}
-        {cli.length > 0 && (
-          <optgroup label={t("settings.providers.local")}>
-            {cli.map((p) => (
-              <option key={p.id} value={p.id}>{p.label}</option>
-            ))}
-          </optgroup>
-        )}
-        {api.length > 0 && (
-          <optgroup label={t("settings.providers.api")}>
-            {api.map((p) => (
-              <option key={p.id} value={p.id}>{p.label}</option>
-            ))}
-          </optgroup>
-        )}
-      </Select>
-    );
-  };
-
+  const textOptions = buildOptions(false);
+  const imageOptions = buildOptions(true);
   const img = settings.prefs.imageModel ?? {};
   const setImage = (partial: { provider?: string; model?: string }) =>
-    wsClient.send("c2s.settings.update", {
-      partial: { prefs: { imageModel: { ...img, ...partial } } },
-    });
+    wsClient.send("c2s.settings.update", { partial: { prefs: { imageModel: { ...img, ...partial } } } });
+  const imgPick = withCurrent(imageOptions, img.provider, img.model);
 
   return (
     <Pane title={t("settings.cat.models")}>
       {ROLES.map((role) => {
         const cfg: RoleConfig = settings.modelOverrides[role] ?? {};
-        const provider = cfg.provider || settings.provider;
-        const opts = modelsFor(provider);
-        const modelOptions: ComboOption[] = [
-          { value: "", label: t("settings.model.auto") },
-          ...opts,
-          ...(cfg.model && !opts.some((o) => o.value === cfg.model)
-            ? [{ value: cfg.model, label: cfg.model }]
-            : []),
-        ];
+        const pick = withCurrent(textOptions, cfg.provider, cfg.model);
         return (
           <Group key={role} className="mb-2.5">
             <div className="px-3.5 py-2.5">
               <div className="text-[13px] font-medium">{t(`settings.role.${role}.label`)}</div>
             </div>
-            <Row label={t("settings.role.provider")}>
-              <ProviderSelect
-                value={provider}
-                list={textProviders}
-                onChange={(v) => patchRole(role, { provider: v, model: undefined })}
-              />
-            </Row>
             <Row label={t("settings.role.model")}>
               <Combobox
-                value={cfg.model ?? ""}
-                options={modelOptions}
-                onChange={(v) => patchRole(role, { model: v || undefined })}
+                value={pick.value}
+                options={pick.options}
+                onChange={(v) => patchRole(role, parse(v))}
                 searchPlaceholder={t("settings.model.search")}
                 emptyLabel={t("settings.model.none")}
               />
@@ -532,32 +552,19 @@ function DefaultModelsPane() {
         <div className="px-3.5 pt-2.5 text-[11px] leading-relaxed text-muted-foreground">
           {t("settings.models.imageHint")}
         </div>
-        <Row label={t("settings.role.provider")}>
-          {imageProviders.length === 0 ? (
+        <Row label={t("settings.role.model")}>
+          {imageOptions.length === 0 ? (
             <span className="text-[12px] text-muted-foreground">{t("settings.models.noImageProvider")}</span>
           ) : (
-            <ProviderSelect
-              value={img.provider ?? ""}
-              list={imageProviders}
-              includeAuto
-              onChange={(v) => setImage({ provider: v || undefined, model: undefined })}
-            />
-          )}
-        </Row>
-        {img.provider && (
-          <Row label={t("settings.role.model")}>
             <Combobox
-              value={img.model ?? ""}
-              options={[
-                { value: "", label: t("settings.model.auto") },
-                ...modelsFor(img.provider, true),
-              ]}
-              onChange={(v) => setImage({ model: v || undefined })}
+              value={imgPick.value}
+              options={imgPick.options}
+              onChange={(v) => setImage(parse(v))}
               searchPlaceholder={t("settings.model.search")}
               emptyLabel={t("settings.model.none")}
             />
-          </Row>
-        )}
+          )}
+        </Row>
       </Group>
     </Pane>
   );
@@ -628,6 +635,10 @@ function Pane({
 interface ComboOption {
   value: string;
   label: string;
+  /** Sub-label shown under the label (e.g. raw model id). */
+  sub?: string;
+  /** Group header this option falls under (contiguous options are grouped). */
+  group?: string;
 }
 
 /** Searchable single-select — used for the model picker (lists can be huge). */
@@ -646,18 +657,35 @@ function Combobox({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const [coords, setCoords] = useState({ top: 0, left: 0, width: 256 });
+  const [coords, setCoords] = useState<{
+    left: number;
+    width: number;
+    top?: number;
+    bottom?: number;
+    maxH: number;
+  }>({ left: 0, width: 264, top: 0, maxH: 280 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const pop = usePopoverMotion();
 
-  // Position the portal'd popover under the trigger (right-aligned). Recompute
-  // on scroll/resize so it tracks the trigger as the settings pane scrolls.
+  // Position the portal'd popover near the trigger, flipping above + clamping to
+  // the viewport so it never spills off-screen. Recomputes on scroll/resize.
   const place = () => {
     const r = triggerRef.current?.getBoundingClientRect();
     if (!r) return;
-    const width = 256;
-    setCoords({ top: r.bottom + 4, left: Math.max(8, r.right - width), width });
+    const width = 264;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const left = Math.min(Math.max(8, r.right - width), vw - width - 8);
+    const spaceBelow = vh - r.bottom - 8;
+    const spaceAbove = r.top - 8;
+    const openUp = spaceBelow < 240 && spaceAbove > spaceBelow;
+    const maxH = Math.max(160, Math.min(340, openUp ? spaceAbove : spaceBelow));
+    setCoords(
+      openUp
+        ? { left, width, bottom: vh - r.top + 4, maxH }
+        : { left, width, top: r.bottom + 4, maxH },
+    );
   };
 
   useEffect(() => {
@@ -684,9 +712,19 @@ function Combobox({
   const needle = q.trim().toLowerCase();
   const filtered = needle
     ? options.filter(
-        (o) => o.label.toLowerCase().includes(needle) || o.value.toLowerCase().includes(needle),
+        (o) =>
+          o.label.toLowerCase().includes(needle) ||
+          o.value.toLowerCase().includes(needle) ||
+          o.group?.toLowerCase().includes(needle),
       )
     : options;
+  // Collapse contiguous same-group options into sections with a header.
+  const groups: { name?: string; items: ComboOption[] }[] = [];
+  for (const o of filtered) {
+    const last = groups[groups.length - 1];
+    if (last && last.name === o.group) last.items.push(o);
+    else groups.push({ name: o.group, items: [o] });
+  }
 
   return (
     <div className="inline-flex w-[15rem]">
@@ -704,10 +742,17 @@ function Combobox({
             <motion.div
               ref={popRef}
               {...pop}
-              style={{ position: "fixed", top: coords.top, left: coords.left, width: coords.width }}
-              className="z-[10001] origin-top-right overflow-hidden rounded-lg border bg-popover shadow-xl"
+              style={{
+                position: "fixed",
+                left: coords.left,
+                width: coords.width,
+                top: coords.top,
+                bottom: coords.bottom,
+                maxHeight: coords.maxH,
+              }}
+              className="z-[10001] flex flex-col overflow-hidden rounded-lg border bg-popover shadow-xl"
             >
-              <div className="flex items-center gap-2 border-b px-2.5">
+              <div className="flex shrink-0 items-center gap-2 border-b px-2.5">
                 <Search className="size-3.5 shrink-0 text-muted-foreground" />
                 <input
                   autoFocus
@@ -717,26 +762,38 @@ function Combobox({
                   className="h-9 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
                 />
               </div>
-              <div className="max-h-60 overflow-auto p-1">
+              <div className="min-h-0 flex-1 overflow-auto p-1">
                 {filtered.length === 0 ? (
                   <div className="px-2 py-4 text-center text-xs text-muted-foreground">{emptyLabel}</div>
                 ) : (
-                  filtered.map((o) => (
-                    <button
-                      key={o.value || "_auto"}
-                      onClick={() => {
-                        onChange(o.value);
-                        setOpen(false);
-                        setQ("");
-                      }}
-                      className={cn(
-                        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
-                        o.value === value ? "bg-accent" : "hover:bg-accent/60",
+                  groups.map((g, gi) => (
+                    <div key={g.name ?? `_g${gi}`}>
+                      {g.name && (
+                        <div className="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {g.name}
+                        </div>
                       )}
-                    >
-                      <span className="flex-1 truncate">{o.label}</span>
-                      {o.value === value && <Check className="size-3.5 shrink-0" />}
-                    </button>
+                      {g.items.map((o) => (
+                        <button
+                          key={o.value || "_auto"}
+                          onClick={() => {
+                            onChange(o.value);
+                            setOpen(false);
+                            setQ("");
+                          }}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+                            o.value === value ? "bg-accent" : "hover:bg-accent/60",
+                          )}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate">{o.label}</span>
+                            {o.sub && <span className="block truncate text-[11px] text-muted-foreground">{o.sub}</span>}
+                          </span>
+                          {o.value === value && <Check className="size-3.5 shrink-0" />}
+                        </button>
+                      ))}
+                    </div>
                   ))
                 )}
               </div>
