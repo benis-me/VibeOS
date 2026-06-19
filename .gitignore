@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+build/
+apps/frontend/dist/
+
+# data / database (the OS state — never commit)
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# env (keep .env.example tracked)
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+logs/
+
+# editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# typescript / tooling caches
+*.tsbuildinfo
+.cache/
+coverage/
+
+# local tooling (regenerable, machine-specific)
+.codegraph/
+.impeccable/

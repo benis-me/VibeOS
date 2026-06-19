@@ -1,0 +1,1152 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------- Light theme — neutral black / white / gray ---------------- */
+:root {
+  --radius: 0.625rem;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  --brand: oklch(0.28 0 0);
+  --run: oklch(0.6 0.15 150);
+  --warn: oklch(0.72 0.15 70);
+  --idle: oklch(0.75 0 0);
+
+  --sheen: rgba(0, 0, 0, 0.02);
+
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  /* VibeOS desktop */
+  --desktop: oklch(0.96 0.005 250);
+  --window-titlebar: oklch(0.985 0 0);
+  --taskbar-h: 2.75rem;
+}
+
+/* ---------------- Dark theme — neutral black / white / gray ---------------- */
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+
+  --brand: oklch(0.92 0 0);
+  --run: oklch(0.74 0.16 152);
+  --warn: oklch(0.8 0.15 75);
+  --idle: oklch(0.45 0 0);
+
+  --sheen: rgba(255, 255, 255, 0.05);
+
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+
+  /* VibeOS desktop */
+  --desktop: oklch(0.12 0.01 260);
+  --window-titlebar: oklch(0.23 0 0);
+}
+
+/* ============================================================================
+   SKINS — alternate visual languages, selected via data-skin on <html>.
+   These override the design tokens (placed after :root/.dark so they win at
+   equal specificity). Phase 1 is token-level (radius, fonts, palette); the
+   deep chrome (XP gradient titlebars, Aqua gloss) comes in later phases.
+   ============================================================================ */
+
+/* Windows XP "Luna" — square, silver-blue, Tahoma. */
+[data-skin="xp"] {
+  --radius: 0rem;
+  --font-sans: Tahoma, Verdana, "Segoe UI", sans-serif;
+  --taskbar-h: 30px;
+
+  --background: oklch(0.93 0.015 95);
+  --foreground: oklch(0.18 0 0);
+  --card: oklch(0.99 0.004 95);
+  --card-foreground: oklch(0.18 0 0);
+  --popover: oklch(0.97 0.008 95);
+  --popover-foreground: oklch(0.18 0 0);
+
+  --primary: oklch(0.45 0.15 255);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.9 0.015 95);
+  --secondary-foreground: oklch(0.2 0 0);
+  --muted: oklch(0.9 0.01 95);
+  --muted-foreground: oklch(0.42 0.01 95);
+  --accent: oklch(0.86 0.05 250);
+  --accent-foreground: oklch(0.2 0.05 255);
+  --destructive: oklch(0.55 0.22 27);
+
+  --border: oklch(0.72 0.02 95);
+  --input: oklch(0.99 0.004 95);
+  --ring: oklch(0.5 0.14 255);
+
+  --brand: oklch(0.45 0.15 255);
+  --desktop: oklch(0.55 0.11 235);
+  --window-titlebar: oklch(0.45 0.15 255);
+  --sheen: rgba(255, 255, 255, 0.5);
+}
+
+/* Mac OS X "Aqua" — glossy, rounded, Lucida Grande. */
+[data-skin="aqua"] {
+  --radius: 0.7rem;
+  --font-sans: "Lucida Grande", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --background: oklch(0.97 0 0);
+  --foreground: oklch(0.2 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0 0);
+  --popover: oklch(0.99 0 0);
+  --popover-foreground: oklch(0.2 0 0);
+
+  --primary: oklch(0.55 0.17 255);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.95 0 0);
+  --secondary-foreground: oklch(0.2 0 0);
+  --muted: oklch(0.95 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.9 0.04 255);
+  --accent-foreground: oklch(0.25 0.05 255);
+  --destructive: oklch(0.58 0.22 27);
+
+  --border: oklch(0.85 0 0);
+  --input: oklch(1 0 0);
+  --ring: oklch(0.6 0.16 255);
+
+  --brand: oklch(0.55 0.17 255);
+  --desktop: oklch(0.6 0.1 245);
+  --window-titlebar: oklch(0.92 0 0);
+  --sheen: rgba(255, 255, 255, 0.6);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand: var(--brand);
+  --color-run: var(--run);
+  --color-warn: var(--warn);
+  --color-idle: var(--idle);
+  --color-desktop: var(--desktop);
+  --color-window-titlebar: var(--window-titlebar);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  user-select: none;
+}
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--foreground) 18%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--color-foreground) 14%, transparent);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--color-foreground) 26%, transparent);
+  background-clip: content-box;
+}
+
+.sheen {
+  box-shadow: inset 0 1px 0 0 var(--sheen);
+}
+
+.glow-run {
+  box-shadow: 0 0 7px 0 color-mix(in oklab, var(--run) 55%, transparent);
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+.breathe {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+/* indeterminate loading bar — slides a partial fill across the track */
+@keyframes vibeos-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+.vibeos-progress {
+  animation: vibeos-progress 1.1s ease-in-out infinite;
+}
+
+/* ---- VibeOS window chrome ---- */
+/* Focused window: a thin, subtle shadow — enough to lift it off the desktop. */
+.win-focused {
+  box-shadow:
+    0 4px 14px -6px rgba(0, 0, 0, 0.22),
+    0 1px 3px -1px rgba(0, 0, 0, 0.14);
+}
+.dark .win-focused {
+  box-shadow:
+    0 5px 16px -7px rgba(0, 0, 0, 0.45),
+    0 1px 4px -1px rgba(0, 0, 0, 0.3);
+}
+/* Unfocused window: frosted glass — translucent + heavy backdrop blur. */
+.win-glass {
+  background-color: color-mix(in oklab, var(--card) 55%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.18);
+}
+.win-glass-content {
+  background-color: color-mix(in oklab, var(--background) 45%, transparent);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* AI-generated content surface: give the AI a sensible base style without
+   letting it break the OS shell. */
+.ai-surface {
+  font-family: var(--font-sans);
+  color: var(--foreground);
+  line-height: 1.5;
+  /* Column flex so the AI's content fills the window vertically. This makes
+     the (usually single) wrapper element stretch to the full height even when
+     the AI forgot height:100%, killing the "empty gap at the bottom". */
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+/* Direct children stretch to fill remaining vertical space. min-height:0 lets
+   inner overflow:auto regions scroll instead of overflowing. */
+.ai-surface > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ai-surface a {
+  color: var(--brand);
+  text-decoration: underline;
+}
+.ai-surface button {
+  font: inherit;
+  /* buttons shouldn't get stretched by the flex rule above */
+  flex: 0 0 auto;
+}
+/* Small leaf elements directly under the surface shouldn't stretch oddly. */
+.ai-surface > h1,
+.ai-surface > h2,
+.ai-surface > h3,
+.ai-surface > p,
+.ai-surface > hr,
+.ai-surface > button,
+.ai-surface > input,
+.ai-surface > label {
+  flex: 0 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================================
+   SKIN CHROME — authentic per-skin window frame, title bar, buttons, taskbar
+   and start menu. Targets the vibe-* hooks; scoped under [data-skin] so the
+   default (devdock) look is untouched. Higher specificity than the Tailwind
+   utilities on the same elements, so it wins.
+   ============================================================================ */
+
+/* =================== macOS-family skins (Default + Aqua) ==================
+   Both put window controls on the LEFT (traffic lights), center the title, and
+   use a centered floating Dock. The STRUCTURE is shared via :is(); the MATERIAL
+   (flat vs glossy) is set per-skin afterwards. Window-control placement lives in
+   each skin block (Aqua already had it). */
+:is([data-skin="devdock"], [data-skin="aqua"]) {
+  --taskbar-h: 76px; /* room for the floating Dock (maximize stops above it) */
+}
+/* Bottom bar → a centered, floating, rounded Dock. */
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-taskbar {
+  inset-inline: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 10px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  height: 58px;
+  padding: 6px 8px;
+  gap: 6px;
+  border-radius: 18px;
+}
+/* Dock items: icon-only tiles. */
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-taskitem {
+  position: relative;
+  height: 44px;
+  width: 44px;
+  justify-content: center;
+  padding: 0;
+  border-radius: 12px;
+}
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-taskitem :where(svg, img) {
+  width: 26px;
+  height: 26px;
+}
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-startbtn {
+  height: 44px;
+}
+/* App name as a hover tooltip above the Dock icon. */
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-taskitem-label {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  translate: -50% 0;
+  max-width: none;
+  overflow: visible;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  font-size: 11px;
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease-out;
+}
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-taskitem:hover .vibe-taskitem-label {
+  opacity: 1;
+}
+/* Divider between the left content and the right tray (notifications + clock). */
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-tray-area {
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+}
+
+/* ---- Default: flat traffic lights + flat translucent Dock ---- */
+[data-skin="devdock"] .vibe-titlebar {
+  position: relative;
+  justify-content: center;
+}
+[data-skin="devdock"] .vibe-winbtns {
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-skin="devdock"] .vibe-title {
+  flex: 0 0 auto;
+  max-width: 62%;
+  text-align: center;
+}
+[data-skin="devdock"] .vibe-winbtn {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  color: transparent;
+  /* the subtle darker ring real macOS lights have */
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22);
+}
+/* draw a mac-accurate glyph instead of the lucide icon */
+[data-skin="devdock"] .vibe-winbtn svg {
+  display: none;
+}
+/* mac-accurate glyphs drawn as masks — perfectly centered + crisp, sized to
+   ~10px so they're clearly visible inside the 12px dot. Each light sets --g. */
+[data-skin="devdock"] .vibe-winbtn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.58);
+  -webkit-mask: var(--g) center / 10px 10px no-repeat;
+  mask: var(--g) center / 10px 10px no-repeat;
+  opacity: 0;
+  transition: opacity 0.1s ease-out;
+}
+/* hover ANY light → every glyph appears (real macOS behavior) */
+[data-skin="devdock"] .vibe-winbtns:hover .vibe-winbtn::after {
+  opacity: 1;
+}
+[data-skin="devdock"] .vibe-winbtn-close {
+  order: 1;
+  background: #ff5f57;
+}
+[data-skin="devdock"] .vibe-winbtn-close::after {
+  --g: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2010%2010'%20fill='none'%20stroke='%23000'%20stroke-width='1.4'%20stroke-linecap='round'%3E%3Cpath%20d='M2.5,2.5L7.5,7.5M7.5,2.5L2.5,7.5'/%3E%3C/svg%3E");
+}
+[data-skin="devdock"] .vibe-winbtn-min {
+  order: 2;
+  background: #febc2e;
+}
+[data-skin="devdock"] .vibe-winbtn-min::after {
+  --g: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2010%2010'%20fill='none'%20stroke='%23000'%20stroke-width='1.4'%20stroke-linecap='round'%3E%3Cpath%20d='M2.3,5H7.7'/%3E%3C/svg%3E");
+}
+[data-skin="devdock"] .vibe-winbtn-max {
+  order: 3;
+  background: #28c840;
+}
+[data-skin="devdock"] .vibe-winbtn-max::after {
+  --g: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2010%2010'%20fill='none'%20stroke='%23000'%20stroke-width='1.4'%20stroke-linecap='round'%3E%3Cpath%20d='M5,2.3V7.7M2.3,5H7.7'/%3E%3C/svg%3E");
+}
+[data-skin="devdock"] .vibe-winbtn-save {
+  order: 4;
+  background: #c9ccd1;
+}
+[data-skin="devdock"] .vibe-winbtn-save::after {
+  --g: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2010%2010'%20fill='none'%20stroke='%23000'%20stroke-width='1.4'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M5,2.4V7.2M3,5.3L5,7.6L7,5.3'/%3E%3C/svg%3E");
+}
+/* Unselected window → gray traffic lights (both macOS skins). */
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-window:not([data-focused]) .vibe-winbtn {
+  background: #c7c7c9;
+}
+[data-skin="devdock"] .vibe-taskbar {
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+  background: color-mix(in oklab, var(--card) 72%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.35);
+}
+
+/* ---------------------------------- Windows XP "Luna" --------------------- */
+[data-skin="xp"] .vibe-window {
+  /* No frame on the window itself — the title bar and content carry their own
+     borders (so the title stroke and the content stroke are independent). */
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 8px 26px -8px rgba(0, 0, 30, 0.5);
+}
+[data-skin="xp"] .vibe-window.win-glass {
+  background-color: var(--card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* Content frame: 1px #0058EB outer (the window edge along sides+bottom) + a
+   2px #0831D9 inner border. The inner border is an inset shadow on an ::after
+   overlay so it sits ABOVE the app content (a plain inset shadow on the body
+   gets painted over by the app's own background). */
+[data-skin="xp"] .vibe-window-body {
+  border: 1px solid #0058eb;
+}
+[data-skin="xp"] .vibe-window-body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px #0831d9;
+}
+[data-skin="xp"] .vibe-titlebar {
+  height: 30px;
+  padding: 0 4px 0 7px;
+  /* the window's outer edge along the top + sides (1px #0058EB) */
+  border: 1px solid #0058eb;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  /* solid base + ~5px top highlight (#3F97FF→clear) + bottom band (#004DE3→clear) */
+  background-color: #0055ea;
+  background-image:
+    linear-gradient(to bottom, #3f97ff, rgba(63, 151, 255, 0) 5px),
+    linear-gradient(to top, #004de3, rgba(0, 77, 227, 0) 7px);
+}
+[data-skin="xp"] .vibe-window:not([data-focused]) .vibe-titlebar {
+  background: linear-gradient(to bottom, #9bb6e8, #7f9fd8 50%, #88a6dd);
+  border-color: #92aadd;
+}
+/* Unfocused: the whole frame fades to a muted blue-grey, like real XP. */
+[data-skin="xp"] .vibe-window:not([data-focused]) .vibe-window-body {
+  border-color: #92aadd;
+}
+[data-skin="xp"] .vibe-window:not([data-focused]) .vibe-window-body::after {
+  box-shadow: inset 0 0 0 2px #b3c6ea;
+}
+[data-skin="xp"] .vibe-title {
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  text-shadow: 1px 1px 1px rgba(0, 0, 30, 0.45);
+}
+[data-skin="xp"] .vibe-winbtn {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  color: #fff;
+  background: linear-gradient(to bottom, #5b9bff, #1a5fd6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+[data-skin="xp"] .vibe-winbtn:hover {
+  background: linear-gradient(to bottom, #7fb3ff, #2a6fe0);
+  color: #fff;
+}
+[data-skin="xp"] .vibe-winbtn-close {
+  background: linear-gradient(to bottom, #f5856b, #d8401b);
+}
+[data-skin="xp"] .vibe-winbtn-close:hover {
+  background: linear-gradient(to bottom, #ff9d83, #e84e26);
+  color: #fff;
+}
+[data-skin="xp"] .vibe-taskbar {
+  /* tight padding; start flush-left, tray flush-right */
+  padding: 0;
+  gap: 3px;
+  /* top: a single #095BC9 stroke (no highlight, no outer shadow) */
+  border-top: 1px solid #095bc9;
+  box-shadow: none;
+  /* solid base + bottom band (#004DE3→clear) */
+  background-color: #255fdc;
+  background-image: linear-gradient(to top, #004de3, rgba(0, 77, 227, 0) 7px);
+}
+[data-skin="xp"] .vibe-startbtn {
+  height: 100%;
+  margin: 0 6px 0 0;
+  padding: 0 18px 3px 12px;
+  color: #fff;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 15px;
+  border-radius: 0 16px 16px 0;
+  background: linear-gradient(
+    to bottom,
+    #76c662 0%,
+    #54a83c 8%,
+    #45a032 46%,
+    #3a9a2a 58%,
+    #338f24 92%,
+    #4aa838 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset -2px 0 3px rgba(0, 70, 0, 0.3);
+  text-shadow: 1px 1px 1px rgba(0, 40, 0, 0.5);
+}
+[data-skin="xp"] .vibe-startbtn:hover {
+  background: linear-gradient(to bottom, #86d472 0%, #5cb242 8%, #4aa636 50%, #3f9e2e 92%, #54b242 100%);
+}
+[data-skin="xp"] .vibe-startbtn[data-open] {
+  box-shadow:
+    inset 1px 1px 4px rgba(0, 50, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+[data-skin="xp"] .vibe-taskitem {
+  height: 22px;
+  color: #fff;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, #3f7ce0, #245fd0);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+[data-skin="xp"] .vibe-taskitem[data-active] {
+  background: linear-gradient(to bottom, #1c4ba8, #2a64c8);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 30, 0.4);
+}
+[data-skin="xp"] .vibe-startmenu {
+  border: 2px solid #1559d4;
+  border-radius: 4px 4px 2px 2px;
+  background-color: #fff;
+}
+
+/* ---------------------------------- Mac OS X "Aqua" ----------------------- */
+[data-skin="aqua"] .vibe-window {
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 11px;
+  box-shadow:
+    0 18px 50px -12px rgba(0, 0, 0, 0.45),
+    0 0 0 0.5px rgba(0, 0, 0, 0.1);
+}
+[data-skin="aqua"] .vibe-window.win-glass {
+  background-color: color-mix(in oklab, var(--card) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+}
+[data-skin="aqua"] .vibe-titlebar {
+  height: 28px;
+  position: relative;
+  /* icon + name sit together, centered; lights are pinned left (absolute). */
+  justify-content: center;
+  border-bottom: 1px solid #9b9b9b;
+  background:
+    repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.03) 0 1px, transparent 1px 2px),
+    linear-gradient(to bottom, #fcfcfc, #d6d6d6);
+}
+[data-skin="aqua"] .vibe-window:not([data-focused]) .vibe-titlebar {
+  background: linear-gradient(to bottom, #f4f4f4, #e6e6e6);
+}
+[data-skin="aqua"] .vibe-title {
+  /* content-width (not flex-1) so it centers as a unit next to the icon */
+  flex: 0 0 auto;
+  max-width: 60%;
+  text-align: center;
+  color: #2b2b2b;
+  font-weight: 600;
+  font-size: 12px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+/* Traffic-light buttons pinned to the LEFT, out of flow so they don't push
+   the centered icon+name off-center. */
+[data-skin="aqua"] .vibe-winbtns {
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+[data-skin="aqua"] .vibe-winbtn {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 0.5px solid rgba(0, 0, 0, 0.25);
+  color: transparent;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5);
+}
+[data-skin="aqua"] .vibe-winbtn svg {
+  width: 8px;
+  height: 8px;
+}
+[data-skin="aqua"] .vibe-winbtns:hover .vibe-winbtn {
+  color: rgba(0, 0, 0, 0.55);
+}
+[data-skin="aqua"] .vibe-winbtn-close {
+  background: radial-gradient(circle at 50% 35%, #ff8a82, #ff5f57);
+}
+[data-skin="aqua"] .vibe-winbtn-min {
+  background: radial-gradient(circle at 50% 35%, #ffd56b, #febc2e);
+}
+[data-skin="aqua"] .vibe-winbtn-max {
+  background: radial-gradient(circle at 50% 35%, #6fe06f, #28c840);
+}
+[data-skin="aqua"] .vibe-winbtn-save {
+  background: radial-gradient(circle at 50% 35%, #d8d8d8, #b0b0b0);
+}
+/* Aqua Dock — glossy translucent (geometry comes from the shared :is() block). */
+[data-skin="aqua"] .vibe-taskbar {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklab, #ffffff 72%, transparent),
+    color-mix(in oklab, #d8e2ee 62%, transparent)
+  );
+  backdrop-filter: blur(16px) saturate(170%);
+  -webkit-backdrop-filter: blur(16px) saturate(170%);
+  box-shadow:
+    0 8px 22px -10px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+[data-skin="aqua"] .vibe-startbtn {
+  border-radius: 12px;
+  background: linear-gradient(to bottom, #ffffff, #e3e3e3);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: inset 0 1px 0 #fff;
+}
+[data-skin="aqua"] .vibe-taskitem[data-active] {
+  background: linear-gradient(to bottom, #8fd0ff, #3a9bff);
+  color: #fff;
+}
+[data-skin="aqua"] .vibe-startmenu {
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 18px 50px -12px rgba(0, 0, 0, 0.45);
+}
+/* Traffic-light ORDER: close · minimize · zoom, left → right (DOM order differs). */
+[data-skin="aqua"] .vibe-winbtn-close {
+  order: 1;
+}
+[data-skin="aqua"] .vibe-winbtn-min {
+  order: 2;
+}
+[data-skin="aqua"] .vibe-winbtn-max {
+  order: 3;
+}
+[data-skin="aqua"] .vibe-winbtn-save {
+  order: 4;
+}
+
+/* ---------------- Skin form controls inside AI app content -----------------
+   AI apps style controls with inline styles, so these use !important to force
+   the skin's material onto raw <button>/<input>/<select>/<textarea>. Scoped to
+   .ai-surface so OS chrome and native apps are untouched. */
+
+/* Windows XP — beveled buttons, sunken white inputs, Tahoma. */
+[data-skin="xp"] .ai-surface button {
+  font-family: Tahoma, "Segoe UI", sans-serif !important;
+  min-height: 23px !important;
+  padding: 2px 12px !important;
+  color: #000 !important;
+  border: 1px solid #003c74 !important;
+  border-radius: 3px !important;
+  background: linear-gradient(to bottom, #fdfefe 0%, #eceadb 47%, #d6d0bf 92%, #e4e0d3 100%) !important;
+  box-shadow: inset 0 0 0 1px #fff !important;
+}
+[data-skin="xp"] .ai-surface button:hover {
+  border-color: #0a246a !important;
+  background: linear-gradient(to bottom, #fff 0%, #f4f2e7 47%, #e0dac9 92%, #efece0 100%) !important;
+}
+[data-skin="xp"] .ai-surface button:active {
+  background: linear-gradient(to bottom, #cdc7b6, #e0dccf) !important;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+[data-skin="xp"] .ai-surface input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-skin="xp"] .ai-surface textarea,
+[data-skin="xp"] .ai-surface select {
+  font-family: Tahoma, "Segoe UI", sans-serif !important;
+  color: #000 !important;
+  border: 1px solid #7f9db9 !important;
+  border-radius: 0 !important;
+  background: #fff !important;
+  padding: 3px 5px !important;
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.14) !important;
+}
+
+/* Mac Aqua — glossy pill buttons, rounded inputs with blue focus glow. */
+[data-skin="aqua"] .ai-surface button {
+  min-height: 22px !important;
+  padding: 2px 15px !important;
+  color: #1a1a1a !important;
+  border: 1px solid rgba(0, 0, 0, 0.28) !important;
+  border-radius: 13px !important;
+  background: linear-gradient(to bottom, #ffffff 0%, #fbfbfb 49%, #e7e7e7 51%, #f4f4f4 100%) !important;
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0, 0, 0, 0.12) !important;
+}
+[data-skin="aqua"] .ai-surface button:active {
+  background: linear-gradient(to bottom, #cfe8ff, #8ec3ff) !important;
+  color: #06306b !important;
+}
+[data-skin="aqua"] .ai-surface input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+[data-skin="aqua"] .ai-surface textarea,
+[data-skin="aqua"] .ai-surface select {
+  border: 1px solid #b6b6b6 !important;
+  border-radius: 8px !important;
+  background: #fff !important;
+  padding: 4px 9px !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+}
+[data-skin="aqua"] .ai-surface input:focus,
+[data-skin="aqua"] .ai-surface textarea:focus,
+[data-skin="aqua"] .ai-surface select:focus {
+  outline: none !important;
+  border-color: #5b9dff !important;
+  box-shadow: 0 0 0 3px rgba(91, 157, 255, 0.4) !important;
+}
+
+/* ---------------- Skinned native chrome widgets + notifications ----------- */
+
+/* XP — taskbar widgets readable on the blue bar; notifications as XP balloons. */
+[data-skin="xp"] .vibe-tray {
+  width: 24px;
+  height: 24px;
+  color: #fff;
+  border-radius: 3px;
+}
+[data-skin="xp"] .vibe-tray:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+}
+[data-skin="xp"] .vibe-clock span {
+  color: #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 30, 0.4);
+}
+/* System tray: lighter recessed area with a 3D groove on its left edge
+   (1px #00449F shadow + 1px #1CCBF4 highlight), flush to the corner. */
+[data-skin="xp"] .vibe-tray-area {
+  margin: 0 0 0 4px;
+  padding: 0 6px;
+  background-color: #1196ea;
+  border-left: 1px solid #00449f;
+  box-shadow: inset 1px 0 0 #1ccbf4;
+}
+[data-skin="xp"] .vibe-notif {
+  border: 1px solid #8a8868;
+  border-radius: 4px;
+  background-color: #fffdea;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 1px 2px 7px rgba(0, 0, 0, 0.3);
+}
+
+/* Aqua — rounded glossy notification panels. */
+[data-skin="aqua"] .vibe-notif {
+  border-radius: 13px;
+  box-shadow: 0 14px 42px -10px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------------- Native system-app controls (Settings / Store) ----------- */
+
+/* Windows XP. */
+[data-skin="xp"] .vibe-group {
+  border: 1px solid #919b9c;
+  border-radius: 0;
+}
+[data-skin="xp"] .vibe-btn,
+[data-skin="xp"] .vibe-combo {
+  font-family: Tahoma, "Segoe UI", sans-serif;
+  color: #000;
+  border: 1px solid #003c74;
+  border-radius: 3px;
+  background: linear-gradient(to bottom, #fdfefe 0%, #eceadb 47%, #d6d0bf 92%, #e4e0d3 100%);
+  box-shadow: inset 0 0 0 1px #fff;
+}
+[data-skin="xp"] .vibe-btn:hover,
+[data-skin="xp"] .vibe-combo:hover {
+  border-color: #0a246a;
+  background: linear-gradient(to bottom, #fff 0%, #f4f2e7 47%, #e0dac9 92%, #efece0 100%);
+}
+[data-skin="xp"] .vibe-select {
+  font-family: Tahoma, "Segoe UI", sans-serif;
+  border: 1px solid #7f9db9;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.14);
+}
+[data-skin="xp"] .vibe-segmented {
+  border-radius: 0;
+  padding: 1px;
+  background: #ece9d8;
+  box-shadow: inset 0 0 0 1px #919b9c;
+}
+[data-skin="xp"] .vibe-seg-btn {
+  border-radius: 0;
+  color: #000;
+  box-shadow: none;
+}
+[data-skin="xp"] .vibe-seg-btn[data-active] {
+  color: #fff;
+  background: linear-gradient(to bottom, #2f6fdc, #1c54c4);
+}
+/* switch → XP checkbox */
+[data-skin="xp"] .vibe-switch {
+  width: 13px;
+  height: 13px;
+  border-radius: 0;
+  border: 1px solid #7f9db9;
+  background: #fff;
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.15);
+}
+[data-skin="xp"] .vibe-switch-knob {
+  display: none;
+}
+[data-skin="xp"] .vibe-switch[aria-checked="true"]::after {
+  content: "✔";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1559d4;
+}
+
+/* Mac Aqua. */
+[data-skin="aqua"] .vibe-group {
+  border-radius: 12px;
+}
+[data-skin="aqua"] .vibe-btn,
+[data-skin="aqua"] .vibe-combo {
+  border-radius: 13px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  color: #1a1a1a;
+  background: linear-gradient(to bottom, #ffffff 0%, #fbfbfb 49%, #e7e7e7 51%, #f4f4f4 100%);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+[data-skin="aqua"] .vibe-select {
+  border-radius: 8px;
+}
+[data-skin="aqua"] .vibe-segmented {
+  border-radius: 9999px;
+}
+[data-skin="aqua"] .vibe-seg-btn {
+  border-radius: 9999px;
+}
+[data-skin="aqua"] .vibe-seg-btn[data-active] {
+  color: #fff;
+  background: linear-gradient(to bottom, #8fd0ff, #3a9bff);
+}
+[data-skin="aqua"] .vibe-switch[aria-checked="true"] {
+  background: linear-gradient(to bottom, #6db6ff, #2f8bff);
+}
+
+/* ============================================================================
+   CONTEXT MENU — OS right-click menus. Base reads the design tokens (adapts to
+   light/dark); skins restyle it. Portaled to <body>, so a high z-index keeps it
+   above windows, taskbar and popovers.
+   ============================================================================ */
+.vibe-menu {
+  position: fixed;
+  z-index: 99999;
+  min-width: 184px;
+  max-width: 300px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.9);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow:
+    0 12px 32px -10px rgba(0, 0, 0, 0.45),
+    0 0 0 0.5px rgba(0, 0, 0, 0.05);
+  font-size: 13px;
+  user-select: none;
+  animation: vibe-menu-in 0.09s ease-out;
+}
+@keyframes vibe-menu-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vibe-menu {
+    animation: none;
+  }
+}
+.vibe-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px 6px 6px;
+  border-radius: calc(var(--radius) * 0.6);
+  text-align: left;
+  color: inherit;
+  cursor: default;
+  line-height: 1.2;
+}
+.vibe-menu-item:hover,
+.vibe-menu-item[data-active="true"] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.vibe-menu-item[data-disabled="true"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.vibe-menu-item[data-danger="true"]:hover,
+.vibe-menu-item[data-danger="true"][data-active="true"] {
+  background: var(--destructive);
+  color: #fff;
+}
+.vibe-menu-icon {
+  display: flex;
+  width: 16px;
+  flex: none;
+  justify-content: center;
+  opacity: 0.85;
+}
+.vibe-menu-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vibe-menu-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 14px;
+  opacity: 0.6;
+  font-size: 11px;
+}
+.vibe-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border);
+}
+
+/* XP — classic flat white menu with a blue highlight bar, Tahoma. */
+[data-skin="xp"] .vibe-menu {
+  border: 1px solid #8a9099;
+  border-radius: 0;
+  padding: 2px;
+  background: #fff;
+  box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.35);
+  font-family: Tahoma, "Segoe UI", sans-serif;
+}
+[data-skin="xp"] .vibe-menu-item {
+  border-radius: 0;
+  padding: 4px 10px 4px 6px;
+}
+[data-skin="xp"] .vibe-menu-item:hover,
+[data-skin="xp"] .vibe-menu-item[data-active="true"] {
+  background: #1660d4;
+  color: #fff;
+}
+[data-skin="xp"] .vibe-menu-item[data-danger="true"]:hover,
+[data-skin="xp"] .vibe-menu-item[data-danger="true"][data-active="true"] {
+  background: #c1272d;
+}
+[data-skin="xp"] .vibe-menu-sep {
+  background: #c3c7cd;
+  margin: 3px 6px 3px 26px;
+}
+
+/* Aqua — translucent rounded glass with a glossy blue highlight. */
+[data-skin="aqua"] .vibe-menu {
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 6px;
+  padding: 4px;
+  background: color-mix(in oklab, #ffffff 86%, transparent);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  box-shadow:
+    0 16px 44px -12px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+[data-skin="aqua"] .vibe-menu-item {
+  border-radius: 5px;
+  padding: 5px 10px 5px 8px;
+}
+[data-skin="aqua"] .vibe-menu-item:hover,
+[data-skin="aqua"] .vibe-menu-item[data-active="true"] {
+  background: linear-gradient(to bottom, #5ca1ff, #2f7cf6);
+  color: #fff;
+}
+[data-skin="aqua"] .vibe-menu-item[data-danger="true"]:hover,
+[data-skin="aqua"] .vibe-menu-item[data-danger="true"][data-active="true"] {
+  background: linear-gradient(to bottom, #ff6b64, #e23b34);
+}

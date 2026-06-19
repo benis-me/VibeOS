@@ -1,0 +1,19 @@
+{
+  "name": "@vibeos/backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VibeOS backend — Bun HTTP/WebSocket server: kernel, AI provider seam, agent scheduler, SQLite.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "^2.0.51",
+    "@vibeos/shared": "workspace:*",
+    "ai": "^6.0.208",
+    "zod": "^4.0.0"
+  }
+}

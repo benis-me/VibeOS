@@ -1,0 +1,7 @@
+[install]
+# Use the public npm registry.
+registry = "https://registry.npmjs.org"
+
+[run]
+# Don't print the command being run.
+silent = false

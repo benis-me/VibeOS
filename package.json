@@ -1,0 +1,35 @@
+{
+  "name": "vibeos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VibeOS — an AI-hallucination-driven operating system in the browser, where every window's UI is generated live by AI.",
+  "license": "MIT",
+  "author": "the VibeOS authors",
+  "keywords": [
+    "ai",
+    "operating-system",
+    "llm",
+    "generative-ui",
+    "react",
+    "bun",
+    "vibe-coding"
+  ],
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "bun run scripts/dev.ts",
+    "dev:backend": "bun run --cwd apps/backend dev",
+    "dev:frontend": "bun run --cwd apps/frontend dev",
+    "build": "bun run --cwd apps/frontend build",
+    "start": "bun run --cwd apps/backend start",
+    "typecheck": "bun run --cwd packages/shared typecheck && bun run --cwd apps/backend typecheck && bun run --cwd apps/frontend typecheck",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^5.7.0"
+  }
+}
