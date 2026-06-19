@@ -47,6 +47,13 @@ const THINKING_MODES: ThinkingMode[] = ["disabled", "adaptive", "enabled"];
 const ROLES: AgentRole[] = ["ui-generation", "system-event", "maintenance"];
 const CAPS: ModelCapability[] = ["text", "vision", "image", "reasoning", "tools"];
 
+/** Merge model lists (seed + discovered + custom); later entries win by id. */
+function mergeModels(...lists: (ProviderModel[] | undefined)[]): ProviderModel[] {
+  const map = new Map<string, ProviderModel>();
+  for (const list of lists) for (const m of list ?? []) map.set(m.id, m);
+  return [...map.values()];
+}
+
 /**
  * Settings is the one app rendered natively (not AI-hallucinated): it controls
  * real system state. Laid out like macOS System Settings — a category sidebar
@@ -256,6 +263,7 @@ function ProvidersPane() {
   const t = useT();
   const settings = useSettingsStore((s) => s.settings)!;
   const available = useConnectionStore((s) => s.availableProviders);
+  const providerModels = useConnectionStore((s) => s.providerModels);
   const cliProviders = AI_PROVIDERS.filter((p) => p.kind === "cli");
   const apiProviders = AI_PROVIDERS.filter((p) => p.kind === "api");
   const [selected, setSelected] = useState<ProviderId>(apiProviders[0]?.id ?? "openai");
@@ -265,7 +273,10 @@ function ProvidersPane() {
 
   const cat = AI_PROVIDERS.find((p) => p.id === selected);
   const cfg = settings.apiProviders[selected] ?? {};
-  const models = cfg.models ?? cat?.seedModels ?? [];
+  const custom = cfg.models ?? []; // user-added; only these are editable/removable
+  // Displayed list = catalog seed + live-discovered + user custom (deduped).
+  const models = mergeModels(cat?.seedModels, providerModels[selected], custom);
+  const isCustom = (id: string) => custom.some((m) => m.id === id);
 
   // Clear the fetching spinner once models arrive (or after a timeout).
   useEffect(() => {
@@ -292,13 +303,13 @@ function ProvidersPane() {
     if (!id) return;
     const entry: ProviderModel = { id, name: draft.name.trim() || id, capabilities: draft.caps };
     const key = draft.original ?? id;
-    const next = models.some((m) => m.id === key)
-      ? models.map((m) => (m.id === key ? entry : m))
-      : [...models, entry];
+    const next = custom.some((m) => m.id === key)
+      ? custom.map((m) => (m.id === key ? entry : m))
+      : [...custom, entry];
     patch(selected, { models: next });
     setDraft(null);
   };
-  const removeModel = (id: string) => patch(selected, { models: models.filter((m) => m.id !== id) });
+  const removeModel = (id: string) => patch(selected, { models: custom.filter((m) => m.id !== id) });
 
   const ProviderButton = ({ id, label }: { id: ProviderId; label: string }) => {
     const isCli = AI_PROVIDERS.find((p) => p.id === id)?.kind === "cli";
@@ -416,22 +427,24 @@ function ProvidersPane() {
                         <div className="truncate text-[11px] text-muted-foreground">{m.id}</div>
                       </div>
                       <Caps caps={m.capabilities} t={t} />
-                      <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover/m:opacity-100">
-                        <button
-                          onClick={() => startEdit(m)}
-                          title={t("settings.providers.edit")}
-                          className="text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                          <Pencil className="size-3.5" />
-                        </button>
-                        <button
-                          onClick={() => removeModel(m.id)}
-                          title={t("settings.providers.remove")}
-                          className="text-muted-foreground transition-colors hover:text-destructive"
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      </div>
+                      {isCustom(m.id) && (
+                        <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover/m:opacity-100">
+                          <button
+                            onClick={() => startEdit(m)}
+                            title={t("settings.providers.edit")}
+                            className="text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                          <button
+                            onClick={() => removeModel(m.id)}
+                            title={t("settings.providers.remove")}
+                            className="text-muted-foreground transition-colors hover:text-destructive"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </Group>
@@ -516,40 +529,30 @@ function ProvidersPane() {
 function DefaultModelsPane() {
   const t = useT();
   const settings = useSettingsStore((s) => s.settings)!;
-  const discovered = useConnectionStore((s) => s.models);
   const available = useConnectionStore((s) => s.availableProviders);
+  const providerModels = useConnectionStore((s) => s.providerModels);
 
-  // A provider contributes models when it's enabled: CLIs need their binary
-  // (only the active one can enumerate models); API providers just need to be
-  // toggled on (default on) — NOT gated on a key, so the picker shows every
-  // enabled provider's models, not only the active/keyed one.
-  const enabled = (p: (typeof AI_PROVIDERS)[number]) =>
-    p.kind === "cli"
-      ? available.includes(p.id) || p.id === settings.provider
-      : settings.apiProviders[p.id]?.enabled !== false;
+  // A provider is shown only when actually set up — so unconfigured providers
+  // don't clutter the picker: CLIs need their binary installed; API providers
+  // need a key (UI or env-detected) and not be explicitly disabled.
+  const isEnabled = (p: (typeof AI_PROVIDERS)[number]) => {
+    if (settings.apiProviders[p.id]?.enabled === false) return false;
+    if (p.kind === "cli") return available.includes(p.id);
+    return available.includes(p.id) || !!settings.apiProviders[p.id]?.apiKey;
+  };
   const providerLabel = (id?: string) => AI_PROVIDERS.find((p) => p.id === id)?.label ?? id ?? "";
 
-  // Every model across all enabled providers, grouped by provider, for ONE picker.
-  // The option value encodes provider+model so a pick implies its provider.
+  // Every model across all enabled providers (seed + discovered + custom),
+  // grouped by provider. The option value encodes provider+model.
   const buildOptions = (imageOnly: boolean): ComboOption[] => {
     const out: ComboOption[] = [];
     for (const p of AI_PROVIDERS) {
       if (imageOnly ? !p.imageCapable : p.textCapable === false) continue;
-      if (!enabled(p)) continue;
-      let models: { id: string; name: string; image?: boolean }[] = [];
-      if (imageOnly || p.kind === "api") {
-        // Image models (and all API text models) are curated: catalog seed +
-        // user-fetched/custom. CLIs like CodeBuddy expose their ImageGen here too.
-        models = (settings.apiProviders[p.id]?.models ?? p.seedModels ?? []).map((m) => ({
-          id: m.id,
-          name: m.name,
-          image: m.capabilities?.includes("image"),
-        }));
-      } else if (p.id === settings.provider) {
-        models = discovered.map((m) => ({ id: m.modelId, name: m.name }));
-      }
-      for (const m of models) {
-        if (imageOnly ? !m.image : m.image) continue;
+      if (!isEnabled(p)) continue;
+      const merged = mergeModels(p.seedModels, providerModels[p.id], settings.apiProviders[p.id]?.models);
+      for (const m of merged) {
+        const isImg = m.capabilities?.includes("image");
+        if (imageOnly ? !isImg : isImg) continue;
         out.push({ value: `${p.id}::${m.id}`, label: m.name, sub: m.id, group: p.label });
       }
     }

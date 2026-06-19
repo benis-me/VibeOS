@@ -152,7 +152,7 @@ export function useBoot(): void {
     );
     offs.push(
       wsClient.on("s2c.provider.models", (p) =>
-        useSettingsStore.getState().setProviderModels(p.providerId, p.models),
+        useConnectionStore.getState().setProviderModels(p.providerId, p.models),
       ),
     );
     offs.push(

@@ -1,12 +1,10 @@
 import { create } from "zustand";
-import type { Settings, Theme, Locale, Skin, ProviderId, ProviderModel } from "@vibeos/shared";
+import type { Settings, Theme, Locale, Skin } from "@vibeos/shared";
 import { DEFAULT_SKIN } from "@vibeos/shared";
 
 interface SettingsStoreState {
   settings: Settings | null;
   set: (settings: Settings) => void;
-  /** Patch one API provider's model list (after a live "Fetch models"). */
-  setProviderModels: (providerId: ProviderId, models: ProviderModel[]) => void;
 }
 
 export const useSettingsStore = create<SettingsStoreState>((set) => ({
@@ -17,13 +15,6 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
     if (settings.locale) applyLocale(settings.locale);
     set({ settings });
   },
-  setProviderModels: (providerId, models) =>
-    set((s) => {
-      if (!s.settings) return s;
-      const apiProviders = { ...s.settings.apiProviders };
-      apiProviders[providerId] = { ...apiProviders[providerId], models };
-      return { settings: { ...s.settings, apiProviders } };
-    }),
 }));
 
 export function applyTheme(theme: Theme): void {

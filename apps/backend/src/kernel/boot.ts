@@ -8,6 +8,7 @@ import { startHttpServer } from "../server/httpServer.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { ModelPolicy } from "../ai/ModelPolicy.ts";
 import { setActiveProvider, activeProviderId, availableProviderIds } from "../ai/providers/index.ts";
+import { discoverAllProviders } from "../ai/modelDiscovery.ts";
 import { DEFAULT_PROVIDER } from "@vibeos/shared/domain";
 import { env } from "../config/env.ts";
 
@@ -58,6 +59,9 @@ export async function boot() {
       .catch((e) =>
         console.warn("[models] discovery error:", e instanceof Error ? e.message : e),
       );
+    // Also discover every provider's models (all CLIs + configured APIs) so the
+    // Default Models picker can list them, not just the active provider's.
+    discoverAllProviders();
   } else {
     console.log("[boot] AI stub mode — skipping model discovery");
   }

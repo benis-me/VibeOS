@@ -4,7 +4,8 @@ import type {
   ClientToServer,
   WsEnvelope,
 } from "@vibeos/shared/protocol";
-import type { AppManifest, ModelCapability } from "@vibeos/shared/domain";
+import type { AppManifest } from "@vibeos/shared/domain";
+import { inferCapabilities, discoverAllProviders } from "../ai/modelDiscovery.ts";
 import { sendTo, broadcast, type WsData } from "./wsGateway.ts";
 import { bus } from "../events/bus.ts";
 import { kernelState } from "../kernel/kernelState.ts";
@@ -202,24 +203,27 @@ async function dispatch(
         void ModelPolicy.discover(loadSettings().modelOverrides)
           .then(() => broadcast("s2c.models.updated", { models: ModelPolicy.available() }))
           .catch((e) => log.warn(`scan discovery failed: ${e instanceof Error ? e.message : e}`));
+        // Re-discover every provider's models for the picker.
+        discoverAllProviders();
       }
       return;
     }
 
     case "c2s.provider.fetchModels": {
-      // Refresh one API provider's model list from its models endpoint, persist
-      // it, and broadcast so every Providers page updates.
+      // Refresh one provider's model list and broadcast it. Discovered lists are
+      // ephemeral (not persisted) so they never overwrite user-added models.
       const { providerId } = msg.payload;
       try {
         const provider = await getProvider(providerId);
         const discovered = await provider.discoverModels();
-        const models = discovered.map((m) => ({
-          id: m.modelId,
-          name: m.name,
-          capabilities: inferCapabilities(m.modelId),
-        }));
-        if (models.length) await updateSettings({ apiProviders: { [providerId]: { models } } });
-        broadcast("s2c.provider.models", { providerId, models });
+        broadcast("s2c.provider.models", {
+          providerId,
+          models: discovered.map((m) => ({
+            id: m.modelId,
+            name: m.name,
+            capabilities: inferCapabilities(m.modelId),
+          })),
+        });
       } catch (e) {
         log.warn(`fetchModels(${providerId}) failed: ${e instanceof Error ? e.message : e}`);
         broadcast("s2c.provider.models", { providerId, models: [] });
@@ -386,15 +390,6 @@ async function dispatch(
       return;
     }
   }
-}
-
-/** Best-effort capability tags for a freshly-discovered model id. */
-function inferCapabilities(id: string): ModelCapability[] {
-  const s = id.toLowerCase();
-  if (/image|imagen|flux|dall|nano-banana|ideogram|recraft|seedream|qwen-image/.test(s)) {
-    return ["image"];
-  }
-  return ["text", "vision"];
 }
 
 /** Open the app's window if not already open; returns the window id (or null). */
