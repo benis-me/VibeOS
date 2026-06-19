@@ -7,6 +7,14 @@ import { logger } from "../util/log.ts";
 
 const log = logger("imagegen");
 
+/**
+ * Cheap LLM that drives CodeBuddy's ImageGen tool (NOT the image model itself).
+ * It only has to call one tool, so a low-cost, tool-reliable model is ideal.
+ * Override with VIBEOS_CODEBUDDY_IMAGE_AGENT_MODEL.
+ */
+const CODEBUDDY_IMAGE_AGENT_MODEL =
+  process.env.VIBEOS_CODEBUDDY_IMAGE_AGENT_MODEL || "claude-haiku-4.5";
+
 export interface GeneratedImage {
   bytes: Uint8Array;
   mime: string;
@@ -137,7 +145,9 @@ async function codebuddyImage(model: string, prompt: string, aspect: string): Pr
   await mkdir(dir, { recursive: true });
   const size = openaiSize(aspect); // ImageGen accepts 1024x1024 / 1024x1536 / 1536x1024
   log.debug(`codebuddy ImageGen → ${dir} (${size})`);
-  const args = ["-p", "-y", "--output-format", "stream-json"];
+  // The actual pixels come from --text-to-image-model; the agent that drives the
+  // ImageGen tool only needs to be cheap, so pin it to a low-cost LLM.
+  const args = ["-p", "-y", "--model", CODEBUDDY_IMAGE_AGENT_MODEL, "--output-format", "stream-json"];
   if (model && model !== "default") args.push("--text-to-image-model", model);
   args.push(
     `Use the ImageGen tool (load it via ToolSearch, then call it through DeferExecuteTool) to generate ONE image and save it. ` +

@@ -468,4 +468,7 @@ function sendBootState(ws: ServerWebSocket<WsData>): void {
     agentRuns: recentRuns(),
   });
   sendTo(ws, "s2c.boot.ready", {});
+  // Now the client is connected and listening: discover every provider's models
+  // (all installed CLIs + configured APIs) and broadcast them for the picker.
+  if (!env.aiStub) discoverAllProviders();
 }
