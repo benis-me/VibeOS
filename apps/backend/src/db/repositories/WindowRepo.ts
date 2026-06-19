@@ -16,6 +16,7 @@ interface WindowRow {
   state: string;
   is_open: number;
   focused: number;
+  sort_order: number;
   opened_at: number;
   updated_at: number;
 }
@@ -31,6 +32,7 @@ function toWindow(row: WindowRow): WindowState {
     state: row.state as WindowDisplayState,
     isOpen: row.is_open === 1,
     focused: row.focused === 1,
+    order: row.sort_order,
     openedAt: row.opened_at,
     updatedAt: row.updated_at,
   };
@@ -39,7 +41,7 @@ function toWindow(row: WindowRow): WindowState {
 export function listOpenWindows(): WindowState[] {
   const db = getDb();
   return db
-    .query<WindowRow, []>("SELECT * FROM windows WHERE is_open = 1 ORDER BY z")
+    .query<WindowRow, []>("SELECT * FROM windows WHERE is_open = 1 ORDER BY sort_order, z")
     .all()
     .map(toWindow);
 }
@@ -68,6 +70,25 @@ function nextZ(): number {
   return (row?.maxz ?? 0) + 1;
 }
 
+function nextOrder(): number {
+  const db = getDb();
+  const row = db
+    .query<{ m: number | null }, []>("SELECT MAX(sort_order) as m FROM windows WHERE is_open = 1")
+    .get();
+  return (row?.m ?? 0) + 1;
+}
+
+/** Persist a new Dock order (the window ids in left→right order). */
+export function reorderWindows(ids: string[]): Promise<void> {
+  return enqueue(() => {
+    const db = getDb();
+    const now = Date.now();
+    ids.forEach((id, i) => {
+      db.query("UPDATE windows SET sort_order = ?, updated_at = ? WHERE id = ?").run(i, now, id);
+    });
+  });
+}
+
 export function openWindow(input: {
   appId: string;
   title: string;
@@ -81,6 +102,7 @@ export function openWindow(input: {
     const now = Date.now();
     const id = ulid(now);
     const z = nextZ();
+    const order = nextOrder();
     const w = input.size?.w ?? 760;
     const h = input.size?.h ?? 520;
     const r =
@@ -94,9 +116,9 @@ export function openWindow(input: {
       };
     db.query("UPDATE windows SET focused = 0 WHERE is_open = 1").run();
     db.query(
-      `INSERT INTO windows (id, app_id, title, kind, x, y, w, h, z, state, is_open, focused, opened_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 1, 1, ?, ?)`,
-    ).run(id, input.appId, input.title, input.kind ?? "app", r.x, r.y, r.w, r.h, z, now, now);
+      `INSERT INTO windows (id, app_id, title, kind, x, y, w, h, z, sort_order, state, is_open, focused, opened_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 1, 1, ?, ?)`,
+    ).run(id, input.appId, input.title, input.kind ?? "app", r.x, r.y, r.w, r.h, z, order, now, now);
     return getWindow(id)!;
   });
 }

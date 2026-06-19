@@ -15,6 +15,20 @@ const log = logger("sdk");
 
 export type { RunResult };
 
+/** Live runs by id → their abort controller, so the UI can stop one. */
+const runRegistry = new Map<string, AbortController>();
+/** Runs the user explicitly stopped (recorded as "aborted", not "error"). */
+const stoppedRuns = new Set<string>();
+
+/** Abort an in-flight run by id (Activity Monitor "Stop"). */
+export function stopRun(runId: string): boolean {
+  const c = runRegistry.get(runId);
+  if (!c) return false;
+  stoppedRuns.add(runId);
+  c.abort();
+  return true;
+}
+
 export interface RunOptions {
   role: AgentRole;
   trigger: AgentTrigger;
@@ -64,7 +78,10 @@ export async function run(opts: RunOptions): Promise<RunResult> {
             estimateCostUsd(cfg.model, result.usage.inputTokens, result.usage.outputTokens),
         }
       : undefined;
-    const finished = await AgentRepo.endRun(run.id, result.ok ? "ok" : "error", result.error, usage);
+    runRegistry.delete(run.id);
+    const status = stoppedRuns.has(run.id) ? "aborted" : result.ok ? "ok" : "error";
+    stoppedRuns.delete(run.id);
+    const finished = await AgentRepo.endRun(run.id, status, result.error, usage);
     if (finished) broadcast("s2c.agent.run", { run: finished });
     return { ...result, runId: run.id };
   };
@@ -81,7 +98,11 @@ export async function run(opts: RunOptions): Promise<RunResult> {
   const locale = loadSettings().locale ?? DEFAULT_LOCALE;
   const systemPrompt =
     (opts.systemPromptOverride ?? systemPromptFor(opts.role)) + localeDirective(locale);
-  const preempt = opts.abort?.signal;
+  // Track the run so the Activity Monitor can stop it. Reuse the caller's abort
+  // controller when given (window close already aborts via it), else make one.
+  const controller = opts.abort ?? new AbortController();
+  const preempt = controller.signal;
+  runRegistry.set(run.id, controller);
 
   // One provider attempt with its own hang-guard timeout, linked to the caller's
   // preemption signal. The timer re-arms on each streamed delta, so it fires only

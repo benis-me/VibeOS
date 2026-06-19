@@ -21,6 +21,7 @@ import {
   focusWindow,
   setWindowState,
   moveWindow,
+  reorderWindows,
   findOpenWindowByApp,
   getWindow,
 } from "../db/repositories/WindowRepo.ts";
@@ -37,6 +38,7 @@ import {
 import { renderInitialWindow } from "../kernel/windowInit.ts";
 import { listRecent, markRead, get as getNotification } from "../db/repositories/NotificationRepo.ts";
 import { recentRuns } from "../db/repositories/AgentRepo.ts";
+import { stopRun } from "../ai/SdkManager.ts";
 import { logger } from "../util/log.ts";
 
 const log = logger("router");
@@ -118,6 +120,12 @@ async function dispatch(
       const { windowId, x, y, w, h } = msg.payload;
       const win = await moveWindow(windowId, { x, y, w, h });
       if (win) broadcast("s2c.window.moved", { window: win });
+      return;
+    }
+
+    case "c2s.window.reorder": {
+      await reorderWindows(msg.payload.ids);
+      broadcast("s2c.window.reordered", { ids: msg.payload.ids });
       return;
     }
 
@@ -341,6 +349,11 @@ async function dispatch(
       const rows = recentRuns(limit + 1, msg.payload.before);
       const hasMore = rows.length > limit;
       sendTo(ws, "s2c.activity.page", { runs: rows.slice(0, limit), hasMore });
+      return;
+    }
+
+    case "c2s.activity.stop": {
+      stopRun(msg.payload.runId);
       return;
     }
   }

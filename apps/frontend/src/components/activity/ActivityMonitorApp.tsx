@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { Activity, Loader2 } from "lucide-react";
+import { Activity, Loader2, Square } from "lucide-react";
 import type { AgentRun } from "@vibeos/shared";
 import { useActivityStore } from "@/stores/activityStore";
+import { wsClient } from "@/lib/ws";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +16,7 @@ const DOT: Record<string, string> = {
 };
 
 const COLS =
-  "grid grid-cols-[minmax(110px,1.2fr)_minmax(140px,1.9fr)_minmax(84px,0.9fr)_70px_52px_60px_66px] gap-3";
+  "grid grid-cols-[minmax(104px,1.2fr)_minmax(130px,1.8fr)_minmax(80px,0.9fr)_66px_50px_58px_62px_60px] gap-3";
 
 const tok = (r: AgentRun) => (r.inputTokens ?? 0) + (r.outputTokens ?? 0);
 
@@ -170,6 +171,7 @@ export function ActivityMonitorApp() {
         <span className="text-right">{t("activity.col.time")}</span>
         <span className="text-right">{t("activity.col.tokens")}</span>
         <span className="text-right">{t("activity.col.cost")}</span>
+        <span className="text-right">{t("activity.col.action")}</span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto" onScroll={onScroll}>
@@ -209,6 +211,19 @@ function RunRow({ r, t }: { r: AgentRun; t: T }) {
       <div className="text-right tabular-nums text-muted-foreground">{dur}</div>
       <div className="text-right tabular-nums text-muted-foreground">{total ? fmtTokens(total) : "—"}</div>
       <div className="text-right tabular-nums text-muted-foreground">{fmtCost(r.costUsd ?? 0)}</div>
+      <div className="flex justify-end">
+        {r.status === "running" ? (
+          <button
+            onClick={() => wsClient.send("c2s.activity.stop", { runId: r.id })}
+            title={t("activity.stop")}
+            className="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive hover:text-white"
+          >
+            <Square className="size-2.5" fill="currentColor" /> {t("activity.stop")}
+          </button>
+        ) : (
+          <span className="text-[11px] text-muted-foreground/40">—</span>
+        )}
+      </div>
     </div>
   );
 }

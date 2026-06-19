@@ -123,6 +123,7 @@ export function useBoot(): void {
     offs.push(wsClient.on("s2c.window.focused", (p) => win.focus(p.windowId)));
     offs.push(wsClient.on("s2c.window.moved", (p) => win.upsert(p.window)));
     offs.push(wsClient.on("s2c.window.stateChanged", (p) => win.upsert(p.window)));
+    offs.push(wsClient.on("s2c.window.reordered", (p) => win.reorder(p.ids)));
 
     offs.push(
       wsClient.on("s2c.syscall.notify", (p) =>

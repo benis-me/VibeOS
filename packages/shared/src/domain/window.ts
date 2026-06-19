@@ -18,6 +18,8 @@ export interface WindowState {
   state: WindowDisplayState;
   isOpen: boolean;
   focused: boolean;
+  /** Dock / taskbar position (left → right). */
+  order: number;
   openedAt: number;
   updatedAt: number;
 }

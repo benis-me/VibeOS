@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Reorder } from "motion/react";
 import { LayoutGrid, Bell } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
 import { useWindowStore } from "@/stores/windowStore";
@@ -24,7 +25,10 @@ export function Taskbar({
   const t = useT();
   const windowMap = useWindowStore((s) => s.windows);
   const windows = useMemo(
-    () => Object.values(windowMap).filter((w) => w.isOpen && w.kind !== "widget"),
+    () =>
+      Object.values(windowMap)
+        .filter((w) => w.isOpen && w.kind !== "widget")
+        .sort((a, b) => a.order - b.order),
     [windowMap],
   );
   const apps = useAppStore((s) => s.apps);
@@ -55,12 +59,23 @@ export function Taskbar({
 
         <div className="mx-1 h-5 w-px bg-border" />
 
-        <div className="flex flex-1 items-center gap-1 overflow-x-auto no-scrollbar">
+        <Reorder.Group
+          axis="x"
+          as="div"
+          values={windows.map((w) => w.id)}
+          onReorder={(ids: string[]) => {
+            useWindowStore.getState().reorder(ids); // optimistic
+            wsClient.send("c2s.window.reorder", { ids });
+          }}
+          className="flex flex-1 items-center gap-1 overflow-x-auto no-scrollbar"
+        >
           {windows.map((w) => {
             const app = apps[w.appId];
             return (
-              <button
+              <Reorder.Item
                 key={w.id}
+                value={w.id}
+                as="button"
                 onClick={() => wsClient.send("c2s.window.focus", { windowId: w.id })}
                 onContextMenu={(e) => openContextMenu(e, taskbarItemMenu({ t, win: w }))}
                 data-win-id={w.id}
@@ -74,10 +89,10 @@ export function Taskbar({
               >
                 <AppIcon name={app?.icon} presetId={app?.presetId} label={app?.name ?? w.title} className="size-4" />
                 <span className="vibe-taskitem-label truncate">{w.title}</span>
-              </button>
+              </Reorder.Item>
             );
           })}
-        </div>
+        </Reorder.Group>
 
         <div className="vibe-tray-area flex h-full items-center gap-1">
           <button

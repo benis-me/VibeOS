@@ -80,6 +80,7 @@ export type ServerToClient =
   | { type: "s2c.syscall.fileCreated"; payload: { node: VfsNode } }
   | { type: "s2c.vfs.changed"; payload: { node: VfsNode } }
   | { type: "s2c.vfs.removed"; payload: { ids: string[] } }
+  | { type: "s2c.window.reordered"; payload: { ids: string[] } }
   | {
       type: "s2c.agent.event";
       payload: { role: AgentRole; kind: string; data?: unknown };

@@ -10,6 +10,7 @@ interface WindowStoreState {
   setAll: (windows: WindowState[], snapshots: Record<string, string>) => void;
   upsert: (w: WindowState) => void;
   remove: (id: string) => void;
+  reorder: (ids: string[]) => void;
   focus: (id: string) => void;
   setSnapshot: (id: string, html: string) => void;
   setBusy: (id: string, busy: boolean) => void;
@@ -26,6 +27,14 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
       return { windows: map, snapshots };
     }),
   upsert: (w) => set((s) => ({ windows: { ...s.windows, [w.id]: w } })),
+  reorder: (ids) =>
+    set((s) => {
+      const windows = { ...s.windows };
+      ids.forEach((id, i) => {
+        if (windows[id]) windows[id] = { ...windows[id]!, order: i };
+      });
+      return { windows };
+    }),
   remove: (id) =>
     set((s) => {
       const windows = { ...s.windows };
