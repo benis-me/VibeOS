@@ -81,6 +81,8 @@ export type ServerToClient =
   | { type: "s2c.vfs.changed"; payload: { node: VfsNode } }
   | { type: "s2c.vfs.removed"; payload: { ids: string[] } }
   | { type: "s2c.window.reordered"; payload: { ids: string[] } }
+  /** Update a window's native chrome (e.g. browser address bar) — AI → shell. */
+  | { type: "s2c.chrome.set"; payload: { windowId: string; patch: Record<string, string> } }
   | {
       type: "s2c.agent.event";
       payload: { role: AgentRole; kind: string; data?: unknown };

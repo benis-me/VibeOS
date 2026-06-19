@@ -27,6 +27,12 @@ export interface AppManifest {
   /** Minimum window size — resize is clamped to this (falls back to global min). */
   minSize?: { w: number; h: number };
   /**
+   * Native chrome to render around the AI content (e.g. "browser" → a built-in
+   * address bar). The AI generates only the content; it updates the chrome via
+   * the `chrome` syscall, and chrome interactions are sent back as ops.
+   */
+  chrome?: string;
+  /**
    * If true, only ONE window of this app may exist — opening it again focuses
    * the existing window (e.g. Settings, Recycle Bin). If false/undefined, the
    * app can be opened multiple times (e.g. Browser, Files, Terminal).

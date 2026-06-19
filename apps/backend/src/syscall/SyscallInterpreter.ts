@@ -131,5 +131,13 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
       broadcast("s2c.window.closed", { windowId: call.windowId });
       return;
     }
+
+    case "chrome": {
+      // Reverse channel: AI content updates its window's native chrome (e.g. the
+      // browser address bar). No-op without a source window.
+      if (!ctx.windowId) return;
+      broadcast("s2c.chrome.set", { windowId: ctx.windowId, patch: call.set });
+      return;
+    }
   }
 }

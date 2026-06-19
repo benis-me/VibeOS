@@ -51,6 +51,10 @@ export const syscallSchema = z.discriminatedUnion("type", [
     type: z.literal("close"),
     windowId: z.string().min(1),
   }),
+  z.object({
+    type: z.literal("chrome"),
+    set: z.record(z.string(), z.string()),
+  }),
 ]);
 
 export const syscallBatchSchema = z.object({

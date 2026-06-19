@@ -36,6 +36,11 @@ const zh: Dict = {
   "win.restore": "还原",
   "win.close": "关闭",
   "win.saveAsApp": "保存为应用",
+  // Browser chrome
+  "browser.back": "后退",
+  "browser.forward": "前进",
+  "browser.reload": "刷新",
+  "browser.address": "搜索或输入网址",
   // Context menus
   "menu.openApp": "打开应用",
   "menu.activity": "活动监视器",
@@ -214,6 +219,11 @@ const en: Dict = {
   "win.restore": "Restore",
   "win.close": "Close",
   "win.saveAsApp": "Save as app",
+  // Browser chrome
+  "browser.back": "Back",
+  "browser.forward": "Forward",
+  "browser.reload": "Reload",
+  "browser.address": "Search or enter address",
   // Context menus
   "menu.openApp": "Open App",
   "menu.activity": "Activity Monitor",

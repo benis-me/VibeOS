@@ -76,6 +76,8 @@ export function assemblePrompt(input: AssembleInput): string {
   const hint = presetHint(app.presetId);
   if (hint) parts.push(`[APP STYLE GUIDE]\n${hint}`);
 
+  if (app.manifest.chrome) parts.push(chromeDirective(String(app.manifest.chrome)));
+
   if (memory?.episodeSummary) {
     parts.push(`[EPISODE MEMORY]\n${truncate(memory.episodeSummary, SUMMARY_BUDGET)}`);
   }
@@ -132,6 +134,21 @@ Choose deliberately before you write: do not re-emit the whole window for a smal
   parts.push(`[OPERATION]\n${opLine}\n\n${modeDirective}`);
 
   return parts.join("\n\n");
+}
+
+/** Per-app instructions when the OS provides a native chrome shell. */
+function chromeDirective(chrome: string): string {
+  if (chrome === "browser") {
+    return `[NATIVE CHROME: browser]
+This window has a NATIVE address bar provided by the OS (back / forward / reload / URL field). You generate ONLY the page CONTENT below it — do NOT draw an address bar, toolbar, tabs, or any browser chrome yourself.
+- Navigation arrives as an OPERATION with action="navigate" and the target in value/form (a URL or a search query). Render that page's content.
+- A clicked link or anything that changes the page is also an OPERATION — render the new page.
+- WHENEVER the shown page changes (navigation, clicked link, redirect, search) you MUST emit a chrome syscall so the address bar stays in sync:
+\`\`\`vibeos-syscall
+{ "calls": [ { "type": "chrome", "set": { "url": "https://example.com/path", "title": "Page title" } } ] }
+\`\`\``;
+  }
+  return `[NATIVE CHROME: ${chrome}]\nThis window has a native shell provided by the OS; generate ONLY the inner content. Update the shell when the content's state changes via a chrome syscall: { "type":"chrome", "set": { ... } }.`;
 }
 
 function compact(state: Record<string, unknown>): Record<string, unknown> {

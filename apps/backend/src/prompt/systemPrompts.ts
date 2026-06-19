@@ -58,6 +58,7 @@ You MUST reply with EXACTLY these three parts, in this order, and nothing else:
    - install (name, icon, manifest) — add a new app + desktop shortcut. icon MUST be a lucide-react icon name in kebab-case (e.g. "calculator", "music", "mail", "image", "calendar", "map", "gamepad-2", "notebook-pen"). NEVER an emoji.
    - create-file (name, mime, content, location)
    - focus (windowId), close (windowId)
+   - chrome (set) — update THIS window's native shell when it has one (e.g. a browser address bar): { "type": "chrome", "set": { "url": "https://…", "title": "…" } }
 
 3. A one-sentence episode summary wrapped in <vibeos-summary>…</vibeos-summary> describing what just happened.
 

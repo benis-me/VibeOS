@@ -8,6 +8,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useWindowDrag } from "@/hooks/useWindowDrag";
 import { AiHtmlSurface } from "./AiHtmlSurface";
 import { NATIVE_APPS } from "./nativeApps";
+import { CHROMES } from "./chromes";
 import { AppIcon } from "@/components/AppIcon";
 import { useT } from "@/lib/i18n";
 import { useWindowMotion, EASE_OUT } from "@/lib/motion";
@@ -31,6 +32,10 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
   // Native (React) apps render their own component; everything else is AI HTML
   // and can be frozen into a reusable app.
   const native = app?.presetId ? NATIVE_APPS[app.presetId] : undefined;
+  // Some AI apps have a NATIVE chrome shell (e.g. browser address bar) wrapping
+  // the generated content; the AI fills only the content region.
+  const chromeKey = typeof app?.manifest.chrome === "string" ? app.manifest.chrome : undefined;
+  const Chrome = !native && chromeKey ? CHROMES[chromeKey] : undefined;
 
   // Keep minimized windows MOUNTED but hidden — unmounting (return null) would
   // rebuild the AI surface on restore and lose scroll + DOM state.
@@ -180,7 +185,15 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
         className="vibe-window-body relative min-h-0 flex-1 bg-background"
         onContextMenu={(e) => openContextMenu(e, appContentMenu({ t, win, native: !!native }))}
       >
-        {native ? native() : <AiHtmlSurface windowId={win.id} html={html} />}
+        {native ? (
+          native()
+        ) : Chrome ? (
+          <Chrome windowId={win.id}>
+            <AiHtmlSurface windowId={win.id} html={html} />
+          </Chrome>
+        ) : (
+          <AiHtmlSurface windowId={win.id} html={html} />
+        )}
       </div>
 
       {/* 8-direction resize handles (edges + corners) */}

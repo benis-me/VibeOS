@@ -47,6 +47,14 @@ export type Syscall =
   | {
       type: "close";
       windowId: string;
+    }
+  | {
+      /**
+       * Update this window's NATIVE chrome (the OS-provided shell around the AI
+       * content, e.g. a browser address bar). Reverse channel: AI content → shell.
+       */
+      type: "chrome";
+      set: Record<string, string>;
     };
 
 export interface SyscallBatch {

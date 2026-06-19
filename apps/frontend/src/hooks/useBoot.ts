@@ -7,6 +7,7 @@ import { useVfsStore } from "@/stores/vfsStore";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useSettingsStore, applyLocale } from "@/stores/settingsStore";
 import { useActivityStore } from "@/stores/activityStore";
+import { useChromeStore } from "@/stores/chromeStore";
 import { browserLocale, translate } from "@/lib/i18n";
 import { ulid } from "@vibeos/shared/util";
 import { applyRegions } from "@/lib/patch";
@@ -119,11 +120,21 @@ export function useBoot(): void {
     );
 
     offs.push(wsClient.on("s2c.window.opened", (p) => win.upsert(p.window)));
-    offs.push(wsClient.on("s2c.window.closed", (p) => win.remove(p.windowId)));
+    offs.push(
+      wsClient.on("s2c.window.closed", (p) => {
+        win.remove(p.windowId);
+        useChromeStore.getState().clear(p.windowId);
+      }),
+    );
     offs.push(wsClient.on("s2c.window.focused", (p) => win.focus(p.windowId)));
     offs.push(wsClient.on("s2c.window.moved", (p) => win.upsert(p.window)));
     offs.push(wsClient.on("s2c.window.stateChanged", (p) => win.upsert(p.window)));
     offs.push(wsClient.on("s2c.window.reordered", (p) => win.reorder(p.ids)));
+    offs.push(
+      wsClient.on("s2c.chrome.set", (p) =>
+        useChromeStore.getState().set(p.windowId, p.patch),
+      ),
+    );
 
     offs.push(
       wsClient.on("s2c.syscall.notify", (p) =>
