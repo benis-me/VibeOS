@@ -85,9 +85,11 @@ interface PanelProps {
   onClose: () => void;
   /** Reports this panel's root element to the parent (for triangle measuring). */
   panelRef?: (el: HTMLDivElement | null) => void;
+  /** Close this (sub)menu and return focus to the parent (ArrowLeft). */
+  onBack?: () => void;
 }
 
-function MenuPanel({ items, x, y, onClose, panelRef }: PanelProps) {
+function MenuPanel({ items, x, y, onClose, panelRef, onBack }: PanelProps) {
   const selfRef = useRef<HTMLDivElement | null>(null);
   const subRef = useRef<HTMLDivElement | null>(null);
   const prev = useRef<Pt>({ x, y });
@@ -95,6 +97,13 @@ function MenuPanel({ items, x, y, onClose, panelRef }: PanelProps) {
   const hov = useRef<number | null>(null);
   const [pos, setPos] = useState<Pt>({ x, y });
   const [open, setOpen] = useState<{ idx: number; x: number; y: number } | null>(null);
+  const [activeIdx, setActiveIdx] = useState(-1);
+
+  // Focus the panel on mount so arrow keys work immediately (a submenu opened by
+  // keyboard becomes the active panel; ArrowLeft returns focus to the parent).
+  useEffect(() => {
+    selfRef.current?.focus();
+  }, []);
 
   // Keep the panel inside the viewport.
   useLayoutEffect(() => {
@@ -125,10 +134,72 @@ function MenuPanel({ items, x, y, onClose, panelRef }: PanelProps) {
 
   const onRowEnter = (idx: number, e: React.MouseEvent) => {
     hov.current = idx;
+    setActiveIdx(idx);
     // If a submenu is open and we're aiming at it, defer — the move handler
     // switches once the pointer stops heading toward the submenu.
     if (open && open.idx !== idx && aiming.current) return;
     openSub(idx, e.currentTarget as HTMLElement);
+  };
+
+  const openSubByIdx = (idx: number) => {
+    const rowEl = selfRef.current?.querySelector<HTMLElement>(`[data-idx="${idx}"]`);
+    if (rowEl) openSub(idx, rowEl);
+  };
+
+  const moveActive = (dir: 1 | -1) => {
+    const n = items.length;
+    if (n === 0) return;
+    let i = activeIdx;
+    for (let step = 0; step < n; step++) {
+      i = (i + dir + n) % n;
+      const it = items[i];
+      if (it && it.type !== "separator" && !(it.type === "item" && it.disabled)) {
+        setActiveIdx(i);
+        return;
+      }
+    }
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    const it = activeIdx >= 0 ? items[activeIdx] : undefined;
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        e.stopPropagation();
+        moveActive(1);
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        e.stopPropagation();
+        moveActive(-1);
+        break;
+      case "ArrowRight":
+        if (it?.type === "submenu") {
+          e.preventDefault();
+          e.stopPropagation();
+          openSubByIdx(activeIdx);
+        }
+        break;
+      case "ArrowLeft":
+        if (onBack) {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(null);
+          onBack();
+        }
+        break;
+      case "Enter":
+      case " ":
+        if (!it) break;
+        e.preventDefault();
+        e.stopPropagation();
+        if (it.type === "submenu") openSubByIdx(activeIdx);
+        else if (it.type === "item" && !it.disabled) {
+          it.onSelect();
+          onClose();
+        }
+        break;
+    }
   };
 
   const onMove = (e: React.MouseEvent) => {
@@ -168,10 +239,12 @@ function MenuPanel({ items, x, y, onClose, panelRef }: PanelProps) {
         selfRef.current = el;
         panelRef?.(el);
       }}
-      className="vibe-menu"
+      className="vibe-menu outline-none"
       role="menu"
+      tabIndex={-1}
       style={{ left: pos.x, top: pos.y }}
       onMouseMove={onMove}
+      onKeyDown={onKeyDown}
       onContextMenu={(e) => e.preventDefault()}
     >
       {items.map((item, idx) => {
@@ -183,7 +256,7 @@ function MenuPanel({ items, x, y, onClose, panelRef }: PanelProps) {
             key={idx}
             data-idx={idx}
             role="menuitem"
-            data-active={open?.idx === idx ? "true" : undefined}
+            data-active={open?.idx === idx || activeIdx === idx ? "true" : undefined}
             data-disabled={disabled ? "true" : undefined}
             data-danger={item.type === "item" && item.danger ? "true" : undefined}
             className={cn("vibe-menu-item")}
@@ -215,6 +288,10 @@ function MenuPanel({ items, x, y, onClose, panelRef }: PanelProps) {
           y={open!.y}
           onClose={onClose}
           panelRef={(el) => (subRef.current = el)}
+          onBack={() => {
+            setOpen(null);
+            selfRef.current?.focus();
+          }}
         />
       )}
     </div>

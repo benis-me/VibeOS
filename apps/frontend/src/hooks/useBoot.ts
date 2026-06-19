@@ -39,6 +39,7 @@ export function useBoot(): void {
       wsClient.on("s2c.boot.state", (p) => {
         conn.setBootInfo({
           bootCount: p.bootCount,
+          version: p.version,
           settings: p.settings,
           models: p.models,
           availableProviders: p.availableProviders,
@@ -52,7 +53,7 @@ export function useBoot(): void {
           wsClient.send("c2s.settings.update", { partial: { locale: detected } });
         }
         apps.setAll(p.apps);
-        vfs.setAll(p.desktopNodes);
+        vfs.setAll([...p.desktopNodes, ...p.recycleBinNodes]);
         win.setAll(p.windows, p.snapshots);
         notif.setAll(p.notifications);
         useActivityStore.getState().setAll(p.agentRuns);
@@ -141,6 +142,7 @@ export function useBoot(): void {
     );
     offs.push(
       wsClient.on("s2c.vfs.changed", (p) => useVfsStore.getState().upsert(p.node)),
+      wsClient.on("s2c.vfs.removed", (p) => useVfsStore.getState().remove(p.ids)),
     );
     offs.push(
       wsClient.on("s2c.settings.changed", (p) =>

@@ -73,7 +73,7 @@ export type ClientToServer =
   /** Launch a (possibly brand-new) app in a fresh window, generated live. */
   | {
       type: "c2s.app.launch";
-      payload: { name: string; description?: string; icon?: string };
+      payload: { name: string; description?: string; icon?: string; widget?: boolean };
     }
   /** Freeze a window's current UI as a reusable installed app (+ desktop shortcut). */
   | { type: "c2s.app.save"; payload: { windowId: string; name?: string; icon?: string } }
@@ -81,7 +81,9 @@ export type ClientToServer =
   | { type: "c2s.app.export"; payload: { appId: string } }
   /** Import an app from a .vibeapp JSON string. */
   | { type: "c2s.app.import"; payload: { json: string } }
-  | { type: "c2s.activity.fetch"; payload: { before?: number; limit?: number } };
+  | { type: "c2s.activity.fetch"; payload: { before?: number; limit?: number } }
+  | { type: "c2s.vfs.delete"; payload: { nodeId: string } }
+  | { type: "c2s.vfs.empty"; payload: Record<string, never> };
 
 export type ClientToServerType = ClientToServer["type"];
 export type ClientToServerPayload<T extends ClientToServerType> = Extract<

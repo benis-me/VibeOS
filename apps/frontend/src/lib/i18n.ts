@@ -20,6 +20,7 @@ const zh: Dict = {
   "startmenu.generated": "我的应用",
   "spotlight.placeholder": "搜索或描述你想要的 App…",
   "spotlight.open": "↵ 打开",
+  "spotlight.asWidget": "小组件",
   "spotlight.noResults": "没有结果，换个描述试试",
   // Notifications
   "notif.title": "通知",
@@ -40,12 +41,13 @@ const zh: Dict = {
   "menu.activity": "活动监视器",
   "menu.reload": "刷新",
   "menu.delete": "移到回收站",
+  "menu.cleanup": "整理桌面",
   // Settings — shell
   "settings.title": "系统设置",
   "settings.cat.appearance": "外观",
   "settings.cat.general": "通用",
   "settings.cat.ai": "AI 引擎",
-  "settings.cat.profile": "画像",
+  "settings.cat.profile": "个性化",
   "settings.cat.activity": "活动",
   "settings.cat.about": "关于",
   "settings.profile.hint": "写一点关于你自己的信息（称呼、偏好、正在做的项目）。所有 AI 生成的应用都会参考它，让一切更懂你、跨窗口更连贯。",
@@ -140,6 +142,13 @@ const zh: Dict = {
   "store.uninstall": "卸载",
   "store.empty": "暂无应用",
   "store.frozen": "已固化",
+  // Recycle Bin
+  "recyclebin.title": "回收站",
+  "recyclebin.empty": "回收站是空的",
+  "recyclebin.restore": "还原",
+  "recyclebin.delete": "彻底删除",
+  "recyclebin.emptyAll": "清空回收站",
+  "recyclebin.items": "项",
 };
 
 const en: Dict = {
@@ -153,6 +162,7 @@ const en: Dict = {
   "startmenu.generated": "My Apps",
   "spotlight.placeholder": "Search or describe an app you want…",
   "spotlight.open": "↵ Open",
+  "spotlight.asWidget": "Widget",
   "spotlight.noResults": "No results — try another description",
   "notif.title": "Notifications",
   "notif.markAllRead": "Mark all read",
@@ -170,11 +180,12 @@ const en: Dict = {
   "menu.activity": "Activity Monitor",
   "menu.reload": "Reload",
   "menu.delete": "Move to Recycle Bin",
+  "menu.cleanup": "Clean Up",
   "settings.title": "Settings",
   "settings.cat.appearance": "Appearance",
   "settings.cat.general": "General",
   "settings.cat.ai": "AI Engine",
-  "settings.cat.profile": "Profile",
+  "settings.cat.profile": "Personalization",
   "settings.cat.activity": "Activity",
   "settings.cat.about": "About",
   "settings.profile.hint": "Tell VibeOS about yourself (name, preferences, projects you're working on). Every AI-generated app uses this to feel personalized and coherent across windows.",
@@ -261,6 +272,13 @@ const en: Dict = {
   "store.uninstall": "Uninstall",
   "store.empty": "No apps",
   "store.frozen": "Frozen",
+  // Recycle Bin
+  "recyclebin.title": "Recycle Bin",
+  "recyclebin.empty": "Recycle Bin is empty",
+  "recyclebin.restore": "Restore",
+  "recyclebin.delete": "Delete",
+  "recyclebin.emptyAll": "Empty",
+  "recyclebin.items": "items",
 };
 
 const DICT: Record<Locale, Dict> = { zh, en };

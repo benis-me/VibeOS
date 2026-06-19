@@ -24,7 +24,7 @@ export function Taskbar({
   const t = useT();
   const windowMap = useWindowStore((s) => s.windows);
   const windows = useMemo(
-    () => Object.values(windowMap).filter((w) => w.isOpen),
+    () => Object.values(windowMap).filter((w) => w.isOpen && w.kind !== "widget"),
     [windowMap],
   );
   const apps = useAppStore((s) => s.apps);
@@ -63,6 +63,7 @@ export function Taskbar({
                 key={w.id}
                 onClick={() => wsClient.send("c2s.window.focus", { windowId: w.id })}
                 onContextMenu={(e) => openContextMenu(e, taskbarItemMenu({ t, win: w }))}
+                data-win-id={w.id}
                 data-active={w.focused && w.state !== "minimized" ? "true" : undefined}
                 className={cn(
                   "vibe-taskitem flex h-8 max-w-44 items-center gap-2 rounded-lg px-2.5 text-xs transition-colors",

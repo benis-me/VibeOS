@@ -23,11 +23,13 @@ export interface AppSearchResult {
 
 export interface BootStatePayload {
   phase: BootPhase;
+  version: string;
   bootCount: number;
   settings: Settings;
   windows: WindowState[];
   apps: AppDescriptor[];
   desktopNodes: VfsNode[];
+  recycleBinNodes: VfsNode[];
   notifications: Notification[];
   globalState: Record<string, unknown>;
   /** Current snapshots for already-open windows, keyed by windowId. */
@@ -77,6 +79,7 @@ export type ServerToClient =
     }
   | { type: "s2c.syscall.fileCreated"; payload: { node: VfsNode } }
   | { type: "s2c.vfs.changed"; payload: { node: VfsNode } }
+  | { type: "s2c.vfs.removed"; payload: { ids: string[] } }
   | {
       type: "s2c.agent.event";
       payload: { role: AgentRole; kind: string; data?: unknown };

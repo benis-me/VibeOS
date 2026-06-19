@@ -1,4 +1,5 @@
-import { motion } from "motion/react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { Minus, Square, X, Copy, Save } from "lucide-react";
 import type { WindowState } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
@@ -9,7 +10,7 @@ import { AiHtmlSurface } from "./AiHtmlSurface";
 import { NATIVE_APPS } from "./nativeApps";
 import { AppIcon } from "@/components/AppIcon";
 import { useT } from "@/lib/i18n";
-import { useWindowMotion } from "@/lib/motion";
+import { useWindowMotion, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { windowMenu, appContentMenu } from "@/components/contextmenu/menus";
@@ -20,13 +21,36 @@ export function Window({ win }: { win: WindowState }) {
   const { onMoveHandle, onResize } = useWindowDrag(win.id);
   const t = useT();
   const winMotion = useWindowMotion();
+  const reduced = useReducedMotion();
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  // Where to fly to when minimizing: the delta from the window centre to this
+  // window's Dock/taskbar item, so it shrinks INTO its icon (genie).
+  const [minTarget, setMinTarget] = useState<{ x: number; y: number } | null>(null);
   // Native (React) apps render their own component; everything else is AI HTML
   // and can be frozen into a reusable app.
   const native = app?.presetId ? NATIVE_APPS[app.presetId] : undefined;
 
-  if (win.state === "minimized") return null;
-
+  // Keep minimized windows MOUNTED but hidden — unmounting (return null) would
+  // rebuild the AI surface on restore and lose scroll + DOM state.
+  const minimized = win.state === "minimized";
   const maximized = win.state === "maximized";
+  // Widgets are chrome-less AI panels pinned to the desktop (behind windows).
+  const widget = win.kind === "widget";
+
+  // When minimizing, measure the delta from the window's centre to its Dock
+  // item so the genie animation flies INTO the icon (and back on restore).
+  useLayoutEffect(() => {
+    if (!minimized || reduced) return;
+    const el = rootRef.current;
+    const dock = document.querySelector(`[data-win-id="${win.id}"]`);
+    if (!el || !dock) return;
+    const wr = el.getBoundingClientRect();
+    const dr = dock.getBoundingClientRect();
+    setMinTarget({
+      x: dr.left + dr.width / 2 - (wr.left + wr.width / 2),
+      y: dr.top + dr.height / 2 - (wr.top + wr.height / 2),
+    });
+  }, [minimized, reduced, win.id]);
   // Maximized height is driven by the CSS taskbar-height var so it adapts when
   // a skin changes the taskbar height (e.g. XP's shorter bar).
   const rect = maximized
@@ -39,30 +63,48 @@ export function Window({ win }: { win: WindowState }) {
 
   return (
     <motion.div
+      ref={rootRef}
       role="dialog"
       aria-label={win.title}
-      onPointerDown={focus}
-      {...winMotion}
+      onPointerDown={widget ? undefined : focus}
+      initial={winMotion.initial}
+      exit={winMotion.exit}
+      // Minimize/restore: shrink INTO the window's Dock icon and fade (genie).
+      animate={
+        minimized
+          ? reduced
+            ? { opacity: 0 }
+            : { opacity: 0, scale: 0.15, x: minTarget?.x ?? 0, y: minTarget?.y ?? 240 }
+          : reduced
+            ? { opacity: 1 }
+            : { opacity: 1, scale: 1, x: 0, y: 0 }
+      }
+      transition={{ duration: reduced ? 0.12 : 0.3, ease: EASE_OUT }}
       data-focused={win.focused ? "true" : undefined}
       data-maximized={maximized ? "true" : undefined}
+      aria-hidden={minimized || undefined}
       className={cn(
-        "vibe-window absolute flex flex-col overflow-hidden rounded-xl border sheen transition-shadow",
-        win.focused
-          ? // focused: frosted glass + a thin soft shadow
-            "ring-1 ring-ring/30 win-focused win-glass"
-          : // unfocused: plain solid surface, no blur
-            "bg-card",
+        "vibe-window group absolute flex flex-col overflow-hidden border sheen transition-shadow",
+        widget
+          ? "rounded-2xl bg-card shadow-xl"
+          : win.focused
+            ? "rounded-xl ring-1 ring-ring/30 win-focused win-glass"
+            : "rounded-xl bg-card",
       )}
       style={{
         left: rect.x,
         top: rect.y,
         width: rect.w,
         height: maximized ? "calc(100vh - var(--taskbar-h))" : rect.h,
-        zIndex: win.z,
+        // Widgets sit on the desktop, behind normal windows.
+        zIndex: widget ? 0 : win.z,
         borderRadius: maximized ? 0 : undefined,
+        transformOrigin: "center",
+        pointerEvents: minimized ? "none" : undefined,
       }}
     >
-      {/* titlebar */}
+      {/* titlebar — omitted for chrome-less widgets */}
+      {!widget && (
       <div
         onPointerDown={(e) => {
           focus(); // drag handler stops propagation, so focus explicitly here
@@ -108,6 +150,27 @@ export function Window({ win }: { win: WindowState }) {
           </TitleButton>
         </div>
       </div>
+      )}
+
+      {/* Widget chrome: a hover drag-handle + close, overlaid on the content. */}
+      {widget && (
+        <>
+          <div
+            onPointerDown={(e) => onMoveHandle(e)}
+            className="absolute inset-x-0 top-0 z-10 h-5 cursor-grab opacity-0 transition-opacity group-hover:opacity-100"
+            aria-hidden
+          >
+            <div className="mx-auto mt-1 h-1 w-8 rounded-full bg-foreground/25" />
+          </div>
+          <button
+            onClick={() => wsClient.send("c2s.window.close", { windowId: win.id })}
+            title={t("win.close")}
+            className="absolute right-1.5 top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-background/70 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive hover:text-white group-hover:opacity-100"
+          >
+            <X className="size-3" />
+          </button>
+        </>
+      )}
 
       {/* content — always solid so the AI UI stays readable; the glass shows
           through the titlebar / window edges of the focused window. */}
@@ -119,7 +182,7 @@ export function Window({ win }: { win: WindowState }) {
       </div>
 
       {/* 8-direction resize handles (edges + corners) */}
-      {!maximized && (
+      {!maximized && !widget && (
         <>
           {/* edges */}
           <div onPointerDown={onResize("n")} className="absolute inset-x-2 top-0 h-1.5 cursor-ns-resize" aria-hidden />

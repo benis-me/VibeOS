@@ -8,6 +8,7 @@ import { wsClient } from "@/lib/ws";
 import { useT } from "@/lib/i18n";
 import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { desktopItemMenu } from "@/components/contextmenu/menus";
+import { snapToGrid } from "@/lib/desktopGrid";
 
 export function DesktopIcon({ node }: { node: VfsNode }) {
   const apps = useAppStore((s) => s.apps);
@@ -45,12 +46,10 @@ export function DesktopIcon({ node }: { node: VfsNode }) {
       if (moved.current) {
         const cur = useVfsStore.getState().nodes[node.id];
         if (cur) {
-          wsClient.send("c2s.vfs.move", {
-            nodeId: node.id,
-            location: "desktop",
-            x: cur.x,
-            y: cur.y,
-          });
+          // Snap to the grid on release.
+          const { x, y } = snapToGrid(cur.x ?? 24, cur.y ?? 24);
+          useVfsStore.getState().upsert({ ...cur, x, y });
+          wsClient.send("c2s.vfs.move", { nodeId: node.id, location: "desktop", x, y });
         }
         setTimeout(() => (moved.current = false), 0);
       }

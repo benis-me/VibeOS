@@ -69,11 +69,12 @@ export function Spotlight({ open, onClose }: Props) {
   const overlay = useOverlayMotion();
   const panel = usePopoverMotion();
 
-  const launch = (r: AppSearchResult) => {
+  const launch = (r: AppSearchResult, asWidget = false) => {
     wsClient.send("c2s.app.launch", {
       name: r.name,
       description: r.description,
       icon: r.icon,
+      widget: asWidget,
     });
     onClose();
   };
@@ -89,7 +90,8 @@ export function Spotlight({ open, onClose }: Props) {
     } else if (e.key === "Enter") {
       e.preventDefault();
       const r = results[active];
-      if (r) launch(r);
+      // Shift+Enter adds it to the desktop as a live widget instead of opening it.
+      if (r) launch(r, e.shiftKey);
     }
   };
 
@@ -144,7 +146,20 @@ export function Spotlight({ open, onClose }: Props) {
                   )}
                 </span>
                 {i === active && (
-                  <span className="text-[10px] text-muted-foreground">{t("spotlight.open")}</span>
+                  <span className="flex shrink-0 items-center gap-2 text-[10px] text-muted-foreground">
+                    <span
+                      role="button"
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        launch(r, true);
+                      }}
+                      className="rounded border px-1.5 py-0.5 transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      {t("spotlight.asWidget")}
+                    </span>
+                    <span>{t("spotlight.open")}</span>
+                  </span>
                 )}
               </button>
             ))}

@@ -11,6 +11,8 @@ import { NotificationCenter } from "@/components/notifications/NotificationCente
 import { Spotlight } from "@/components/spotlight/Spotlight";
 import { ContextMenuRoot, openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { desktopMenu } from "@/components/contextmenu/menus";
+import { wsClient } from "@/lib/ws";
+import { gridPosition } from "@/lib/desktopGrid";
 
 export function Desktop() {
   const nodeMap = useVfsStore((s) => s.nodes);
@@ -25,10 +27,10 @@ export function Desktop() {
   const skin = useSettingsStore((s) => s.settings?.skin ?? "devdock");
   const theme = useSettingsStore((s) => s.settings?.theme ?? "dark");
 
-  // ⌘Space / Ctrl+Space toggles Spotlight, like macOS.
+  // ⌘K / ⌘Space (and Ctrl variants) toggle the App Search, like Spotlight.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.code === "Space") {
+      if ((e.metaKey || e.ctrlKey) && (e.code === "Space" || e.key.toLowerCase() === "k")) {
         e.preventDefault();
         setSpotlightOpen((v) => !v);
       }
@@ -36,6 +38,17 @@ export function Desktop() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  const autoArrange = () => {
+    const desktopNodes = Object.values(useVfsStore.getState().nodes).filter(
+      (n) => n.location === "desktop",
+    );
+    desktopNodes.forEach((n, i) => {
+      const { x, y } = gridPosition(i, window.innerHeight);
+      useVfsStore.getState().upsert({ ...n, x, y });
+      wsClient.send("c2s.vfs.move", { nodeId: n.id, location: "desktop", x, y });
+    });
+  };
 
   return (
     <div
@@ -49,6 +62,7 @@ export function Desktop() {
             skin,
             theme,
             onAppSearch: () => setSpotlightOpen(true),
+            onAutoArrange: autoArrange,
           }),
         )
       }

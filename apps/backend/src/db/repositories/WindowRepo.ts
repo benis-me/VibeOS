@@ -25,7 +25,7 @@ function toWindow(row: WindowRow): WindowState {
     id: row.id,
     appId: row.app_id,
     title: row.title,
-    kind: row.kind === "system" ? "system" : "app",
+    kind: row.kind === "system" ? "system" : row.kind === "widget" ? "widget" : "app",
     rect: { x: row.x, y: row.y, w: row.w, h: row.h },
     z: row.z,
     state: row.state as WindowDisplayState,
@@ -71,7 +71,7 @@ function nextZ(): number {
 export function openWindow(input: {
   appId: string;
   title: string;
-  kind?: "app" | "system";
+  kind?: "app" | "system" | "widget";
   rect?: { x: number; y: number; w: number; h: number };
   /** Preferred size; position is cascaded automatically. */
   size?: { w: number; h: number };

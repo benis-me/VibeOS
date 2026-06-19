@@ -13,6 +13,7 @@ import {
   FolderOpen,
   Download,
   Trash2,
+  LayoutGrid,
 } from "lucide-react";
 import type { AppDescriptor, Skin, Theme, WindowState, VfsNode } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
@@ -33,6 +34,7 @@ export function desktopMenu(o: {
   skin: Skin;
   theme: Theme;
   onAppSearch: () => void;
+  onAutoArrange: () => void;
 }): MenuItem[] {
   return [
     { type: "item", label: o.t("startmenu.appSearch"), icon: <Search size={15} />, onSelect: o.onAppSearch },
@@ -42,6 +44,7 @@ export function desktopMenu(o: {
       icon: <AppWindow size={15} />,
       items: o.apps.map((a) => ({ type: "item", label: a.name, onSelect: () => openApp(a.id) })),
     },
+    { type: "item", label: o.t("menu.cleanup"), icon: <LayoutGrid size={15} />, onSelect: o.onAutoArrange },
     { type: "separator" },
     {
       type: "submenu",

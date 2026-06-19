@@ -1,4 +1,4 @@
-export type WindowKind = "app" | "system";
+export type WindowKind = "app" | "system" | "widget";
 export type WindowDisplayState = "normal" | "minimized" | "maximized";
 
 export interface Rect {

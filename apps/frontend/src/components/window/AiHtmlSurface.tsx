@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
-import type { AiOp } from "@vibeos/shared/protocol";
+import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import { sanitizeAiHtml } from "@/lib/sanitize";
 import { wsClient } from "@/lib/ws";
 import { useDelegatedEvents } from "@/hooks/useDelegatedEvents";
@@ -79,6 +79,41 @@ export function AiHtmlSurface({ windowId, html }: Props) {
     if (saved && el.scrollTop === 0) el.scrollTop = saved;
   });
 
+  // Drop TARGET: accept a drag from any app (or the OS) and route it to the
+  // backend, which asks the agent to react to it.
+  const onDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const dt = e.dataTransfer;
+      let source: DragPayload | null = null;
+      const raw = dt.getData("application/x-vibeos-drag");
+      if (raw) {
+        try {
+          source = JSON.parse(raw) as DragPayload;
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!source && dt.files.length) {
+        const f = dt.files[0]!;
+        source = { kind: "file", ref: f.name, label: f.name };
+      }
+      if (!source) {
+        const val = (dt.getData("text/uri-list") || dt.getData("text/plain")).trim();
+        if (val) source = { kind: "text", ref: val, label: val.slice(0, 80) };
+      }
+      if (!source?.ref) return;
+      useWindowStore.getState().setBusy(windowId, true);
+      wsClient.send("c2s.op.dragdrop", { windowId, source, target: { windowId } });
+    },
+    [windowId],
+  );
+
   // After the HTML is applied, restore a preserved input value if the AI's new
   // markup left the matching field blank (so navigation/search keep your text).
   useLayoutEffect(() => {
@@ -107,7 +142,7 @@ export function AiHtmlSurface({ windowId, html }: Props) {
   const safe = html ? sanitizeAiHtml(html) : "";
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden" onDragOver={onDragOver} onDrop={onDrop}>
       {/* OS-style loading bar pinned to the top while the AI is working.
           No text — the bar alone communicates activity, like a native shell. */}
       {busy && <ProgressBar />}

@@ -10,7 +10,12 @@ export type PresetAppId =
 export type AppKind = "preset" | "virtual";
 
 /** Preset apps rendered natively (real React), never AI-hallucinated. */
-export const NATIVE_PRESET_APPS: PresetAppId[] = ["settings", "activity-monitor", "app-store"];
+export const NATIVE_PRESET_APPS: PresetAppId[] = [
+  "settings",
+  "activity-monitor",
+  "app-store",
+  "recycle-bin",
+];
 
 export interface AppManifest {
   /** Short description used to seed the AI prompt for a virtual app. */

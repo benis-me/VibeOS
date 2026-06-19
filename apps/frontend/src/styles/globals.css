@@ -583,6 +583,8 @@ button:not(:disabled),
 [data-skin="xp"] .vibe-titlebar {
   height: 30px;
   padding: 0 4px 0 7px;
+  /* light icon/text on the blue bar (AppIcon uses currentColor) */
+  color: #fff;
   /* the window's outer edge along the top + sides (1px #0058EB) */
   border: 1px solid #0058eb;
   border-bottom: 0;

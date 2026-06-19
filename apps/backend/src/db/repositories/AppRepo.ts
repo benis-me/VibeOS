@@ -51,6 +51,7 @@ const PRESETS: Array<{ id: PresetAppId; name: string; icon: string; manifest: Ap
   { id: "settings", name: "Settings", icon: "settings", manifest: { description: "System settings.", category: "system", defaultSize: { w: 720, h: 560 }, singleInstance: true } },
   { id: "activity-monitor", name: "Activity Monitor", icon: "activity", manifest: { description: "Live view of AI agent runs, models, latency and token cost.", category: "system", defaultSize: { w: 720, h: 560 }, singleInstance: true } },
   { id: "app-store", name: "App Store", icon: "layout-grid", manifest: { description: "Browse, install, export and share apps.", category: "system", defaultSize: { w: 820, h: 580 }, singleInstance: true } },
+  { id: "recycle-bin", name: "Recycle Bin", icon: "trash-2", manifest: { description: "Restore or permanently delete items you've thrown away.", category: "system", defaultSize: { w: 640, h: 500 }, singleInstance: true } },
 ];
 
 /** Seed preset apps on first boot (idempotent: keyed by preset id). */

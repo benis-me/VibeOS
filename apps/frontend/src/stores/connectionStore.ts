@@ -5,6 +5,7 @@ interface ConnectionState {
   connected: boolean;
   bootPhase: BootPhase;
   bootCount: number;
+  version: string;
   settings: Settings | null;
   models: ModelInfo[];
   availableProviders: ProviderId[];
@@ -12,6 +13,7 @@ interface ConnectionState {
   setBootPhase: (p: BootPhase) => void;
   setBootInfo: (info: {
     bootCount: number;
+    version: string;
     settings: Settings;
     models: ModelInfo[];
     availableProviders: ProviderId[];
@@ -24,6 +26,7 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   connected: false,
   bootPhase: "connecting",
   bootCount: 0,
+  version: "",
   settings: null,
   models: [],
   availableProviders: [],
@@ -32,6 +35,7 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   setBootInfo: (info) =>
     set({
       bootCount: info.bootCount,
+      version: info.version,
       settings: info.settings,
       models: info.models,
       availableProviders: info.availableProviders,

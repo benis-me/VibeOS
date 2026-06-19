@@ -245,6 +245,34 @@ export function useDelegatedEvents(
       });
     };
 
+    // Drag SOURCE: make AI content draggable across apps. An element opts in with
+    // data-vibeos-drag (+ optional data-drag-kind/-ref/-label); native <img>/<a>
+    // work too. The DROP side lives on the window surface (AiHtmlSurface).
+    const onDragStart = (e: DragEvent) => {
+      const el = (e.target as HTMLElement)?.closest?.(
+        "[data-vibeos-drag],img[src],a[href]",
+      ) as HTMLElement | null;
+      if (!el || !e.dataTransfer) return;
+      const text = (el.textContent ?? "").trim().slice(0, 200);
+      let payload: { kind: string; ref: string; label?: string } | null = null;
+      if (el.matches("[data-vibeos-drag]")) {
+        const kind = el.dataset.dragKind ?? "text";
+        payload = {
+          kind: ["text", "image", "file", "desktop-object", "app-shortcut"].includes(kind) ? kind : "text",
+          ref: el.dataset.dragRef ?? text,
+          label: el.dataset.dragLabel ?? text.slice(0, 80),
+        };
+      } else if (el.tagName === "IMG") {
+        payload = { kind: "image", ref: (el as HTMLImageElement).src, label: (el as HTMLImageElement).alt || "image" };
+      } else if (el.tagName === "A") {
+        payload = { kind: "text", ref: (el as HTMLAnchorElement).href, label: text.slice(0, 80) || "link" };
+      }
+      if (!payload) return;
+      e.dataTransfer.setData("application/x-vibeos-drag", JSON.stringify(payload));
+      e.dataTransfer.setData("text/plain", payload.label ?? payload.ref);
+      e.dataTransfer.effectAllowed = "copy";
+    };
+
     root.addEventListener("click", onClick);
     root.addEventListener("dblclick", onDblClick);
     // Capture phase so the native submit is intercepted before the browser can
@@ -252,12 +280,14 @@ export function useDelegatedEvents(
     root.addEventListener("submit", onSubmit, true);
     root.addEventListener("change", onChange);
     root.addEventListener("keydown", onKey);
+    root.addEventListener("dragstart", onDragStart);
     return () => {
       root.removeEventListener("click", onClick);
       root.removeEventListener("dblclick", onDblClick);
       root.removeEventListener("submit", onSubmit, true);
       root.removeEventListener("change", onChange);
       root.removeEventListener("keydown", onKey);
+      root.removeEventListener("dragstart", onDragStart);
     };
   }, [ref, onOp]);
 }

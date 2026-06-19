@@ -2,14 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import {
-  Palette,
   SlidersHorizontal,
   Cpu,
   Info,
   Sun,
   Moon,
   Languages,
-  Sparkles,
   ChevronDown,
   RefreshCw,
   Search,
@@ -25,7 +23,7 @@ import { useT, useLocale } from "@/lib/i18n";
 import { EASE_OUT, usePopoverMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-type CategoryId = "appearance" | "general" | "ai" | "profile" | "about";
+type CategoryId = "general" | "ai" | "profile" | "about";
 
 const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh"];
 const THINKING_MODES: ThinkingMode[] = ["disabled", "adaptive", "enabled"];
@@ -39,11 +37,10 @@ const ROLES: AgentRole[] = ["ui-generation", "system-event", "maintenance"];
 export function SettingsApp() {
   const t = useT();
   const settings = useSettingsStore((s) => s.settings);
-  const [category, setCategory] = useState<CategoryId>("appearance");
+  const [category, setCategory] = useState<CategoryId>("general");
   if (!settings) return null;
 
   const CATEGORIES: { id: CategoryId; icon: React.ReactNode; label: string }[] = [
-    { id: "appearance", icon: <Palette className="size-3.5" />, label: t("settings.cat.appearance") },
     { id: "general", icon: <SlidersHorizontal className="size-3.5" />, label: t("settings.cat.general") },
     { id: "ai", icon: <Cpu className="size-3.5" />, label: t("settings.cat.ai") },
     { id: "profile", icon: <User className="size-3.5" />, label: t("settings.cat.profile") },
@@ -88,7 +85,6 @@ export function SettingsApp() {
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15, ease: EASE_OUT }}
             >
-              {category === "appearance" && <AppearancePane />}
               {category === "general" && <GeneralPane />}
               {category === "ai" && <AiEnginePane />}
               {category === "profile" && <ProfilePane />}
@@ -101,16 +97,22 @@ export function SettingsApp() {
   );
 }
 
-function AppearancePane() {
+function GeneralPane() {
   const t = useT();
+  const locale = useLocale();
   const theme = useSettingsStore((s) => s.settings?.theme ?? "dark");
   const skin = useSettingsStore((s) => s.settings?.skin ?? "devdock");
+  const proactive = useSettingsStore((s) => s.settings?.prefs.proactiveAgents !== false);
+  const setLocale = (next: Locale) =>
+    wsClient.send("c2s.settings.update", { partial: { locale: next } });
   const setTheme = (next: "light" | "dark") =>
     wsClient.send("c2s.settings.update", { partial: { theme: next } });
   const setSkin = (next: Skin) => wsClient.send("c2s.settings.update", { partial: { skin: next } });
+  const setProactive = (on: boolean) =>
+    wsClient.send("c2s.settings.update", { partial: { prefs: { proactiveAgents: on } } });
 
   return (
-    <Pane title={t("settings.cat.appearance")}>
+    <Pane title={t("settings.cat.general")}>
       <Group>
         <Row label={t("settings.theme")}>
           <Segmented
@@ -129,23 +131,6 @@ function AppearancePane() {
             <option value="aqua">Mac Aqua</option>
           </Select>
         </Row>
-      </Group>
-    </Pane>
-  );
-}
-
-function GeneralPane() {
-  const t = useT();
-  const locale = useLocale();
-  const proactive = useSettingsStore((s) => s.settings?.prefs.proactiveAgents !== false);
-  const setLocale = (next: Locale) =>
-    wsClient.send("c2s.settings.update", { partial: { locale: next } });
-  const setProactive = (on: boolean) =>
-    wsClient.send("c2s.settings.update", { partial: { prefs: { proactiveAgents: on } } });
-
-  return (
-    <Pane title={t("settings.cat.general")}>
-      <Group>
         <Row label={t("settings.language")} hint={t("settings.language.hint")}>
           <Segmented
             value={locale}
@@ -185,7 +170,6 @@ function AiEnginePane() {
   const providerOptions = AI_PROVIDERS.filter(
     (p) => available.includes(p.id) || p.id === provider,
   );
-  const providerMeta = AI_PROVIDERS.find((p) => p.id === provider);
   const setProvider = (id: ProviderId) =>
     wsClient.send("c2s.settings.update", { partial: { provider: id } });
   const patchRole = (role: AgentRole, cfg: Partial<RoleConfig>) =>
@@ -215,7 +199,7 @@ function AiEnginePane() {
       }
     >
       <Group>
-        <Row label={t("settings.provider")} hint={t("settings.provider.hint")}>
+        <Row label={t("settings.provider")}>
           <Select value={provider} onChange={(v) => setProvider(v as ProviderId)}>
             {providerOptions.map((p) => (
               <option key={p.id} value={p.id}>
@@ -224,9 +208,6 @@ function AiEnginePane() {
             ))}
           </Select>
         </Row>
-        <p className="px-3.5 pb-3 text-[11px] leading-relaxed text-muted-foreground">
-          {providerMeta?.kind === "api" ? t("settings.provider.apiHint") : t("settings.provider.cliHint")}
-        </p>
       </Group>
 
       <GroupLabel>{t("settings.models")}</GroupLabel>
@@ -241,9 +222,6 @@ function AiEnginePane() {
           <Group key={role} className="mb-2.5">
             <div className="px-3.5 py-2.5">
               <div className="text-[13px] font-medium">{t(`settings.role.${role}.label`)}</div>
-              <div className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-                {t(`settings.role.${role}.hint`)}
-              </div>
             </div>
             <Row label={t("settings.role.model")}>
               <Combobox
@@ -311,23 +289,16 @@ function ProfilePane() {
 function AboutPane() {
   const t = useT();
   const bootCount = useConnectionStore((s) => s.bootCount);
-  const provider = useSettingsStore((s) => s.settings?.provider);
-  const engine = AI_PROVIDERS.find((p) => p.id === provider)?.label ?? provider ?? "—";
+  const version = useConnectionStore((s) => s.version);
 
   return (
     <Pane title={t("settings.cat.about")}>
       <Group>
         <Row label={t("settings.about.system")}>
-          <span className="text-[13px] font-medium">VibeOS 0.1.0</span>
+          <span className="text-[13px] font-medium">{version ? `VibeOS ${version}` : "VibeOS"}</span>
         </Row>
         <Row label={t("settings.about.boots")}>
           <span className="text-[13px] font-medium">{bootCount}</span>
-        </Row>
-        <Row label={t("settings.about.engine")}>
-          <span className="flex items-center gap-1.5 text-[13px] font-medium">
-            <Sparkles className="size-3.5 text-muted-foreground" />
-            {engine}
-          </span>
         </Row>
       </Group>
     </Pane>

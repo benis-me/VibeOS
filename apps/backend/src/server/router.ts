@@ -1,4 +1,5 @@
 import type { ServerWebSocket } from "bun";
+import pkg from "../../package.json";
 import type {
   ClientToServer,
   WsEnvelope,
@@ -24,7 +25,15 @@ import {
   getWindow,
 } from "../db/repositories/WindowRepo.ts";
 import { ensureMemory, getSnapshot, getMemory } from "../db/repositories/AppMemoryRepo.ts";
-import { listByLocation, moveNode, getNode, createNode, ensureShortcut } from "../db/repositories/VfsRepo.ts";
+import {
+  listByLocation,
+  moveNode,
+  getNode,
+  createNode,
+  ensureShortcut,
+  deleteNode,
+  emptyRecycleBin,
+} from "../db/repositories/VfsRepo.ts";
 import { renderInitialWindow } from "../kernel/windowInit.ts";
 import { listRecent, markRead, get as getNotification } from "../db/repositories/NotificationRepo.ts";
 import { recentRuns } from "../db/repositories/AgentRepo.ts";
@@ -115,6 +124,19 @@ async function dispatch(
     case "c2s.vfs.move": {
       const node = await moveNode(msg.payload);
       if (node) broadcast("s2c.vfs.changed", { node });
+      return;
+    }
+
+    case "c2s.vfs.delete": {
+      if (await deleteNode(msg.payload.nodeId)) {
+        broadcast("s2c.vfs.removed", { ids: [msg.payload.nodeId] });
+      }
+      return;
+    }
+
+    case "c2s.vfs.empty": {
+      const ids = await emptyRecycleBin();
+      if (ids.length) broadcast("s2c.vfs.removed", { ids });
       return;
     }
 
@@ -227,20 +249,25 @@ async function dispatch(
     }
 
     case "c2s.app.launch": {
-      // Spawn a fresh window and have the AI generate this app live inside it.
+      // Spawn a fresh window (or desktop widget) and generate it live.
       const appId = await ensureTransientApp();
+      const widget = !!msg.payload.widget;
       const w = await openWindow({
         appId,
         title: msg.payload.name,
-        kind: "app",
-        rect: { x: 140, y: 90, w: 820, h: 580 },
+        kind: widget ? "widget" : "app",
+        rect: widget ? { x: 60, y: 60, w: 320, h: 260 } : { x: 140, y: 90, w: 820, h: 580 },
       });
       await ensureMemory(w.id, appId);
       broadcast("s2c.window.opened", { window: w });
-      const seed = `Generate the application "${msg.payload.name}".${
-        msg.payload.description ? ` It is: ${msg.payload.description}.` : ""
-      } Produce a complete, believable, fully usable first screen for this app.`;
-      log.info(`launch app "${msg.payload.name}" → window [${w.id.slice(-6)}]`);
+      const seed = widget
+        ? `Generate a compact desktop WIDGET called "${msg.payload.name}".${
+            msg.payload.description ? ` It is: ${msg.payload.description}.` : ""
+          } It must be a small, glanceable, self-contained panel WITHOUT any window chrome that fills its area (e.g. a clock, weather, stocks, a mini to-do or player). Keep it minimal, legible, and visually striking.`
+        : `Generate the application "${msg.payload.name}".${
+            msg.payload.description ? ` It is: ${msg.payload.description}.` : ""
+          } Produce a complete, believable, fully usable first screen for this app.`;
+      log.info(`launch ${widget ? "widget" : "app"} "${msg.payload.name}" → window [${w.id.slice(-6)}]`);
       bus.emit("window.spawnRender", { windowId: w.id, seedPrompt: seed });
       return;
     }
@@ -380,11 +407,13 @@ function sendBootState(ws: ServerWebSocket<WsData>): void {
 
   sendTo(ws, "s2c.boot.state", {
     phase: "ready",
+    version: pkg.version,
     bootCount: kernelState.bootCount,
     settings: loadSettings(),
     windows,
     apps: listApps(),
     desktopNodes: listByLocation("desktop"),
+    recycleBinNodes: listByLocation("recyclebin"),
     notifications: listRecent(),
     globalState: kernelState.get(),
     snapshots,
