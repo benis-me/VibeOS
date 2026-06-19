@@ -151,6 +151,11 @@ export function useBoot(): void {
       ),
     );
     offs.push(
+      wsClient.on("s2c.provider.models", (p) =>
+        useSettingsStore.getState().setProviderModels(p.providerId, p.models),
+      ),
+    );
+    offs.push(
       wsClient.on("s2c.notification.read", (p) =>
         useNotificationStore.getState().markRead(p.id),
       ),

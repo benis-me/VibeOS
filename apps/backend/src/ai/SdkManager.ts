@@ -4,7 +4,7 @@ import { ModelPolicy } from "./ModelPolicy.ts";
 import { estimateCostUsd } from "./pricing.ts";
 import { systemPromptFor, localeDirective } from "../prompt/systemPrompts.ts";
 import { env } from "../config/env.ts";
-import { activeProvider, availableProviderIds, getProvider } from "./providers/index.ts";
+import { activeProviderId, availableProviderIds, getProvider } from "./providers/index.ts";
 import type { AiProvider, RunResult } from "./providers/types.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 import * as AgentRepo from "../db/repositories/AgentRepo.ts";
@@ -149,7 +149,7 @@ export async function run(opts: RunOptions): Promise<RunResult> {
     }
   };
 
-  const provider = await activeProvider();
+  const provider = await getProvider(cfg.providerId ?? activeProviderId());
   log.debug(
     `query ${opts.role} via ${provider.id} model=${cfg.model ?? "(default)"} effort=${cfg.effort} thinking=${cfg.thinking?.type} locale=${locale}${opts.sessionId ? " resume" : ""}`,
   );

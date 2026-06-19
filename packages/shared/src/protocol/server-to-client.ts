@@ -2,7 +2,7 @@ import type { WindowState } from "../domain/window.ts";
 import type { AppDescriptor } from "../domain/app.ts";
 import type { VfsNode } from "../domain/vfs.ts";
 import type { Notification } from "../domain/notification.ts";
-import type { Settings, ProviderId } from "../domain/settings.ts";
+import type { Settings, ProviderId, ProviderModel } from "../domain/settings.ts";
 import type { AgentRole, AgentRun } from "../domain/agent.ts";
 
 export type BootPhase = "connecting" | "restoring" | "ready";
@@ -90,6 +90,8 @@ export type ServerToClient =
   | { type: "s2c.settings.changed"; payload: { settings: Settings } }
   | { type: "s2c.models.updated"; payload: { models: ModelInfo[] } }
   | { type: "s2c.providers.updated"; payload: { availableProviders: ProviderId[] } }
+  /** Refreshed model list for one API provider (Providers settings page). */
+  | { type: "s2c.provider.models"; payload: { providerId: ProviderId; models: ProviderModel[] } }
   | {
       type: "s2c.app.searchResults";
       payload: { requestId: string; results: AppSearchResult[] };

@@ -4,12 +4,12 @@ import type {
   ClientToServer,
   WsEnvelope,
 } from "@vibeos/shared/protocol";
-import type { AppManifest } from "@vibeos/shared/domain";
+import type { AppManifest, ModelCapability } from "@vibeos/shared/domain";
 import { sendTo, broadcast, type WsData } from "./wsGateway.ts";
 import { bus } from "../events/bus.ts";
 import { kernelState } from "../kernel/kernelState.ts";
 import { ModelPolicy } from "../ai/ModelPolicy.ts";
-import { setActiveProvider, activeProviderId, availableProviderIds } from "../ai/providers/index.ts";
+import { setActiveProvider, activeProviderId, availableProviderIds, getProvider } from "../ai/providers/index.ts";
 import { env } from "../config/env.ts";
 import { searchApps } from "../ai/appSearch.ts";
 import { loadSettings, updateSettings } from "../db/repositories/SettingsRepo.ts";
@@ -198,6 +198,27 @@ async function dispatch(
       return;
     }
 
+    case "c2s.provider.fetchModels": {
+      // Refresh one API provider's model list from its models endpoint, persist
+      // it, and broadcast so every Providers page updates.
+      const { providerId } = msg.payload;
+      try {
+        const provider = await getProvider(providerId);
+        const discovered = await provider.discoverModels();
+        const models = discovered.map((m) => ({
+          id: m.modelId,
+          name: m.name,
+          capabilities: inferCapabilities(m.modelId),
+        }));
+        if (models.length) await updateSettings({ apiProviders: { [providerId]: { models } } });
+        broadcast("s2c.provider.models", { providerId, models });
+      } catch (e) {
+        log.warn(`fetchModels(${providerId}) failed: ${e instanceof Error ? e.message : e}`);
+        broadcast("s2c.provider.models", { providerId, models: [] });
+      }
+      return;
+    }
+
     case "c2s.notification.read": {
       await markRead(msg.payload.id);
       broadcast("s2c.notification.read", { id: msg.payload.id });
@@ -357,6 +378,15 @@ async function dispatch(
       return;
     }
   }
+}
+
+/** Best-effort capability tags for a freshly-discovered model id. */
+function inferCapabilities(id: string): ModelCapability[] {
+  const s = id.toLowerCase();
+  if (/image|imagen|flux|dall|nano-banana|ideogram|recraft|seedream|qwen-image/.test(s)) {
+    return ["image"];
+  }
+  return ["text", "vision"];
 }
 
 /** Open the app's window if not already open; returns the window id (or null). */

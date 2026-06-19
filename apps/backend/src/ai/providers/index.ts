@@ -2,6 +2,7 @@ import type { ProviderId } from "@vibeos/shared/domain";
 import { DEFAULT_PROVIDER } from "@vibeos/shared/domain";
 import type { AiProvider } from "./types.ts";
 import { whichBinary } from "./detect.ts";
+import { hasApiKey } from "./config.ts";
 
 export type { AiProvider, DiscoveredModel, ProviderRunOptions, RunResult, ThinkingConfig } from "./types.ts";
 
@@ -15,7 +16,10 @@ const LOADERS: Partial<Record<ProviderId, () => Promise<AiProvider>>> = {
   claude: async () => (await import("./claude.ts")).claudeProvider,
   codex: async () => (await import("./codex.ts")).codexProvider,
   openrouter: async () => (await import("./openrouter.ts")).openrouterProvider,
-  // openai / anthropic / gemini / fal are wired in Phase 2.
+  openai: async () => (await import("./openai.ts")).openaiProvider,
+  anthropic: async () => (await import("./anthropic.ts")).anthropicProvider,
+  gemini: async () => (await import("./gemini.ts")).geminiProvider,
+  // fal is image-only (no text run) — wired as an ImageProvider in Phase 4.
 };
 
 /** CLI providers require their binary on PATH; the names match the binaries. */
@@ -56,12 +60,12 @@ export { whichBinary } from "./detect.ts";
 
 /**
  * Which providers are usable on this machine: CLI providers need their binary
- * resolvable; API providers (openrouter) are always offered (the Settings hint
- * covers a missing key). Cheap — call on demand to rescan.
+ * resolvable; API providers need a key (from Settings or env). Cheap — call on
+ * demand to rescan.
  */
 export function availableProviderIds(): ProviderId[] {
   return (Object.keys(LOADERS) as ProviderId[]).filter((id) => {
     const bin = CLI_BINARIES[id];
-    return bin ? whichBinary(bin) !== null : true;
+    return bin ? whichBinary(bin) !== null : hasApiKey(id);
   });
 }

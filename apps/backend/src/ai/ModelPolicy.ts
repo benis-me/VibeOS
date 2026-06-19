@@ -1,16 +1,19 @@
 import type {
   AgentRole,
   ModelPolicyOverrides,
+  ProviderId,
   RoleConfig,
   ThinkingMode,
 } from "@vibeos/shared/domain";
-import { activeProvider } from "./providers/index.ts";
+import { activeProvider, activeProviderId } from "./providers/index.ts";
 import type { DiscoveredModel, ThinkingConfig } from "./providers/types.ts";
 import { env } from "../config/env.ts";
 
 export type { DiscoveredModel, ThinkingConfig };
 
 export interface RoleModelConfig {
+  /** Source provider for this role (CLI or API). */
+  providerId?: ProviderId;
   model?: string;
   fallbackModel?: string;
   effort?: "low" | "medium" | "high" | "xhigh";
@@ -87,7 +90,22 @@ class ModelPolicyImpl {
   }
 
   for(role: AgentRole): RoleModelConfig {
-    return this.roleConfig[role];
+    const defaultProvider = activeProviderId();
+    const o: RoleConfig = this.overrides[role] ?? {};
+    const providerId = (o.provider as ProviderId) || defaultProvider;
+    // An explicit non-default provider bypasses the default-provider auto-pick:
+    // honor the user's exact model choice for that provider (its own model list
+    // isn't what `recompute` indexed).
+    if (o.provider && o.provider !== defaultProvider) {
+      return {
+        providerId,
+        model: o.model || undefined,
+        fallbackModel: undefined,
+        effort: o.effort ?? DEFAULTS[role].effort,
+        thinking: toThinking(o.thinking ?? DEFAULTS[role].thinking, o.thinkingBudget),
+      };
+    }
+    return { providerId, ...this.roleConfig[role] };
   }
 
   /** Discovered models, for surfacing in Settings. */

@@ -1,4 +1,4 @@
-import type { Settings } from "../domain/settings.ts";
+import type { ProviderId, Settings } from "../domain/settings.ts";
 import type { VfsLocation } from "../domain/vfs.ts";
 
 /** A delegated event from inside an AI-generated window surface. */
@@ -66,6 +66,8 @@ export type ClientToServer =
   | { type: "c2s.vfs.open"; payload: { nodeId: string } }
   | { type: "c2s.settings.update"; payload: { partial: Partial<Settings> } }
   | { type: "c2s.provider.scan"; payload: Record<string, never> }
+  /** Refresh one API provider's model list from its models endpoint. */
+  | { type: "c2s.provider.fetchModels"; payload: { providerId: ProviderId } }
   | { type: "c2s.notification.read"; payload: { id: string | "all" } }
   | { type: "c2s.notification.click"; payload: { id: string } }
   /** Spotlight-style app search: AI returns a list of candidate apps. */

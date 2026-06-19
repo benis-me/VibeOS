@@ -53,7 +53,8 @@ export type ProviderField = "apiKey" | "baseUrl";
 
 /** Per-API-provider configuration (key + base url + model list), stored in DB. */
 export interface ApiProviderConfig {
-  enabled: boolean;
+  /** Defaults to true (treat `!== false` as enabled). */
+  enabled?: boolean;
   apiKey?: string;
   baseUrl?: string;
   /** Seeded from the catalog, refreshable via "Fetch models". */
