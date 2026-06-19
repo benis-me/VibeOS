@@ -560,10 +560,14 @@ function DefaultModelsPane() {
   };
 
   // Build a picker's options, keeping the current selection visible even if its
-  // provider/model isn't in the live list.
-  const withCurrent = (opts: ComboOption[], provider?: string, model?: string) => {
+  // provider/model isn't in the live list. `emptyLabel` names the cleared state
+  // (roles: "auto"; image: "off — no image generation").
+  const withCurrent = (opts: ComboOption[], provider?: string, model?: string, emptyLabel?: string) => {
     const value = provider && model ? `${provider}::${model}` : "";
-    const options: ComboOption[] = [{ value: "", label: t("settings.model.auto") }, ...opts];
+    const options: ComboOption[] = [
+      { value: "", label: emptyLabel ?? t("settings.model.auto") },
+      ...opts,
+    ];
     if (value && !opts.some((o) => o.value === value)) {
       options.push({ value, label: model!, sub: model, group: providerLabel(provider) });
     }
@@ -584,7 +588,7 @@ function DefaultModelsPane() {
   const img = settings.prefs.imageModel ?? {};
   const setImage = (partial: { provider?: string; model?: string }) =>
     wsClient.send("c2s.settings.update", { partial: { prefs: { imageModel: { ...img, ...partial } } } });
-  const imgPick = withCurrent(imageOptions, img.provider, img.model);
+  const imgPick = withCurrent(imageOptions, img.provider, img.model, t("settings.models.imageOff"));
 
   return (
     <Pane title={t("settings.cat.models")}>
