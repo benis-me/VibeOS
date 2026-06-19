@@ -3,11 +3,12 @@ import { ulid } from "@vibeos/shared/util";
 import { env } from "../config/env.ts";
 import { registerSocket, unregisterSocket, type WsData } from "./wsGateway.ts";
 import { handleMessage } from "./router.ts";
+import { getImageForServe } from "../ai/imageCache.ts";
 
 export function startHttpServer(): Server<WsData> {
   const server = Bun.serve<WsData>({
     port: env.port,
-    fetch(req, srv) {
+    async fetch(req, srv) {
       const url = new URL(req.url);
       if (url.pathname === "/ws") {
         const ok = srv.upgrade(req, { data: { clientId: ulid() } });
@@ -16,6 +17,14 @@ export function startHttpServer(): Server<WsData> {
       }
       if (url.pathname === "/healthz") {
         return new Response("ok", { status: 200 });
+      }
+      // Generated images, served by content id (awaits in-flight generation).
+      if (url.pathname.startsWith("/api/img/")) {
+        const img = await getImageForServe(url.pathname.slice("/api/img/".length));
+        if (!img) return new Response("not found", { status: 404 });
+        return new Response(img.bytes as Uint8Array<ArrayBuffer>, {
+          headers: { "Content-Type": img.mime, "Cache-Control": "public, max-age=31536000, immutable" },
+        });
       }
       return new Response("VibeOS backend", { status: 200 });
     },

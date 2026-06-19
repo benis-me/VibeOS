@@ -2,7 +2,7 @@ import type { AgentRole, AgentTrigger } from "@vibeos/shared/domain";
 import { DEFAULT_LOCALE } from "@vibeos/shared/domain";
 import { ModelPolicy } from "./ModelPolicy.ts";
 import { estimateCostUsd } from "./pricing.ts";
-import { systemPromptFor, localeDirective } from "../prompt/systemPrompts.ts";
+import { systemPromptFor, localeDirective, imageDirective } from "../prompt/systemPrompts.ts";
 import { env } from "../config/env.ts";
 import { activeProviderId, availableProviderIds, getProvider } from "./providers/index.ts";
 import type { AiProvider, RunResult } from "./providers/types.ts";
@@ -95,9 +95,16 @@ export async function run(opts: RunOptions): Promise<RunResult> {
   // Skin is applied purely via CSS (design tokens + .ai-surface control styles),
   // so generated HTML stays skin-neutral and every app — old and new — re-skins
   // live when the skin changes. We deliberately do NOT tell the agent the skin.
-  const locale = loadSettings().locale ?? DEFAULT_LOCALE;
+  const settings = loadSettings();
+  const locale = settings.locale ?? DEFAULT_LOCALE;
+  const imageOn =
+    opts.role === "ui-generation" &&
+    !!settings.prefs.imageModel?.provider &&
+    !!settings.prefs.imageModel?.model;
   const systemPrompt =
-    (opts.systemPromptOverride ?? systemPromptFor(opts.role)) + localeDirective(locale);
+    (opts.systemPromptOverride ?? systemPromptFor(opts.role)) +
+    localeDirective(locale) +
+    (imageOn ? imageDirective() : "");
   // Track the run so the Activity Monitor can stop it. Reuse the caller's abort
   // controller when given (window close already aborts via it), else make one.
   const controller = opts.abort ?? new AbortController();

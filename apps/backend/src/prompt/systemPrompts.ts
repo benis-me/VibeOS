@@ -99,3 +99,11 @@ export function localeDirective(locale: Locale): string {
     ? `\n\nLANGUAGE: Write ALL user-facing text (UI labels, content, notification titles and bodies, summaries) in English. Do NOT translate HTML tag/attribute names or the syscall JSON keys.`
     : `\n\nLANGUAGE: 所有面向用户的文本（界面文字、正文内容、通知标题与正文、摘要）必须使用简体中文。不要改动 HTML 标签/属性名或 syscall JSON 的键名。`;
 }
+
+/**
+ * Appended to ui-generation prompts ONLY when an image model is configured, so
+ * the agent can request real raster images that the OS generates and injects.
+ */
+export function imageDirective(): string {
+  return `\n\nIMAGES: When the UI genuinely needs a raster image (a photo, illustration, album/cover art, avatar, product shot, hero/banner), include an <img> with NO src and instead add data-vibe-img="<vivid, specific description of the image to generate>", data-vibe-ratio="<W:H, e.g. 16:9 / 1:1 / 4:3>", and an alt="". Give it concrete CSS size (e.g. style="width:100%;height:160px;object-fit:cover;border-radius:8px"). The OS generates the image and fills in the src — do NOT invent a src or use a placeholder URL. Use images purposefully where a real app would show one; keep icons, decoration, and charts as CSS/SVG (never data-vibe-img). Reuse the SAME data-vibe-img text across re-renders for the same image so it stays stable and isn't regenerated.`;
+}

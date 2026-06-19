@@ -18,6 +18,7 @@ import { run, recordSummary } from "../ai/SdkManager.ts";
 import { parseAiOutput, extractStreamingHtml, extractRegions } from "../ai/streamParser.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
 import { applyRegionsServer, extractRegionIds } from "./regionMerge.ts";
+import { rewriteImages } from "../ai/imageCache.ts";
 import { logger } from "../util/log.ts";
 
 const log = logger("ui-gen");
@@ -253,17 +254,20 @@ async function generate(
 
   const current = memory?.htmlSnapshot ?? "";
   if (parsed.html !== undefined) {
-    await saveSnapshot(windowId, parsed.html);
-    broadcast("s2c.ui.patch", { windowId, mode: "full", html: parsed.html, done: true });
+    // Resolve <img data-vibe-img> placeholders → /api/img/:id (generates + caches).
+    const html = rewriteImages(parsed.html);
+    await saveSnapshot(windowId, html);
+    broadcast("s2c.ui.patch", { windowId, mode: "full", html, done: true });
     log.info(
-      `✓ ${app.name} [${windowId.slice(-6)}] full render ${parsed.html.length} chars, ${parsed.syscalls.length} syscall(s) in ${dt}ms`,
+      `✓ ${app.name} [${windowId.slice(-6)}] full render ${html.length} chars, ${parsed.syscalls.length} syscall(s) in ${dt}ms`,
     );
   } else if (parsed.regions && parsed.regions.length > 0) {
-    const merged = applyRegionsServer(current, parsed.regions);
+    const regions = parsed.regions.map((r) => ({ ...r, html: rewriteImages(r.html) }));
+    const merged = applyRegionsServer(current, regions);
     await saveSnapshot(windowId, merged);
-    broadcast("s2c.ui.patch", { windowId, mode: "regions", regions: parsed.regions, done: true });
+    broadcast("s2c.ui.patch", { windowId, mode: "regions", regions, done: true });
     log.info(
-      `✓ ${app.name} [${windowId.slice(-6)}] patched ${parsed.regions.length} region(s), ${parsed.syscalls.length} syscall(s) in ${dt}ms`,
+      `✓ ${app.name} [${windowId.slice(-6)}] patched ${regions.length} region(s), ${parsed.syscalls.length} syscall(s) in ${dt}ms`,
     );
   } else {
     broadcast("s2c.ui.busy", { windowId, busy: false });
