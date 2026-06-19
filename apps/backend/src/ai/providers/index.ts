@@ -10,11 +10,12 @@ export type { AiProvider, DiscoveredModel, ProviderRunOptions, RunResult, Thinki
  * imported/evaluated, so booting on Codex never loads the CodeBuddy/Claude SDKs
  * (and a broken/missing SDK can't crash boot — it only breaks its own provider).
  */
-const LOADERS: Record<ProviderId, () => Promise<AiProvider>> = {
+const LOADERS: Partial<Record<ProviderId, () => Promise<AiProvider>>> = {
   codebuddy: async () => (await import("./codebuddy.ts")).codebuddyProvider,
   claude: async () => (await import("./claude.ts")).claudeProvider,
   codex: async () => (await import("./codex.ts")).codexProvider,
   openrouter: async () => (await import("./openrouter.ts")).openrouterProvider,
+  // openai / anthropic / gemini / fal are wired in Phase 2.
 };
 
 /** CLI providers require their binary on PATH; the names match the binaries. */
@@ -40,7 +41,9 @@ export function activeProviderId(): ProviderId {
 export async function getProvider(id: ProviderId): Promise<AiProvider> {
   const hit = cache.get(id);
   if (hit) return hit;
-  const provider = await LOADERS[id]();
+  const loader = LOADERS[id];
+  if (!loader) throw new Error(`No provider loader registered for "${id}"`);
+  const provider = await loader();
   cache.set(id, provider);
   return provider;
 }

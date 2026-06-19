@@ -11,13 +11,23 @@ interface SettingsRow {
   skin: string | null;
   user_profile: string | null;
   model_overrides_json: string;
+  api_providers_json: string | null;
   prefs_json: string;
   updated_at: number;
 }
 
 const SETTINGS_ID = "settings";
 
-const PROVIDERS: readonly ProviderId[] = ["codebuddy", "claude", "codex", "openrouter"];
+const PROVIDERS: readonly ProviderId[] = [
+  "codebuddy",
+  "claude",
+  "codex",
+  "openrouter",
+  "openai",
+  "anthropic",
+  "gemini",
+  "fal",
+];
 
 function asProvider(v: string | null | undefined): ProviderId {
   return PROVIDERS.includes(v as ProviderId) ? (v as ProviderId) : DEFAULT_PROVIDER;
@@ -35,6 +45,7 @@ const DEFAULTS: Settings = {
   theme: "dark",
   provider: DEFAULT_PROVIDER,
   modelOverrides: {},
+  apiProviders: {},
   prefs: { proactiveAgents: true },
   updatedAt: 0,
 };
@@ -58,6 +69,7 @@ export function loadSettings(): Settings {
     skin: asSkin(row.skin),
     userProfile: row.user_profile ?? undefined,
     modelOverrides: safeJson(row.model_overrides_json),
+    apiProviders: safeJson(row.api_providers_json ?? "{}"),
     prefs: safeJson(row.prefs_json),
     updatedAt: row.updated_at,
   };
@@ -73,14 +85,15 @@ export function ensureSettings(): Promise<Settings> {
     if (existing) return loadSettings();
     const now = Date.now();
     db.query(
-      `INSERT INTO settings (id, theme, provider, locale, model_overrides_json, prefs_json, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO settings (id, theme, provider, locale, model_overrides_json, api_providers_json, prefs_json, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       SETTINGS_ID,
       DEFAULTS.theme,
       DEFAULTS.provider,
       DEFAULTS.locale ?? null,
       JSON.stringify(DEFAULTS.modelOverrides),
+      JSON.stringify(DEFAULTS.apiProviders),
       JSON.stringify(DEFAULTS.prefs),
       now,
     );
@@ -102,6 +115,12 @@ export function updateSettings(partial: Partial<Settings>): Promise<Settings> {
         ...cfg,
       };
     }
+    // Same per-key shallow merge for API providers: changing one provider's key
+    // (or model list) must not clobber the others or the rest of that entry.
+    const mergedApi = { ...current.apiProviders };
+    for (const [id, cfg] of Object.entries(partial.apiProviders ?? {})) {
+      mergedApi[id] = { ...mergedApi[id], ...cfg };
+    }
     const next: Settings = {
       theme: partial.theme ?? current.theme,
       provider: partial.provider ?? current.provider,
@@ -109,11 +128,12 @@ export function updateSettings(partial: Partial<Settings>): Promise<Settings> {
       skin: partial.skin ?? current.skin,
       userProfile: partial.userProfile ?? current.userProfile,
       modelOverrides: mergedOverrides,
+      apiProviders: mergedApi,
       prefs: { ...current.prefs, ...partial.prefs },
       updatedAt: Date.now(),
     };
     db.query(
-      `UPDATE settings SET theme = ?, provider = ?, locale = ?, skin = ?, user_profile = ?, model_overrides_json = ?, prefs_json = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE settings SET theme = ?, provider = ?, locale = ?, skin = ?, user_profile = ?, model_overrides_json = ?, api_providers_json = ?, prefs_json = ?, updated_at = ? WHERE id = ?`,
     ).run(
       next.theme,
       next.provider,
@@ -121,6 +141,7 @@ export function updateSettings(partial: Partial<Settings>): Promise<Settings> {
       next.skin ?? null,
       next.userProfile ?? null,
       JSON.stringify(next.modelOverrides),
+      JSON.stringify(next.apiProviders),
       JSON.stringify(next.prefs),
       next.updatedAt,
       SETTINGS_ID,

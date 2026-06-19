@@ -35,3 +35,5 @@ coverage/
 # local tooling (regenerable, machine-specific)
 .codegraph/
 .impeccable/
+.claude/
+docs/superpowers/
