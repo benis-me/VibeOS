@@ -1,5 +1,11 @@
+import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import type { ProviderId } from "@vibeos/shared/domain";
 import { providerConfig } from "./providers/config.ts";
+import { logger } from "../util/log.ts";
+
+const log = logger("imagegen");
 
 export interface GeneratedImage {
   bytes: Uint8Array;
@@ -42,6 +48,9 @@ export async function generateImage(
   prompt: string,
   aspect: string,
 ): Promise<GeneratedImage> {
+  // CodeBuddy is a local CLI: its ImageGen tool writes a file we then read.
+  if (provider === "codebuddy") return codebuddyImage(model, prompt, aspect);
+
   const { apiKey, baseUrl } = providerConfig(provider as ProviderId);
   if (!apiKey) throw new Error(`No API key for ${provider}`);
   const signal = AbortSignal.timeout(90_000);
@@ -115,4 +124,41 @@ export async function generateImage(
   }
 
   throw new Error(`Image generation not supported for provider "${provider}"`);
+}
+
+/**
+ * Generate an image via the CodeBuddy CLI's ImageGen tool. Run headlessly
+ * (`-p -y`), the agent invokes ImageGen (via DeferExecuteTool) which writes the
+ * file into `output_dir`; we read that file back. Optional `--text-to-image-model`
+ * selects the model (otherwise CodeBuddy's configured default is used).
+ */
+async function codebuddyImage(model: string, prompt: string, aspect: string): Promise<GeneratedImage> {
+  const dir = `${tmpdir()}/vibeos-img-${randomUUID()}`;
+  await mkdir(dir, { recursive: true });
+  const size = openaiSize(aspect); // ImageGen accepts 1024x1024 / 1024x1536 / 1536x1024
+  log.debug(`codebuddy ImageGen → ${dir} (${size})`);
+  const args = ["-p", "-y", "--output-format", "stream-json"];
+  if (model && model !== "default") args.push("--text-to-image-model", model);
+  args.push(
+    `Use the ImageGen tool (load it via ToolSearch, then call it through DeferExecuteTool) to generate ONE image and save it. ` +
+      `prompt: ${JSON.stringify(prompt)}. size: "${size}". output_dir: ${JSON.stringify(dir)}. ` +
+      `Do nothing else and do not ask questions.`,
+  );
+  const proc = Bun.spawn(["codebuddy", ...args], { stdout: "ignore", stderr: "ignore" });
+  const timer = setTimeout(() => proc.kill(), 150_000);
+  try {
+    await proc.exited;
+  } finally {
+    clearTimeout(timer);
+  }
+  try {
+    const files = (await readdir(dir)).filter((f) => /\.(png|jpe?g|webp)$/i.test(f));
+    const file = files[0];
+    if (!file) throw new Error("codebuddy ImageGen produced no image");
+    const bytes = new Uint8Array(await readFile(`${dir}/${file}`));
+    const mime = /\.png$/i.test(file) ? "image/png" : /\.webp$/i.test(file) ? "image/webp" : "image/jpeg";
+    return { bytes, mime };
+  } finally {
+    void rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
 }

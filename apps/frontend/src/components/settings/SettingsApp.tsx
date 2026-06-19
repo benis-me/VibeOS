@@ -537,7 +537,9 @@ function DefaultModelsPane() {
       if (imageOnly ? !p.imageCapable : p.textCapable === false) continue;
       if (!enabled(p)) continue;
       let models: { id: string; name: string; image?: boolean }[] = [];
-      if (p.kind === "api") {
+      if (imageOnly || p.kind === "api") {
+        // Image models (and all API text models) are curated: catalog seed +
+        // user-fetched/custom. CLIs like CodeBuddy expose their ImageGen here too.
         models = (settings.apiProviders[p.id]?.models ?? p.seedModels ?? []).map((m) => ({
           id: m.id,
           name: m.name,

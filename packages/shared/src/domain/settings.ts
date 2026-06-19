@@ -86,7 +86,15 @@ const IMG: ModelCapability[] = ["image"];
 /** Static provider catalog: Local Agents (CLI) + API Providers. */
 export const AI_PROVIDERS: readonly ProviderCatalogEntry[] = [
   // — Local Agents (CLI subprocess; no key, configured via their own login) —
-  { id: "codebuddy", label: "CodeBuddy", kind: "cli", textCapable: true },
+  {
+    id: "codebuddy",
+    label: "CodeBuddy",
+    kind: "cli",
+    textCapable: true,
+    // CodeBuddy's CLI has a built-in ImageGen tool (text-to-image).
+    imageCapable: true,
+    seedModels: [{ id: "default", name: "ImageGen", capabilities: IMG }],
+  },
   { id: "claude", label: "Claude Code", kind: "cli", textCapable: true },
   { id: "codex", label: "Codex", kind: "cli", textCapable: true },
   // — API Providers (hosted, key configured in Settings) —
