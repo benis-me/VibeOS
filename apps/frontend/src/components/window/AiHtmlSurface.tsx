@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import { sanitizeAiHtml } from "@/lib/sanitize";
 import { wsClient, API_BASE } from "@/lib/ws";
@@ -75,6 +75,28 @@ export function AiHtmlSurface({ windowId, html }: Props) {
     if (API_BASE && out) out = out.replace(/(["'])\/api\/img\//g, `$1${API_BASE}/api/img/`);
     el.innerHTML = out;
   }, [html]);
+
+  // Retry generated images that fail to load (e.g. the held request was cut
+  // short, or a transient error) instead of leaving a broken image. The image
+  // streams once generation finishes, so a backed-off retry recovers it.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onErr = (e: Event) => {
+      const img = e.target as HTMLImageElement;
+      if (!img || img.tagName !== "IMG" || !/\/api\/img\//.test(img.src)) return;
+      const n = Number(img.dataset.vibeRetry ?? "0");
+      if (n >= 6) return;
+      img.dataset.vibeRetry = String(n + 1);
+      const base = img.src.replace(/[?&]r=\d+$/, "");
+      const sep = base.includes("?") ? "&" : "?";
+      setTimeout(() => {
+        img.src = `${base}${sep}r=${n + 1}`;
+      }, 1000 + n * 1500);
+    };
+    el.addEventListener("error", onErr, true); // capture — error doesn't bubble
+    return () => el.removeEventListener("error", onErr, true);
+  }, []);
 
   // Remember the scroll position as the user scrolls.
   const onScroll = useCallback(() => {

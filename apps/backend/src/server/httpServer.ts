@@ -8,6 +8,10 @@ import { getImageForServe } from "../ai/imageCache.ts";
 export function startHttpServer(): Server<WsData> {
   const server = Bun.serve<WsData>({
     port: env.port,
+    // /api/img requests block while the image generates (can take 30–150s). The
+    // default idle timeout (~10s) would kill that held request → a broken image.
+    // 255s is Bun's max and comfortably exceeds generation time.
+    idleTimeout: 255,
     async fetch(req, srv) {
       const url = new URL(req.url);
       if (url.pathname === "/ws") {
