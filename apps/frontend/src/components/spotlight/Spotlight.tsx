@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, Fragment } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Search, Loader2, LayoutGrid, AppWindow } from "lucide-react";
+import { Search, Loader2, LayoutGrid, AppWindow, Sparkles, ChevronRight } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
 import type { AppSearchResult } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
@@ -20,10 +20,18 @@ export function Spotlight({ open, onClose }: Props) {
   const [results, setResults] = useState<AppSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(0);
+  const [running, setRunning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const reqId = useRef<string>("");
+  const cmdReqId = useRef<string>("");
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const t = useT();
+
+  // A leading ">" switches from app search to AI command mode (Raycast/VS Code
+  // convention): the rest of the line is a natural-language instruction the AI
+  // executes against the system.
+  const isCommand = query.trimStart().startsWith(">");
+  const commandText = query.replace(/^\s*>\s*/, "");
 
   // Focus the box and reset when opened.
   useEffect(() => {
@@ -31,9 +39,22 @@ export function Spotlight({ open, onClose }: Props) {
       setQuery("");
       setResults([]);
       setActive(0);
+      setRunning(false);
       setTimeout(() => inputRef.current?.focus(), 30);
     }
   }, [open]);
+
+  // AI command finished: stop the spinner and close on success (the AI's own
+  // notify syscall surfaces the result to the user).
+  useEffect(
+    () =>
+      wsClient.on("s2c.command.result", (p) => {
+        if (p.requestId !== cmdReqId.current) return;
+        setRunning(false);
+        if (!p.error) onClose();
+      }),
+    [onClose],
+  );
 
   // Receive search results that match our latest request.
   useEffect(() => {
@@ -54,6 +75,12 @@ export function Spotlight({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     if (debounce.current) clearTimeout(debounce.current);
+    // Command mode does its own thing (run on Enter) — no app search.
+    if (isCommand) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
     const q = query.trim();
     if (q.length < 2) {
       setResults([]);
@@ -84,8 +111,24 @@ export function Spotlight({ open, onClose }: Props) {
     onClose();
   };
 
+  const runCommandPalette = () => {
+    const text = commandText.trim();
+    if (!text || running) return;
+    const id = ulid();
+    cmdReqId.current = id;
+    setRunning(true);
+    wsClient.send("c2s.command.run", { text, requestId: id });
+  };
+
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") return onClose();
+    if (isCommand) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        runCommandPalette();
+      }
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActive((a) => Math.min(a + 1, results.length - 1));
@@ -114,8 +157,10 @@ export function Spotlight({ open, onClose }: Props) {
             onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 px-4">
-              {loading ? (
+              {loading || running ? (
                 <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" />
+              ) : isCommand ? (
+                <ChevronRight className="size-5 shrink-0 text-brand" />
               ) : (
                 <Search className="size-5 shrink-0 text-muted-foreground" />
               )}
@@ -129,7 +174,36 @@ export function Spotlight({ open, onClose }: Props) {
               />
             </div>
 
-            {results.length > 0 && (
+            {isCommand && (
+              <div className="border-t p-1.5">
+                <button
+                  onClick={runCommandPalette}
+                  disabled={!commandText.trim() || running}
+                  className="flex w-full items-center gap-3 rounded-lg bg-accent px-3 py-2.5 text-left disabled:opacity-60"
+                >
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">
+                    {running ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="size-3.5" />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">
+                      {running ? t("spotlight.cmdRunning") : t("spotlight.cmdRun")}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {commandText.trim() || t("spotlight.cmdHint")}
+                    </span>
+                  </span>
+                  <kbd className="rounded border bg-muted px-1 font-sans text-[10px] text-muted-foreground">
+                    ↵
+                  </kbd>
+                </button>
+              </div>
+            )}
+
+            {!isCommand && results.length > 0 && (
               <div className="max-h-80 overflow-auto border-t p-1.5">
                 {results.map((r, i) => {
                   const isWidget = r.kind === "widget";
@@ -171,9 +245,16 @@ export function Spotlight({ open, onClose }: Props) {
               </div>
             )}
 
-            {query.trim().length >= 2 && !loading && results.length === 0 && (
+            {!isCommand && query.trim().length >= 2 && !loading && results.length === 0 && (
               <div className="border-t px-4 py-6 text-center text-sm text-muted-foreground">
                 {t("spotlight.noResults")}
+              </div>
+            )}
+
+            {!isCommand && (
+              <div className="flex items-center gap-1.5 border-t px-4 py-1.5 text-[10px] text-muted-foreground">
+                <kbd className="rounded border bg-muted px-1 font-sans">&gt;</kbd>
+                {t("spotlight.cmdMode")}
               </div>
             )}
           </motion.div>

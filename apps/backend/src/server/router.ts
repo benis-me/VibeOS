@@ -16,6 +16,8 @@ import {
 } from "../ai/providers/index.ts";
 import { env } from "../config/env.ts";
 import { searchApps } from "../ai/appSearch.ts";
+import { runCommand } from "../ai/commandPalette.ts";
+import * as Syscalls from "../syscall/SyscallInterpreter.ts";
 import { requestWallpaper, storeUpload } from "../ai/imageCache.ts";
 import { loadSettings, updateSettings } from "../db/repositories/SettingsRepo.ts";
 import { listApps, getApp, ensureTransientApp, installApp } from "../db/repositories/AppRepo.ts";
@@ -55,6 +57,8 @@ const log = logger("router");
 
 /** The latest in-flight app search per connection, so a new query preempts it. */
 const appSearchAborts = new WeakMap<ServerWebSocket<WsData>, AbortController>();
+/** The latest in-flight command per connection, so a new command preempts it. */
+const commandAborts = new WeakMap<ServerWebSocket<WsData>, AbortController>();
 
 export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): Promise<void> {
   let env: WsEnvelope<unknown>;
@@ -327,6 +331,27 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
       const results = await searchApps(msg.payload.query, ctrl);
       if (ctrl.signal.aborted) return; // superseded — a newer search took over
       sendTo(ws, "s2c.app.searchResults", { requestId: msg.payload.requestId, results });
+      return;
+    }
+
+    case "c2s.command.run": {
+      // AI command palette: interpret the instruction into syscalls and run them.
+      commandAborts.get(ws)?.abort();
+      const ctrl = new AbortController();
+      commandAborts.set(ws, ctrl);
+      try {
+        const calls = await runCommand(msg.payload.text, ctrl);
+        if (ctrl.signal.aborted) return; // superseded
+        await Syscalls.execute(calls, { source: "syscall" });
+        sendTo(ws, "s2c.command.result", { requestId: msg.payload.requestId, count: calls.length });
+      } catch (e) {
+        if (ctrl.signal.aborted) return;
+        sendTo(ws, "s2c.command.result", {
+          requestId: msg.payload.requestId,
+          count: 0,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
       return;
     }
 

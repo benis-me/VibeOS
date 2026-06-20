@@ -100,6 +100,11 @@ export type ServerToClient =
       type: "s2c.app.searchResults";
       payload: { requestId: string; results: AppSearchResult[] };
     }
+  /** Result of an AI command-palette command: how many syscalls ran. */
+  | {
+      type: "s2c.command.result";
+      payload: { requestId: string; count: number; error?: string };
+    }
   | { type: "s2c.notification.read"; payload: { id: string | "all" } }
   | {
       type: "s2c.error";
