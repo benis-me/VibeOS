@@ -16,7 +16,14 @@ export function imageId(provider: string, model: string, aspect: string, prompt:
   return createHash("sha256").update(`${provider}|${model}|${aspect}|${prompt}`).digest("hex").slice(0, 32);
 }
 
-function ensureImage(id: string, provider: string, model: string, aspect: string, prompt: string): void {
+function ensureImage(
+  id: string,
+  provider: string,
+  model: string,
+  aspect: string,
+  prompt: string,
+  appName = "ImageGen",
+): void {
   if (hasImage(id) || inflight.has(id)) return;
   log.debug(`generating ${id} (${provider}/${model}, ${aspect})`);
   // Track each generation as an AgentRun so it shows in the Activity Monitor.
@@ -25,7 +32,7 @@ function ensureImage(id: string, provider: string, model: string, aspect: string
       role: "image-generation",
       trigger: "event",
       model: `${provider}/${model}`,
-      appName: "ImageGen",
+      appName,
     });
     broadcast("s2c.agent.run", { run });
     try {
@@ -61,6 +68,40 @@ export async function getImageForServe(id: string): Promise<{ mime: string; byte
     }
   }
   return null;
+}
+
+/**
+ * Kick off generation of a desktop wallpaper (16:9) with the configured image
+ * model and return its `/api/img/:id` path. Returns null when no image model is
+ * configured. Generation runs in the background (tracked in the Activity
+ * Monitor); the path serves once the route awaits it.
+ */
+export function requestWallpaper(prompt: string): string | null {
+  const im = loadSettings().prefs.imageModel;
+  if (!im?.provider || !im?.model) return null;
+  const aspect = "16:9";
+  const id = imageId(im.provider, im.model, aspect, prompt);
+  ensureImage(id, im.provider, im.model, aspect, prompt, "Wallpaper");
+  return `/api/img/${id}`;
+}
+
+/**
+ * Store an uploaded image (a `data:` URL) under a content-addressed id and
+ * return its `/api/img/:id` path. Returns null if the data URL can't be parsed.
+ */
+export async function storeUpload(dataUrl: string): Promise<string | null> {
+  const m = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(dataUrl);
+  if (!m) return null;
+  const mime = m[1] || "image/png";
+  const body = m[3] ?? "";
+  const bytes = m[2]
+    ? new Uint8Array(Buffer.from(body, "base64"))
+    : new Uint8Array(Buffer.from(decodeURIComponent(body)));
+  if (!bytes.length) return null;
+  const id = createHash("sha256").update(bytes).digest("hex").slice(0, 32);
+  await putImage({ id, prompt: "(upload)", model: "(upload)", mime, bytes });
+  log.info(`✓ wallpaper upload ${id} (${bytes.length} bytes, ${mime})`);
+  return `/api/img/${id}`;
 }
 
 // Match ANY element carrying data-vibe-img (models use <img> but also <div>).

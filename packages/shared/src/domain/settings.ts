@@ -217,7 +217,8 @@ export interface ImageModelRef {
 export interface Preferences {
   /** Disable proactive system-event agent. */
   proactiveAgents?: boolean;
-  /** Wallpaper identifier. */
+  /** Desktop wallpaper: an `/api/img/:id` path (uploaded or generated), or
+   *  empty/undefined for the default brand gradient. */
   wallpaper?: string;
   /** Model used for in-UI image generation. */
   imageModel?: ImageModelRef;

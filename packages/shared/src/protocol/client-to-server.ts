@@ -65,6 +65,10 @@ export type ClientToServer =
     }
   | { type: "c2s.vfs.open"; payload: { nodeId: string } }
   | { type: "c2s.settings.update"; payload: { partial: Partial<Settings> } }
+  /** Set the desktop wallpaper from an uploaded image (a data: URL). */
+  | { type: "c2s.wallpaper.upload"; payload: { dataUrl: string } }
+  /** Generate a desktop wallpaper with the configured image model. */
+  | { type: "c2s.wallpaper.generate"; payload: { prompt: string } }
   | { type: "c2s.provider.scan"; payload: Record<string, never> }
   /** Refresh one API provider's model list from its models endpoint. */
   | { type: "c2s.provider.fetchModels"; payload: { providerId: ProviderId } }

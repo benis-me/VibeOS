@@ -13,6 +13,7 @@ import { ModelPolicy } from "../ai/ModelPolicy.ts";
 import { setActiveProvider, activeProviderId, availableProviderIds, getProvider } from "../ai/providers/index.ts";
 import { env } from "../config/env.ts";
 import { searchApps } from "../ai/appSearch.ts";
+import { requestWallpaper, storeUpload } from "../ai/imageCache.ts";
 import { loadSettings, updateSettings } from "../db/repositories/SettingsRepo.ts";
 import { listApps, getApp, ensureTransientApp, installApp } from "../db/repositories/AppRepo.ts";
 import {
@@ -190,6 +191,30 @@ async function dispatch(
       } else if (msg.payload.partial.modelOverrides) {
         ModelPolicy.recompute(settings.modelOverrides);
       }
+      return;
+    }
+
+    case "c2s.wallpaper.upload": {
+      const path = await storeUpload(msg.payload.dataUrl);
+      if (!path) {
+        sendTo(ws, "s2c.error", { code: "wallpaper_bad_image" });
+        return;
+      }
+      const settings = await updateSettings({ prefs: { wallpaper: path } });
+      broadcast("s2c.settings.changed", { settings });
+      return;
+    }
+
+    case "c2s.wallpaper.generate": {
+      const path = requestWallpaper(msg.payload.prompt);
+      if (!path) {
+        sendTo(ws, "s2c.error", { code: "wallpaper_no_image_model" });
+        return;
+      }
+      // The path serves once generation finishes (the /api/img route awaits it);
+      // persist it now so the desktop swaps to it the moment it's ready.
+      const settings = await updateSettings({ prefs: { wallpaper: path } });
+      broadcast("s2c.settings.changed", { settings });
       return;
     }
 

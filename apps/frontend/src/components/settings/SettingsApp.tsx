@@ -19,6 +19,9 @@ import {
   Pencil,
   X,
   User,
+  Upload,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import type {
   AgentRole,
@@ -35,7 +38,8 @@ import type {
 import { AI_PROVIDERS } from "@vibeos/shared";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { wsClient } from "@/lib/ws";
+import { wsClient, API_BASE } from "@/lib/ws";
+import { fileToWallpaperDataUrl } from "@/lib/image";
 import { useT, useLocale } from "@/lib/i18n";
 import { EASE_OUT, usePopoverMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -159,6 +163,7 @@ function GeneralPane() {
             <option value="aqua">Mac Aqua</option>
           </Select>
         </Row>
+        <WallpaperRow />
       </Group>
 
       <GroupLabel>{t("settings.sec.prefs")}</GroupLabel>
@@ -178,6 +183,125 @@ function GeneralPane() {
         </Row>
       </Group>
     </Pane>
+  );
+}
+
+/** Desktop wallpaper: upload an image, or generate one (needs an image model). */
+function WallpaperRow() {
+  const t = useT();
+  const wallpaper = useSettingsStore((s) => s.settings?.prefs.wallpaper);
+  const imageModel = useSettingsStore((s) => s.settings?.prefs.imageModel);
+  const imageOn = !!(imageModel?.provider && imageModel?.model);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [prompt, setPrompt] = useState("");
+  const [busy, setBusy] = useState<null | "upload" | "generate">(null);
+
+  // The desktop swaps the moment settings.changed lands; clear the spinner then.
+  // A server error (e.g. generation failed) also releases it.
+  useEffect(() => setBusy(null), [wallpaper]);
+  useEffect(() => wsClient.on("s2c.error", () => setBusy(null)), []);
+
+  const wallpaperUrl = wallpaper ? `${API_BASE}${wallpaper}` : null;
+
+  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    setBusy("upload");
+    try {
+      wsClient.send("c2s.wallpaper.upload", { dataUrl: await fileToWallpaperDataUrl(file) });
+    } catch {
+      setBusy(null);
+    }
+  };
+
+  const onGenerate = () => {
+    const p = prompt.trim();
+    if (!p || !imageOn || busy) return;
+    setBusy("generate");
+    wsClient.send("c2s.wallpaper.generate", { prompt: p });
+  };
+
+  const onReset = () =>
+    wsClient.send("c2s.settings.update", { partial: { prefs: { wallpaper: "" } } });
+
+  return (
+    <div className="px-3.5 py-3">
+      <div className="flex items-start gap-3.5">
+        <div
+          className="relative h-16 w-24 shrink-0 overflow-hidden rounded-lg border bg-cover bg-center"
+          style={
+            wallpaperUrl
+              ? { backgroundImage: `url("${wallpaperUrl}")` }
+              : {
+                  background:
+                    "radial-gradient(120% 120% at 80% 0%, color-mix(in oklab, var(--brand) 32%, var(--muted)), var(--muted) 70%)",
+                }
+          }
+        >
+          {busy && (
+            <div className="absolute inset-0 grid place-items-center bg-black/35">
+              <Loader2 className="size-4 animate-spin text-white" />
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px]">{t("settings.wallpaper")}</div>
+          <div className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+            {t("settings.wallpaper.hint")}
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={!!busy}
+              className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-accent disabled:opacity-50"
+            >
+              <Upload className="size-3.5" />
+              {t("settings.wallpaper.upload")}
+            </button>
+            {wallpaper && (
+              <button
+                type="button"
+                onClick={onReset}
+                disabled={!!busy}
+                className="vibe-btn rounded-lg border bg-card px-2.5 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-accent disabled:opacity-50"
+              >
+                {t("settings.wallpaper.reset")}
+              </button>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
+          </div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onGenerate()}
+              disabled={!imageOn || !!busy}
+              placeholder={t("settings.wallpaper.promptPlaceholder")}
+              className="vibe-input min-w-0 flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
+            />
+            <button
+              type="button"
+              onClick={onGenerate}
+              disabled={!imageOn || !prompt.trim() || !!busy}
+              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-brand/90 disabled:opacity-50"
+            >
+              <Sparkles className="size-3.5" />
+              {t("settings.wallpaper.generate")}
+            </button>
+          </div>
+          {!imageOn && (
+            <div className="mt-1.5 text-[11px] text-muted-foreground">
+              {t("settings.wallpaper.needModel")}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

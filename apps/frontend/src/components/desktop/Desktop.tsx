@@ -11,7 +11,7 @@ import { NotificationCenter } from "@/components/notifications/NotificationCente
 import { Spotlight } from "@/components/spotlight/Spotlight";
 import { ContextMenuRoot, openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { desktopMenu } from "@/components/contextmenu/menus";
-import { wsClient } from "@/lib/ws";
+import { wsClient, API_BASE } from "@/lib/ws";
 import { gridPosition } from "@/lib/desktopGrid";
 
 export function Desktop() {
@@ -26,6 +26,8 @@ export function Desktop() {
   const appMap = useAppStore((s) => s.apps);
   const skin = useSettingsStore((s) => s.settings?.skin ?? "devdock");
   const theme = useSettingsStore((s) => s.settings?.theme ?? "dark");
+  const wallpaper = useSettingsStore((s) => s.settings?.prefs.wallpaper);
+  const wallpaperUrl = wallpaper ? `${API_BASE}${wallpaper}` : null;
 
   // ⌘K / ⌘Space (and Ctrl variants) toggle the App Search, like Spotlight.
   useEffect(() => {
@@ -67,7 +69,8 @@ export function Desktop() {
         )
       }
     >
-      {/* wallpaper gradient */}
+      {/* Base wallpaper gradient — also the fallback shown while a custom/AI
+          wallpaper is still loading or generating. */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -75,6 +78,19 @@ export function Desktop() {
             "radial-gradient(120% 120% at 80% 0%, color-mix(in oklab, var(--brand) 14%, transparent), transparent 60%)",
         }}
       />
+
+      {/* User wallpaper (uploaded or AI-generated). Overlays the gradient and
+          covers it once the image loads — no broken state while it generates. */}
+      {wallpaperUrl && (
+        <>
+          <div
+            className="pointer-events-none absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url("${wallpaperUrl}")` }}
+          />
+          {/* Subtle scrim keeps desktop icon labels legible over any image. */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/25" />
+        </>
+      )}
 
       {/* desktop icons */}
       <div className="absolute inset-0 bottom-11">
