@@ -71,6 +71,8 @@ export type ClientToServer =
   | { type: "c2s.notification.click"; payload: { id: string } }
   /** Spotlight-style app search: AI returns a list of candidate apps. */
   | { type: "c2s.app.search"; payload: { query: string; requestId: string } }
+  /** AI command palette: a natural-language instruction the AI turns into syscalls. */
+  | { type: "c2s.command.run"; payload: { text: string; requestId: string } }
   /** Launch a (possibly brand-new) app in a fresh window, generated live. */
   | {
       type: "c2s.app.launch";

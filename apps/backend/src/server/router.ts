@@ -1,6 +1,7 @@
 import type { ServerWebSocket } from "bun";
 import pkg from "../../package.json";
 import type { ClientToServer, WsEnvelope } from "@vibeos/shared/protocol";
+import { parseClientMessage } from "@vibeos/shared/protocol";
 import type { AppManifest } from "@vibeos/shared/domain";
 import { inferCapabilities, discoverAllProviders } from "../ai/modelDiscovery.ts";
 import { sendTo, broadcast, type WsData } from "./wsGateway.ts";
@@ -64,7 +65,12 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): P
     sendTo(ws, "s2c.error", { code: "bad_json" });
     return;
   }
-  const msg = { type: env.type, payload: env.payload } as ClientToServer;
+  const msg = parseClientMessage({ type: env.type, payload: env.payload });
+  if (!msg) {
+    log.warn(`rejected invalid message: ${String(env.type)}`);
+    sendTo(ws, "s2c.error", { code: "bad_message", detail: String(env.type) });
+    return;
+  }
   log.debug(`◀ ${msg.type}`, msg.payload);
   const t0 = performance.now();
   try {
