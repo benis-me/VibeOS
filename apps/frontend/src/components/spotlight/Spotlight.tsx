@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Fragment } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Search, Loader2, LayoutGrid, AppWindow } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
@@ -39,7 +39,12 @@ export function Spotlight({ open, onClose }: Props) {
   useEffect(() => {
     return wsClient.on("s2c.app.searchResults", (p) => {
       if (p.requestId !== reqId.current) return;
-      setResults(p.results);
+      // Group by type for sectioned display: apps first, then widgets (sort is
+      // stable, so the model's order within each group is preserved).
+      const sorted = [...p.results].sort(
+        (a, b) => (a.kind === "widget" ? 1 : 0) - (b.kind === "widget" ? 1 : 0),
+      );
+      setResults(sorted);
       setActive(0);
       setLoading(false);
     });
@@ -90,8 +95,8 @@ export function Spotlight({ open, onClose }: Props) {
     } else if (e.key === "Enter") {
       e.preventDefault();
       const r = results[active];
-      // Enter launches in the result's suggested form; Shift+Enter flips it.
-      if (r) launch(r, e.shiftKey ? r.kind !== "widget" : r.kind === "widget");
+      // Each result launches in the form the model assigned it — no toggling.
+      if (r) launch(r, r.kind === "widget");
     }
   };
 
@@ -125,68 +130,41 @@ export function Spotlight({ open, onClose }: Props) {
         </div>
 
         {results.length > 0 && (
-          <>
-            <div className="max-h-80 overflow-auto border-t p-1.5">
-              {results.map((r, i) => {
-                const isWidget = r.kind === "widget";
-                return (
-                  <div
-                    key={`${r.name}-${i}`}
+          <div className="max-h-80 overflow-auto border-t p-1.5">
+            {results.map((r, i) => {
+              const isWidget = r.kind === "widget";
+              // results are sorted by kind, so a header shows at each boundary.
+              const showHeader = i === 0 || results[i - 1]?.kind !== r.kind;
+              return (
+                <Fragment key={`${r.name}-${i}`}>
+                  {showHeader && (
+                    <div className="flex items-center gap-1.5 px-3 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground">
+                      {isWidget ? <LayoutGrid className="size-3" /> : <AppWindow className="size-3" />}
+                      {isWidget ? t("spotlight.kindWidget") : t("spotlight.kindApp")}
+                    </div>
+                  )}
+                  <button
                     onPointerEnter={() => setActive(i)}
+                    onClick={() => launch(r, isWidget)}
                     className={cn(
-                      "group flex w-full items-center gap-2 rounded-lg pl-3 pr-1.5 transition-colors",
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
                       i === active ? "bg-accent" : "hover:bg-accent/60",
                     )}
                   >
-                    {/* Launch in the result's suggested form (app or widget). */}
-                    <button
-                      onClick={() => launch(r, isWidget)}
-                      className="flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left"
-                    >
-                      <AppIcon name={r.icon} label={r.name} className="size-6" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{r.name}</span>
-                        {r.description && (
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {r.description}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                    <div className="flex shrink-0 items-center gap-1.5 pr-1">
-                      {/* Override: launch in the other form. */}
-                      <button
-                        onClick={() => launch(r, !isWidget)}
-                        title={isWidget ? t("spotlight.openAsApp") : t("spotlight.openAsWidget")}
-                        className={cn(
-                          "rounded-md border p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground",
-                          i === active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                        )}
-                      >
-                        {isWidget ? <AppWindow className="size-3" /> : <LayoutGrid className="size-3" />}
-                      </button>
-                      {/* Type badge — what a normal click does. */}
-                      <span className="flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                        {isWidget ? <LayoutGrid className="size-3" /> : <AppWindow className="size-3" />}
-                        {isWidget ? t("spotlight.kindWidget") : t("spotlight.kindApp")}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            {/* Legend: Enter launches in the shown form, Shift+Enter flips it. */}
-            <div className="flex items-center justify-end gap-4 border-t px-4 py-1.5 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <kbd className="rounded border bg-muted px-1 font-sans">↵</kbd>
-                {t("spotlight.open")}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <kbd className="rounded border bg-muted px-1 font-sans">⇧↵</kbd>
-                {t("spotlight.switchKind")}
-              </span>
-            </div>
-          </>
+                    <AppIcon name={r.icon} label={r.name} className="size-6" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{r.name}</span>
+                      {r.description && (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {r.description}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                </Fragment>
+              );
+            })}
+          </div>
         )}
 
         {query.trim().length >= 2 && !loading && results.length === 0 && (
