@@ -5,3 +5,7 @@ registry = "https://registry.npmjs.org"
 [run]
 # Don't print the command being run.
 silent = false
+
+[test]
+# Isolate tests from the real dev DB and avoid any model/network calls.
+preload = ["./test/setup.ts"]
