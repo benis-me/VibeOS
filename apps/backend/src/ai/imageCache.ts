@@ -63,8 +63,11 @@ export async function getImageForServe(id: string): Promise<{ mime: string; byte
   return null;
 }
 
+// Match ANY element carrying data-vibe-img (models use <img> but also <div>).
+// Optionally consume an immediately-following close tag so empty placeholders
+// like `<div data-vibe-img …></div>` convert cleanly to a real <img>.
 // Tolerant of whitespace around `=` (some models emit `attr = "value"`).
-const IMG_TAG = /<img\b[^>]*\bdata-vibe-img\s*=\s*(["'])([\s\S]*?)\1[^>]*>/gi;
+const VIBE_IMG = /<([a-z][\w-]*)\b([^>]*\bdata-vibe-img\s*=\s*(["'])([\s\S]*?)\3[^>]*)>(?:\s*<\/\1\s*>)?/gi;
 
 function decodeEntities(s: string): string {
   return s
@@ -91,18 +94,20 @@ export function rewriteImages(html: string): string {
     return html;
   }
   let matched = 0;
-  const out = html.replace(IMG_TAG, (tag, _q, rawPrompt) => {
-    // Skip ONLY images we already resolved. A src the AI invented (a placeholder
-    // / fake URL, despite the directive) must NOT block generation — strip it.
-    if (/\bsrc\s*=\s*["'][^"']*\/api\/img\//i.test(tag)) return tag;
+  const out = html.replace(VIBE_IMG, (whole, _tag, attrs: string, _q, rawPrompt) => {
+    // Skip what we already resolved (src/background already points at /api/img/).
+    if (/\/api\/img\//i.test(attrs)) return whole;
     const prompt = decodeEntities(String(rawPrompt)).trim();
-    if (!prompt) return tag;
+    if (!prompt) return whole;
     matched++;
-    const ratio = decodeEntities(tag.match(/\bdata-vibe-ratio\s*=\s*(["'])([\s\S]*?)\1/i)?.[2] ?? "1:1");
+    const ratio = decodeEntities(attrs.match(/\bdata-vibe-ratio\s*=\s*(["'])([\s\S]*?)\1/i)?.[2] ?? "1:1");
     const id = imageId(im.provider!, im.model!, ratio, prompt);
     ensureImage(id, im.provider!, im.model!, ratio, prompt);
-    const stripped = tag.replace(/\ssrc\s*=\s*(["'])[\s\S]*?\1/i, "");
-    return stripped.replace(/^<img\b/i, `<img src="/api/img/${id}"`);
+    // Normalize to a real <img>: carry over the element's attributes (minus any
+    // src the AI invented), so <div data-vibe-img>…</div> placeholders become
+    // images whose object-fit/size/radius styles now actually apply.
+    const a = attrs.replace(/\ssrc\s*=\s*(["'])[\s\S]*?\1/i, "");
+    return `<img src="/api/img/${id}"${a}>`;
   });
   if (hasTag && matched === 0) {
     log.warn("data-vibe-img present but matched 0 images — unexpected <img> attribute format");
