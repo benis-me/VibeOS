@@ -5,15 +5,34 @@ import { logger } from "../util/log.ts";
 
 const log = logger("app-search");
 
-const SEARCH_INSTRUCTION = `You are the app search engine of VibeOS, an AI operating system where any app can be hallucinated into existence. Given a user's query, return a list of 4-8 plausible apps that would satisfy it — a mix of obvious matches and a couple of imaginative ones. These apps don't need to exist; they will be generated on demand.
+// The icon vocabulary we can actually render (keys of the frontend AppIcon map).
+// Constraining the model to this list means icons reliably resolve to a glyph
+// instead of falling back to a monogram.
+const ICON_VOCAB = [
+  "globe", "terminal", "folder", "settings", "calculator", "music", "mail",
+  "image", "calendar", "map", "gamepad-2", "notebook-pen", "cloud-sun",
+  "palette", "paint-brush", "app-window", "file-text", "chat", "camera",
+  "clock", "timer", "star", "heart", "user", "search", "bell", "video",
+  "book-open", "shopping-cart", "code", "database", "chart-bar", "compass",
+  "home", "wrench", "cloud", "sun", "moon", "trophy", "gift", "lightbulb",
+  "fire", "leaf", "heartbeat", "barbell", "fork-knife", "coffee", "wallet",
+  "credit-card", "briefcase", "car", "airplane", "rocket", "newspaper",
+  "graduation-cap", "bug", "lightning",
+].join(", ");
+
+const SEARCH_INSTRUCTION = `You are the app search engine of VibeOS, an AI operating system where any app can be hallucinated into existence. Given a user's query, return a list of 4-8 plausible results that would satisfy it — a mix of obvious matches and a couple of imaginative ones. They don't need to exist; they will be generated on demand.
 
 Reply with ONLY a fenced JSON code block, nothing else:
 \`\`\`json
 { "results": [
-  { "name": "App Name", "description": "one short line", "icon": "calculator" }
+  { "name": "App Name", "description": "one short line", "icon": "calculator", "kind": "app" }
 ] }
 \`\`\`
-Rules: name ≤ 30 chars; description ≤ 60 chars. icon = a lucide-react icon name in kebab-case (e.g. "calculator", "music", "mail", "image", "calendar", "map", "gamepad-2"), NEVER an emoji. No prose outside the block.`;
+Rules:
+- name ≤ 30 chars; description ≤ 60 chars.
+- kind: "widget" for a small, glanceable, single-purpose panel (clock, weather, stocks ticker, timer, mini player, to-do, system stat); "app" for a full interactive application (editor, browser, game, file tool, dashboard). Pick the more natural form for each result; include a sensible mix.
+- icon: choose the SINGLE closest name from THIS list ONLY, nothing else: ${ICON_VOCAB}. Never invent a name, never use an emoji.
+No prose outside the block.`;
 
 const JSON_RE = /```(?:json)?\s*([\s\S]*?)```/i;
 
@@ -56,6 +75,7 @@ function parse(text: string): AppSearchResult[] {
             typeof o.description === "string" ? stripEmoji(o.description).slice(0, 80) : "",
           // lucide icon name; default to a generic app icon
           icon: rawIcon || "app-window",
+          kind: o.kind === "widget" ? "widget" : "app",
         };
       })
       .filter((r): r is AppSearchResult => r !== null)

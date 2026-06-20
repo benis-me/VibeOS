@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Search, Loader2, LayoutGrid, CornerDownLeft } from "lucide-react";
+import { Search, Loader2, LayoutGrid, AppWindow } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
 import type { AppSearchResult } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
@@ -90,8 +90,8 @@ export function Spotlight({ open, onClose }: Props) {
     } else if (e.key === "Enter") {
       e.preventDefault();
       const r = results[active];
-      // Shift+Enter adds it to the desktop as a live widget instead of opening it.
-      if (r) launch(r, e.shiftKey);
+      // Enter launches in the result's suggested form; Shift+Enter flips it.
+      if (r) launch(r, e.shiftKey ? r.kind !== "widget" : r.kind === "widget");
     }
   };
 
@@ -127,48 +127,55 @@ export function Spotlight({ open, onClose }: Props) {
         {results.length > 0 && (
           <>
             <div className="max-h-80 overflow-auto border-t p-1.5">
-              {results.map((r, i) => (
-                <div
-                  key={`${r.name}-${i}`}
-                  onPointerEnter={() => setActive(i)}
-                  className={cn(
-                    "group flex w-full items-center gap-2 rounded-lg pl-3 pr-1.5 transition-colors",
-                    i === active ? "bg-accent" : "hover:bg-accent/60",
-                  )}
-                >
-                  {/* Primary: open as a full app. */}
-                  <button
-                    onClick={() => launch(r)}
-                    className="flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left"
-                  >
-                    <AppIcon name={r.icon} label={r.name} className="size-6" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{r.name}</span>
-                      {r.description && (
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {r.description}
-                        </span>
-                      )}
-                    </span>
-                  </button>
-                  {/* Secondary: add to the desktop as a chrome-less widget. */}
-                  <button
-                    onClick={() => launch(r, true)}
-                    title={t("spotlight.asWidgetHint")}
+              {results.map((r, i) => {
+                const isWidget = r.kind === "widget";
+                return (
+                  <div
+                    key={`${r.name}-${i}`}
+                    onPointerEnter={() => setActive(i)}
                     className={cn(
-                      "flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] transition-colors hover:bg-background hover:text-foreground",
-                      i === active
-                        ? "text-foreground/70"
-                        : "text-muted-foreground opacity-0 group-hover:opacity-100",
+                      "group flex w-full items-center gap-2 rounded-lg pl-3 pr-1.5 transition-colors",
+                      i === active ? "bg-accent" : "hover:bg-accent/60",
                     )}
                   >
-                    <LayoutGrid className="size-3" />
-                    {t("spotlight.asWidget")}
-                  </button>
-                </div>
-              ))}
+                    {/* Launch in the result's suggested form (app or widget). */}
+                    <button
+                      onClick={() => launch(r, isWidget)}
+                      className="flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left"
+                    >
+                      <AppIcon name={r.icon} label={r.name} className="size-6" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{r.name}</span>
+                        {r.description && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {r.description}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-1.5 pr-1">
+                      {/* Override: launch in the other form. */}
+                      <button
+                        onClick={() => launch(r, !isWidget)}
+                        title={isWidget ? t("spotlight.openAsApp") : t("spotlight.openAsWidget")}
+                        className={cn(
+                          "rounded-md border p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground",
+                          i === active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                        )}
+                      >
+                        {isWidget ? <AppWindow className="size-3" /> : <LayoutGrid className="size-3" />}
+                      </button>
+                      {/* Type badge — what a normal click does. */}
+                      <span className="flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {isWidget ? <LayoutGrid className="size-3" /> : <AppWindow className="size-3" />}
+                        {isWidget ? t("spotlight.kindWidget") : t("spotlight.kindApp")}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            {/* Legend so both actions are discoverable. */}
+            {/* Legend: Enter launches in the shown form, Shift+Enter flips it. */}
             <div className="flex items-center justify-end gap-4 border-t px-4 py-1.5 text-[10px] text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <kbd className="rounded border bg-muted px-1 font-sans">↵</kbd>
@@ -176,7 +183,7 @@ export function Spotlight({ open, onClose }: Props) {
               </span>
               <span className="flex items-center gap-1.5">
                 <kbd className="rounded border bg-muted px-1 font-sans">⇧↵</kbd>
-                {t("spotlight.asWidget")}
+                {t("spotlight.switchKind")}
               </span>
             </div>
           </>

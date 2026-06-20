@@ -339,7 +339,7 @@ async function dispatch(
       const seed = widget
         ? `Generate a compact desktop WIDGET called "${msg.payload.name}".${
             msg.payload.description ? ` It is: ${msg.payload.description}.` : ""
-          } It must be a small, glanceable, self-contained panel WITHOUT any window chrome that fills its area (e.g. a clock, weather, stocks, a mini to-do or player). Keep it minimal, legible, and visually striking.`
+          } It must be a small, glanceable, self-contained panel WITHOUT any window chrome that fills its area (e.g. a clock, weather, stocks, a mini to-do or player). It sits on a FROSTED-GLASS surface: use a fully TRANSPARENT background (no opaque page/container background — at most subtle translucent layers), and high-contrast, legible text and icons that read clearly over a blurred backdrop. Keep it minimal and visually striking.`
         : `Generate the application "${msg.payload.name}".${
             msg.payload.description ? ` It is: ${msg.payload.description}.` : ""
           } Produce a complete, believable, fully usable first screen for this app.`;

@@ -93,7 +93,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
       className={cn(
         "vibe-window group absolute flex flex-col overflow-hidden border sheen transition-shadow",
         widget
-          ? "rounded-2xl bg-card shadow-xl"
+          ? "rounded-2xl border-white/20 bg-card/25 shadow-xl backdrop-blur-2xl"
           : win.focused
             ? "rounded-xl ring-1 ring-ring/30 win-focused win-glass"
             : "rounded-xl bg-card",
@@ -182,7 +182,12 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
       {/* content — always solid so the AI UI stays readable; the glass shows
           through the titlebar / window edges of the focused window. */}
       <div
-        className="vibe-window-body relative min-h-0 flex-1 bg-background"
+        className={cn(
+          "vibe-window-body relative min-h-0 flex-1",
+          // Widgets are frosted glass: keep the body transparent so the blurred
+          // desktop shows through (the AI content is told to stay transparent too).
+          widget ? "bg-transparent" : "bg-background",
+        )}
         onContextMenu={(e) => openContextMenu(e, appContentMenu({ t, win, native: !!native }))}
       >
         {native ? (

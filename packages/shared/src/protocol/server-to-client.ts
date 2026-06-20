@@ -19,6 +19,8 @@ export interface AppSearchResult {
   description: string;
   /** An emoji or icon hint. */
   icon: string;
+  /** Whether this is best as a full app or a glanceable desktop widget. */
+  kind: "app" | "widget";
 }
 
 export interface BootStatePayload {

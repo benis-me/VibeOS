@@ -39,6 +39,26 @@ import {
   Cloud,
   Sun,
   Moon,
+  Timer,
+  Trophy,
+  Gift,
+  Lightbulb,
+  Fire,
+  Leaf,
+  Heartbeat,
+  Barbell,
+  ForkKnife,
+  Coffee,
+  Wallet,
+  CreditCard,
+  Briefcase,
+  Car,
+  Airplane,
+  Rocket,
+  Newspaper,
+  GraduationCap,
+  Bug,
+  Lightning,
   type Icon,
 } from "@phosphor-icons/react";
 import type { PresetAppId } from "@vibeos/shared";
@@ -114,6 +134,59 @@ const ICONS: Record<string, Icon> = {
   cloud: Cloud,
   sun: Sun,
   moon: Moon,
+  timer: Timer,
+  stopwatch: Timer,
+  trophy: Trophy,
+  award: Trophy,
+  gift: Gift,
+  lightbulb: Lightbulb,
+  idea: Lightbulb,
+  fire: Fire,
+  flame: Fire,
+  leaf: Leaf,
+  plant: Leaf,
+  nature: Leaf,
+  heartbeat: Heartbeat,
+  activity: Heartbeat,
+  health: Heartbeat,
+  pulse: Heartbeat,
+  barbell: Barbell,
+  dumbbell: Barbell,
+  fitness: Barbell,
+  gym: Barbell,
+  "fork-knife": ForkKnife,
+  utensils: ForkKnife,
+  food: ForkKnife,
+  restaurant: ForkKnife,
+  coffee: Coffee,
+  wallet: Wallet,
+  money: Wallet,
+  "credit-card": CreditCard,
+  card: CreditCard,
+  finance: CreditCard,
+  bank: CreditCard,
+  briefcase: Briefcase,
+  work: Briefcase,
+  business: Briefcase,
+  job: Briefcase,
+  car: Car,
+  airplane: Airplane,
+  plane: Airplane,
+  flight: Airplane,
+  travel: Airplane,
+  rocket: Rocket,
+  launch: Rocket,
+  newspaper: Newspaper,
+  news: Newspaper,
+  "graduation-cap": GraduationCap,
+  education: GraduationCap,
+  school: GraduationCap,
+  learn: GraduationCap,
+  bug: Bug,
+  lightning: Lightning,
+  bolt: Lightning,
+  zap: Lightning,
+  energy: Lightning,
 };
 
 interface Props {
@@ -135,8 +208,11 @@ export function AppIcon({ name, presetId, label, className }: Props) {
   const Cmp = (presetId && PRESET_ICONS[presetId]) || (name ? ICONS[name.toLowerCase()] : undefined);
   if (Cmp) return <Cmp weight="duotone" className={cn("size-5", className)} />;
 
-  const monogram =
-    (label ?? name ?? "?").replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?";
+  // Monogram fallback: prefer 1-2 ASCII letters; for non-Latin names (e.g. CJK)
+  // use the first character so they don't collapse to "?".
+  const base = (label ?? name ?? "").trim();
+  const ascii = base.replace(/[^A-Za-z0-9]/g, "");
+  const monogram = ascii ? ascii.slice(0, 2).toUpperCase() : ([...base][0] ?? "?");
   return (
     <span
       className={cn(
