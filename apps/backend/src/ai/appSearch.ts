@@ -17,7 +17,10 @@ Rules: name ≤ 30 chars; description ≤ 60 chars. icon = a lucide-react icon n
 
 const JSON_RE = /```(?:json)?\s*([\s\S]*?)```/i;
 
-export async function searchApps(query: string): Promise<AppSearchResult[]> {
+export async function searchApps(
+  query: string,
+  abort?: AbortController,
+): Promise<AppSearchResult[]> {
   const t0 = performance.now();
   const result = await run({
     role: "system-event", // fast model — search should be snappy
@@ -25,7 +28,10 @@ export async function searchApps(query: string): Promise<AppSearchResult[]> {
     systemPromptOverride: SEARCH_INSTRUCTION,
     prompt: `[QUERY]\n${query}`,
     appName: "App Search",
+    abort, // a newer keystroke aborts this one — no wasted generation
   });
+  // Superseded by a newer query: drop silently (the client already ignores it).
+  if (abort?.signal.aborted) return [];
   const parsed = parse(result.text);
   await recordSummary(result.runId, `"${query}" → ${parsed.length} results`);
   log.info(`"${query}" → ${parsed.length} results in ${(performance.now() - t0).toFixed(0)}ms`);

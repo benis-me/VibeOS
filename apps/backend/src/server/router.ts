@@ -46,6 +46,9 @@ import { logger } from "../util/log.ts";
 
 const log = logger("router");
 
+/** The latest in-flight app search per connection, so a new query preempts it. */
+const appSearchAborts = new WeakMap<ServerWebSocket<WsData>, AbortController>();
+
 export async function handleMessage(
   ws: ServerWebSocket<WsData>,
   raw: string,
@@ -309,7 +312,14 @@ async function dispatch(
     }
 
     case "c2s.app.search": {
-      const results = await searchApps(msg.payload.query);
+      // Cancel this connection's previous in-flight search so fast typing doesn't
+      // leave redundant AI generations running (the client debounces too, but a
+      // new query that lands mid-generation should preempt the old one).
+      appSearchAborts.get(ws)?.abort();
+      const ctrl = new AbortController();
+      appSearchAborts.set(ws, ctrl);
+      const results = await searchApps(msg.payload.query, ctrl);
+      if (ctrl.signal.aborted) return; // superseded — a newer search took over
       sendTo(ws, "s2c.app.searchResults", { requestId: msg.payload.requestId, results });
       return;
     }

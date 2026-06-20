@@ -4,7 +4,9 @@ import { AppIcon } from "@/components/AppIcon";
 import type { VfsNode } from "@vibeos/shared";
 import { useAppStore } from "@/stores/appStore";
 import { useVfsStore } from "@/stores/vfsStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { wsClient } from "@/lib/ws";
+import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { desktopItemMenu } from "@/components/contextmenu/menus";
@@ -12,6 +14,7 @@ import { snapToGrid } from "@/lib/desktopGrid";
 
 export function DesktopIcon({ node }: { node: VfsNode }) {
   const apps = useAppStore((s) => s.apps);
+  const hasWallpaper = useSettingsStore((s) => !!s.settings?.prefs.wallpaper);
   const t = useT();
   const dragging = useRef(false);
   const moved = useRef(false);
@@ -81,10 +84,20 @@ export function DesktopIcon({ node }: { node: VfsNode }) {
       className="absolute flex w-20 touch-none flex-col items-center gap-1 rounded-lg p-2 text-center transition-colors hover:bg-foreground/5 focus-visible:bg-foreground/10"
       style={{ left: node.x ?? 24, top: node.y ?? 24 }}
     >
-      <span className="flex size-10 items-center justify-center text-3xl leading-none">
+      <span
+        className={cn(
+          "flex size-10 items-center justify-center text-3xl leading-none",
+          hasWallpaper && "desktop-glyph-on-wallpaper",
+        )}
+      >
         {icon}
       </span>
-      <span className="line-clamp-2 text-[11px] text-foreground/90 drop-shadow">
+      <span
+        className={cn(
+          "line-clamp-2 text-[11px]",
+          hasWallpaper ? "desktop-icon-on-wallpaper" : "text-foreground/90 drop-shadow",
+        )}
+      >
         {node.name}
       </span>
     </button>
