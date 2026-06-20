@@ -27,7 +27,10 @@ export function startHttpServer(): Server<WsData> {
         const img = await getImageForServe(url.pathname.slice("/api/img/".length));
         if (!img) return new Response("not found", { status: 404 });
         return new Response(img.bytes as Uint8Array<ArrayBuffer>, {
-          headers: { "Content-Type": img.mime, "Cache-Control": "public, max-age=31536000, immutable" },
+          headers: {
+            "Content-Type": img.mime,
+            "Cache-Control": "public, max-age=31536000, immutable",
+          },
         });
       }
       return new Response("VibeOS backend", { status: 200 });

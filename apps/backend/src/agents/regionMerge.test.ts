@@ -13,7 +13,9 @@ describe("applyRegionsServer", () => {
     const out = applyRegionsServer(current, [
       { region: "body", html: `<div data-vibeos-region="body">new</div>` },
     ]);
-    expect(out).toBe(`<header>top</header><div data-vibeos-region="body">new</div><footer>end</footer>`);
+    expect(out).toBe(
+      `<header>top</header><div data-vibeos-region="body">new</div><footer>end</footer>`,
+    );
   });
 
   test("appends a region that isn't present yet", () => {

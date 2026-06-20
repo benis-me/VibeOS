@@ -56,9 +56,7 @@ export function getNode(id: string): VfsNode | null {
 function gridSlot(): { x: number; y: number } {
   const db = getDb();
   const row = db
-    .query<{ c: number }, []>(
-      "SELECT COUNT(*) as c FROM vfs_nodes WHERE location = 'desktop'",
-    )
+    .query<{ c: number }, []>("SELECT COUNT(*) as c FROM vfs_nodes WHERE location = 'desktop'")
     .get();
   const n = row?.c ?? 0;
   const col = Math.floor(n / 7);
@@ -152,7 +150,11 @@ export function emptyRecycleBin(): Promise<string[]> {
 }
 
 /** Create an app shortcut on the desktop (idempotent by target app). */
-export function ensureShortcut(appId: string, name: string, icon?: string): Promise<VfsNode | null> {
+export function ensureShortcut(
+  appId: string,
+  name: string,
+  icon?: string,
+): Promise<VfsNode | null> {
   return enqueue(() => {
     const db = getDb();
     const existing = db
@@ -167,7 +169,16 @@ export function ensureShortcut(appId: string, name: string, icon?: string): Prom
     db.query(
       `INSERT INTO vfs_nodes (id, parent_id, name, type, mime, content, target_app_id, location, x, y, deleted_at, meta_json, created_at, updated_at)
        VALUES (?, NULL, ?, 'shortcut', NULL, NULL, ?, 'desktop', ?, ?, NULL, ?, ?, ?)`,
-    ).run(id, name, appId, slot.x, slot.y, JSON.stringify({ icon: icon ?? "app-window" }), now, now);
+    ).run(
+      id,
+      name,
+      appId,
+      slot.x,
+      slot.y,
+      JSON.stringify({ icon: icon ?? "app-window" }),
+      now,
+      now,
+    );
     return getNode(id);
   });
 }

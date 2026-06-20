@@ -1,9 +1,5 @@
 import type { ServerWebSocket } from "bun";
-import {
-  makeEnvelope,
-  type ServerToClient,
-  type WsEnvelope,
-} from "@vibeos/shared/protocol";
+import { makeEnvelope, type ServerToClient, type WsEnvelope } from "@vibeos/shared/protocol";
 import { ulid } from "@vibeos/shared/util";
 
 export interface WsData {

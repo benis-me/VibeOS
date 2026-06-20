@@ -71,9 +71,7 @@ export function useBoot(): void {
     );
 
     offs.push(
-      wsClient.on("s2c.models.updated", (p) =>
-        useConnectionStore.getState().setModels(p.models),
-      ),
+      wsClient.on("s2c.models.updated", (p) => useConnectionStore.getState().setModels(p.models)),
     );
 
     offs.push(
@@ -114,9 +112,7 @@ export function useBoot(): void {
     );
 
     offs.push(
-      wsClient.on("s2c.ui.busy", (p) =>
-        useWindowStore.getState().setBusy(p.windowId, p.busy),
-      ),
+      wsClient.on("s2c.ui.busy", (p) => useWindowStore.getState().setBusy(p.windowId, p.busy)),
     );
 
     offs.push(wsClient.on("s2c.window.opened", (p) => win.upsert(p.window)));
@@ -131,9 +127,7 @@ export function useBoot(): void {
     offs.push(wsClient.on("s2c.window.stateChanged", (p) => win.upsert(p.window)));
     offs.push(wsClient.on("s2c.window.reordered", (p) => win.reorder(p.ids)));
     offs.push(
-      wsClient.on("s2c.chrome.set", (p) =>
-        useChromeStore.getState().set(p.windowId, p.patch),
-      ),
+      wsClient.on("s2c.chrome.set", (p) => useChromeStore.getState().set(p.windowId, p.patch)),
     );
 
     offs.push(
@@ -147,19 +141,13 @@ export function useBoot(): void {
         if (p.shortcut) useVfsStore.getState().upsert(p.shortcut);
       }),
     );
-    offs.push(
-      wsClient.on("s2c.syscall.fileCreated", (p) =>
-        useVfsStore.getState().upsert(p.node),
-      ),
-    );
+    offs.push(wsClient.on("s2c.syscall.fileCreated", (p) => useVfsStore.getState().upsert(p.node)));
     offs.push(
       wsClient.on("s2c.vfs.changed", (p) => useVfsStore.getState().upsert(p.node)),
       wsClient.on("s2c.vfs.removed", (p) => useVfsStore.getState().remove(p.ids)),
     );
     offs.push(
-      wsClient.on("s2c.settings.changed", (p) =>
-        useSettingsStore.getState().set(p.settings),
-      ),
+      wsClient.on("s2c.settings.changed", (p) => useSettingsStore.getState().set(p.settings)),
     );
     offs.push(
       wsClient.on("s2c.provider.models", (p) =>
@@ -167,9 +155,7 @@ export function useBoot(): void {
       ),
     );
     offs.push(
-      wsClient.on("s2c.notification.read", (p) =>
-        useNotificationStore.getState().markRead(p.id),
-      ),
+      wsClient.on("s2c.notification.read", (p) => useNotificationStore.getState().markRead(p.id)),
     );
 
     wsClient.connect();

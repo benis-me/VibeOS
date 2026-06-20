@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import type { Database } from "bun:sqlite";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,12 +6,8 @@ import { fileURLToPath } from "node:url";
 const MIGRATIONS_DIR = fileURLToPath(new URL("./migrations", import.meta.url));
 
 export function migrate(db: Database): void {
-  db.exec(
-    "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);",
-  );
-  const row = db
-    .query<{ version: number }, []>("SELECT version FROM schema_version LIMIT 1")
-    .get();
+  db.exec("CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);");
+  const row = db.query<{ version: number }, []>("SELECT version FROM schema_version LIMIT 1").get();
   const current = row?.version ?? 0;
 
   const files = readdirSync(MIGRATIONS_DIR)

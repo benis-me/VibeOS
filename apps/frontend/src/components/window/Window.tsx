@@ -60,9 +60,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
   }, [minimized, reduced, win.id]);
   // Maximized height is driven by the CSS taskbar-height var so it adapts when
   // a skin changes the taskbar height (e.g. XP's shorter bar).
-  const rect = maximized
-    ? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight }
-    : win.rect;
+  const rect = maximized ? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight } : win.rect;
 
   const focus = () => {
     if (!win.focused) wsClient.send("c2s.window.focus", { windowId: win.id });
@@ -112,51 +110,68 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
     >
       {/* titlebar — omitted for chrome-less widgets */}
       {!widget && (
-      <div
-        onPointerDown={(e) => {
-          focus(); // drag handler stops propagation, so focus explicitly here
-          if (!maximized) onMoveHandle(e);
-        }}
-        onDoubleClick={() => wsClient.send("c2s.window.maximize", { windowId: win.id })}
-        onContextMenu={(e) => openContextMenu(e, windowMenu({ t, win, native: !!native }))}
-        className={cn(
-          "vibe-titlebar flex h-9 shrink-0 items-center gap-2 border-b px-3 select-none",
-          // focused titlebar is translucent so the frosted glass shows through;
-          // unfocused is a flat greyed-out surface.
-          win.focused ? "bg-window-titlebar/60" : "bg-muted/50",
-        )}
-      >
-        <AppIcon
-          name={app?.icon}
-          presetId={app?.presetId}
-          label={app?.name ?? win.title}
-          className={cn("size-4", !win.focused && "opacity-50")}
-        />
-        <span
+        <div
+          onPointerDown={(e) => {
+            focus(); // drag handler stops propagation, so focus explicitly here
+            if (!maximized) onMoveHandle(e);
+          }}
+          onDoubleClick={() => wsClient.send("c2s.window.maximize", { windowId: win.id })}
+          onContextMenu={(e) => openContextMenu(e, windowMenu({ t, win, native: !!native }))}
           className={cn(
-            "vibe-title flex-1 truncate text-xs font-medium",
-            win.focused ? "text-foreground/90" : "text-muted-foreground",
+            "vibe-titlebar flex h-9 shrink-0 items-center gap-2 border-b px-3 select-none",
+            // focused titlebar is translucent so the frosted glass shows through;
+            // unfocused is a flat greyed-out surface.
+            win.focused ? "bg-window-titlebar/60" : "bg-muted/50",
           )}
         >
-          {win.title}
-        </span>
-        <div className="vibe-winbtns flex items-center gap-1">
-          {!native && (
-            <TitleButton kind="save" title={t("win.saveAsApp")} onClick={() => wsClient.send("c2s.app.save", { windowId: win.id })}>
-              <Save className="size-3.5" />
+          <AppIcon
+            name={app?.icon}
+            presetId={app?.presetId}
+            label={app?.name ?? win.title}
+            className={cn("size-4", !win.focused && "opacity-50")}
+          />
+          <span
+            className={cn(
+              "vibe-title flex-1 truncate text-xs font-medium",
+              win.focused ? "text-foreground/90" : "text-muted-foreground",
+            )}
+          >
+            {win.title}
+          </span>
+          <div className="vibe-winbtns flex items-center gap-1">
+            {!native && (
+              <TitleButton
+                kind="save"
+                title={t("win.saveAsApp")}
+                onClick={() => wsClient.send("c2s.app.save", { windowId: win.id })}
+              >
+                <Save className="size-3.5" />
+              </TitleButton>
+            )}
+            <TitleButton
+              kind="min"
+              title={t("win.minimize")}
+              onClick={() => wsClient.send("c2s.window.minimize", { windowId: win.id })}
+            >
+              <Minus className="size-3.5" />
             </TitleButton>
-          )}
-          <TitleButton kind="min" title={t("win.minimize")} onClick={() => wsClient.send("c2s.window.minimize", { windowId: win.id })}>
-            <Minus className="size-3.5" />
-          </TitleButton>
-          <TitleButton kind="max" title={t("win.maximize")} onClick={() => wsClient.send("c2s.window.maximize", { windowId: win.id })}>
-            {maximized ? <Copy className="size-3" /> : <Square className="size-3" />}
-          </TitleButton>
-          <TitleButton kind="close" title={t("win.close")} danger onClick={() => wsClient.send("c2s.window.close", { windowId: win.id })}>
-            <X className="size-3.5" />
-          </TitleButton>
+            <TitleButton
+              kind="max"
+              title={t("win.maximize")}
+              onClick={() => wsClient.send("c2s.window.maximize", { windowId: win.id })}
+            >
+              {maximized ? <Copy className="size-3" /> : <Square className="size-3" />}
+            </TitleButton>
+            <TitleButton
+              kind="close"
+              title={t("win.close")}
+              danger
+              onClick={() => wsClient.send("c2s.window.close", { windowId: win.id })}
+            >
+              <X className="size-3.5" />
+            </TitleButton>
+          </div>
         </div>
-      </div>
       )}
 
       {/* Widget chrome: a hover drag-handle + close, overlaid on the content. */}
@@ -205,15 +220,47 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
       {!maximized && !widget && (
         <>
           {/* edges */}
-          <div onPointerDown={onResize("n")} className="absolute inset-x-2 top-0 h-1.5 cursor-ns-resize" aria-hidden />
-          <div onPointerDown={onResize("s")} className="absolute inset-x-2 bottom-0 h-1.5 cursor-ns-resize" aria-hidden />
-          <div onPointerDown={onResize("w")} className="absolute inset-y-2 left-0 w-1.5 cursor-ew-resize" aria-hidden />
-          <div onPointerDown={onResize("e")} className="absolute inset-y-2 right-0 w-1.5 cursor-ew-resize" aria-hidden />
+          <div
+            onPointerDown={onResize("n")}
+            className="absolute inset-x-2 top-0 h-1.5 cursor-ns-resize"
+            aria-hidden
+          />
+          <div
+            onPointerDown={onResize("s")}
+            className="absolute inset-x-2 bottom-0 h-1.5 cursor-ns-resize"
+            aria-hidden
+          />
+          <div
+            onPointerDown={onResize("w")}
+            className="absolute inset-y-2 left-0 w-1.5 cursor-ew-resize"
+            aria-hidden
+          />
+          <div
+            onPointerDown={onResize("e")}
+            className="absolute inset-y-2 right-0 w-1.5 cursor-ew-resize"
+            aria-hidden
+          />
           {/* corners */}
-          <div onPointerDown={onResize("nw")} className="absolute left-0 top-0 size-3 cursor-nwse-resize" aria-hidden />
-          <div onPointerDown={onResize("ne")} className="absolute right-0 top-0 size-3 cursor-nesw-resize" aria-hidden />
-          <div onPointerDown={onResize("sw")} className="absolute bottom-0 left-0 size-3 cursor-nesw-resize" aria-hidden />
-          <div onPointerDown={onResize("se")} className="absolute bottom-0 right-0 size-3 cursor-nwse-resize" aria-hidden />
+          <div
+            onPointerDown={onResize("nw")}
+            className="absolute left-0 top-0 size-3 cursor-nwse-resize"
+            aria-hidden
+          />
+          <div
+            onPointerDown={onResize("ne")}
+            className="absolute right-0 top-0 size-3 cursor-nesw-resize"
+            aria-hidden
+          />
+          <div
+            onPointerDown={onResize("sw")}
+            className="absolute bottom-0 left-0 size-3 cursor-nesw-resize"
+            aria-hidden
+          />
+          <div
+            onPointerDown={onResize("se")}
+            className="absolute bottom-0 right-0 size-3 cursor-nwse-resize"
+            aria-hidden
+          />
         </>
       )}
     </motion.div>

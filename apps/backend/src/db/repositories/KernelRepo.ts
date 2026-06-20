@@ -47,26 +47,20 @@ export function recordBoot(): Promise<KernelState> {
        VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET boot_count = excluded.boot_count,
          last_boot_at = excluded.last_boot_at, updated_at = excluded.updated_at`,
-    ).run(
-      KERNEL_ID,
-      next.bootCount,
-      now,
-      JSON.stringify(next.globalState),
-      now,
-    );
+    ).run(KERNEL_ID, next.bootCount, now, JSON.stringify(next.globalState), now);
     return next;
   });
 }
 
-export function saveGlobalState(
-  globalState: Record<string, unknown>,
-): Promise<void> {
+export function saveGlobalState(globalState: Record<string, unknown>): Promise<void> {
   return enqueue(() => {
     const db = getDb();
     const now = Date.now();
-    db.query(
-      `UPDATE kernel_state SET global_state_json = ?, updated_at = ? WHERE id = ?`,
-    ).run(JSON.stringify(globalState), now, KERNEL_ID);
+    db.query(`UPDATE kernel_state SET global_state_json = ?, updated_at = ? WHERE id = ?`).run(
+      JSON.stringify(globalState),
+      now,
+      KERNEL_ID,
+    );
   });
 }
 

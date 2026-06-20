@@ -44,8 +44,20 @@ function extractFullHtml(full: string): string | null {
 }
 
 const VOID_TAGS = new Set([
-  "area", "base", "br", "col", "embed", "hr", "img", "input",
-  "link", "meta", "param", "source", "track", "wbr",
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
 ]);
 const OPEN_TAG = /<([a-zA-Z][a-zA-Z0-9-]*)\b([^>]*)>/g;
 const REGION_ATTR = /\bdata-vibeos-region\s*=\s*["']([^"']+)["']/;

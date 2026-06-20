@@ -29,19 +29,30 @@ function orientation(aspect: string): "landscape" | "portrait" | "square" {
 }
 
 const openaiSize = (a: string) =>
-  orientation(a) === "landscape" ? "1536x1024" : orientation(a) === "portrait" ? "1024x1536" : "1024x1024";
+  orientation(a) === "landscape"
+    ? "1536x1024"
+    : orientation(a) === "portrait"
+      ? "1024x1536"
+      : "1024x1024";
 const falSize = (a: string) =>
-  orientation(a) === "landscape" ? "landscape_16_9" : orientation(a) === "portrait" ? "portrait_16_9" : "square_hd";
+  orientation(a) === "landscape"
+    ? "landscape_16_9"
+    : orientation(a) === "portrait"
+      ? "portrait_16_9"
+      : "square_hd";
 
 async function fromUrlOrData(url: string): Promise<GeneratedImage> {
   if (url.startsWith("data:")) {
     const m = url.match(/^data:([^;]+);base64,(.*)$/);
-    if (!m || !m[1] || !m[2]) throw new Error("malformed data URL");
+    if (!m?.[1] || !m[2]) throw new Error("malformed data URL");
     return { bytes: Buffer.from(m[2], "base64"), mime: m[1] };
   }
   const r = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   if (!r.ok) throw new Error(`image fetch ${r.status}`);
-  return { bytes: new Uint8Array(await r.arrayBuffer()), mime: r.headers.get("content-type") ?? "image/jpeg" };
+  return {
+    bytes: new Uint8Array(await r.arrayBuffer()),
+    mime: r.headers.get("content-type") ?? "image/jpeg",
+  };
 }
 
 const short = (s: string) => s.slice(0, 200);
@@ -71,7 +82,8 @@ export async function generateImage(
       body: JSON.stringify({ model, prompt, size: openaiSize(aspect), n: 1 }),
       signal,
     });
-    if (!res.ok) throw new Error(`openai image ${res.status}: ${short(await res.text().catch(() => ""))}`);
+    if (!res.ok)
+      throw new Error(`openai image ${res.status}: ${short(await res.text().catch(() => ""))}`);
     const j = (await res.json()) as { data?: Array<{ b64_json?: string }> };
     const b64 = j.data?.[0]?.b64_json;
     if (!b64) throw new Error("openai: no image data");
@@ -88,13 +100,19 @@ export async function generateImage(
       }),
       signal,
     });
-    if (!res.ok) throw new Error(`gemini image ${res.status}: ${short(await res.text().catch(() => ""))}`);
+    if (!res.ok)
+      throw new Error(`gemini image ${res.status}: ${short(await res.text().catch(() => ""))}`);
     const j = (await res.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string } }> } }>;
+      candidates?: Array<{
+        content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string } }> };
+      }>;
     };
     const part = j.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
     if (!part?.inlineData?.data) throw new Error("gemini: no image data");
-    return { bytes: Buffer.from(part.inlineData.data, "base64"), mime: part.inlineData.mimeType ?? "image/png" };
+    return {
+      bytes: Buffer.from(part.inlineData.data, "base64"),
+      mime: part.inlineData.mimeType ?? "image/png",
+    };
   }
 
   if (provider === "openrouter") {
@@ -108,7 +126,8 @@ export async function generateImage(
       }),
       signal,
     });
-    if (!res.ok) throw new Error(`openrouter image ${res.status}: ${short(await res.text().catch(() => ""))}`);
+    if (!res.ok)
+      throw new Error(`openrouter image ${res.status}: ${short(await res.text().catch(() => ""))}`);
     const j = (await res.json()) as {
       choices?: Array<{ message?: { images?: Array<{ image_url?: { url?: string } }> } }>;
     };
@@ -124,7 +143,8 @@ export async function generateImage(
       body: JSON.stringify({ prompt, image_size: falSize(aspect), num_images: 1 }),
       signal,
     });
-    if (!res.ok) throw new Error(`fal image ${res.status}: ${short(await res.text().catch(() => ""))}`);
+    if (!res.ok)
+      throw new Error(`fal image ${res.status}: ${short(await res.text().catch(() => ""))}`);
     const j = (await res.json()) as { images?: Array<{ url?: string }> };
     const url = j.images?.[0]?.url;
     if (!url) throw new Error("fal: no image returned");
@@ -140,14 +160,25 @@ export async function generateImage(
  * file into `output_dir`; we read that file back. Optional `--text-to-image-model`
  * selects the model (otherwise CodeBuddy's configured default is used).
  */
-async function codebuddyImage(model: string, prompt: string, aspect: string): Promise<GeneratedImage> {
+async function codebuddyImage(
+  model: string,
+  prompt: string,
+  aspect: string,
+): Promise<GeneratedImage> {
   const dir = `${tmpdir()}/vibeos-img-${randomUUID()}`;
   await mkdir(dir, { recursive: true });
   const size = openaiSize(aspect); // ImageGen accepts 1024x1024 / 1024x1536 / 1536x1024
   log.debug(`codebuddy ImageGen → ${dir} (${size})`);
   // The actual pixels come from --text-to-image-model; the agent that drives the
   // ImageGen tool only needs to be cheap, so pin it to a low-cost LLM.
-  const args = ["-p", "-y", "--model", CODEBUDDY_IMAGE_AGENT_MODEL, "--output-format", "stream-json"];
+  const args = [
+    "-p",
+    "-y",
+    "--model",
+    CODEBUDDY_IMAGE_AGENT_MODEL,
+    "--output-format",
+    "stream-json",
+  ];
   if (model && model !== "default") args.push("--text-to-image-model", model);
   args.push(
     `Use the ImageGen tool (load it via ToolSearch, then call it through DeferExecuteTool) to generate ONE image and save it. ` +
@@ -166,7 +197,11 @@ async function codebuddyImage(model: string, prompt: string, aspect: string): Pr
     const file = files[0];
     if (!file) throw new Error("codebuddy ImageGen produced no image");
     const bytes = new Uint8Array(await readFile(`${dir}/${file}`));
-    const mime = /\.png$/i.test(file) ? "image/png" : /\.webp$/i.test(file) ? "image/webp" : "image/jpeg";
+    const mime = /\.png$/i.test(file)
+      ? "image/png"
+      : /\.webp$/i.test(file)
+        ? "image/webp"
+        : "image/jpeg";
     return { bytes, mime };
   } finally {
     void rm(dir, { recursive: true, force: true }).catch(() => {});

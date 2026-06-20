@@ -41,7 +41,10 @@ class WsClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   connect(): void {
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)
+    ) {
       return;
     }
     const ws = new WebSocket(WS_URL);

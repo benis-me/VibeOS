@@ -58,27 +58,33 @@ export function ensureMemory(windowId: string, appId: string): Promise<void> {
 export function saveSnapshot(windowId: string, html: string): Promise<void> {
   return enqueue(() => {
     const db = getDb();
-    db.query(
-      "UPDATE app_memory SET html_snapshot = ?, updated_at = ? WHERE window_id = ?",
-    ).run(html, Date.now(), windowId);
+    db.query("UPDATE app_memory SET html_snapshot = ?, updated_at = ? WHERE window_id = ?").run(
+      html,
+      Date.now(),
+      windowId,
+    );
   });
 }
 
 export function saveSummary(windowId: string, summary: string): Promise<void> {
   return enqueue(() => {
     const db = getDb();
-    db.query(
-      "UPDATE app_memory SET episode_summary = ?, updated_at = ? WHERE window_id = ?",
-    ).run(summary, Date.now(), windowId);
+    db.query("UPDATE app_memory SET episode_summary = ?, updated_at = ? WHERE window_id = ?").run(
+      summary,
+      Date.now(),
+      windowId,
+    );
   });
 }
 
 export function saveSessionId(windowId: string, sessionId: string): Promise<void> {
   return enqueue(() => {
     const db = getDb();
-    db.query(
-      "UPDATE app_memory SET sdk_session_id = ?, updated_at = ? WHERE window_id = ?",
-    ).run(sessionId, Date.now(), windowId);
+    db.query("UPDATE app_memory SET sdk_session_id = ?, updated_at = ? WHERE window_id = ?").run(
+      sessionId,
+      Date.now(),
+      windowId,
+    );
   });
 }
 

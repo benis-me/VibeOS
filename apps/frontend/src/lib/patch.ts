@@ -7,10 +7,7 @@ import type { UiRegion } from "@vibeos/shared/protocol";
  */
 export function applyRegions(currentHtml: string, regions: UiRegion[]): string {
   if (regions.length === 0) return currentHtml;
-  const doc = new DOMParser().parseFromString(
-    `<div id="__root">${currentHtml}</div>`,
-    "text/html",
-  );
+  const doc = new DOMParser().parseFromString(`<div id="__root">${currentHtml}</div>`, "text/html");
   const root = doc.getElementById("__root");
   if (!root) return currentHtml;
 

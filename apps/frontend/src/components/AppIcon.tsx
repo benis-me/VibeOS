@@ -205,7 +205,8 @@ interface Props {
  * unknown falls back to a 1-2 letter monogram (never emoji).
  */
 export function AppIcon({ name, presetId, label, className }: Props) {
-  const Cmp = (presetId && PRESET_ICONS[presetId]) || (name ? ICONS[name.toLowerCase()] : undefined);
+  const Cmp =
+    (presetId && PRESET_ICONS[presetId]) || (name ? ICONS[name.toLowerCase()] : undefined);
   if (Cmp) return <Cmp weight="duotone" className={cn("size-5", className)} />;
 
   // Monogram fallback: prefer 1-2 ASCII letters; for non-Latin names (e.g. CJK)

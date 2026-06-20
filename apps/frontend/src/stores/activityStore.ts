@@ -42,6 +42,9 @@ export const useActivityStore = create<ActivityState>((set, get) => ({
     const s = get();
     if (s.loading || !s.hasMore || s.runs.length === 0) return;
     set({ loading: true });
-    wsClient.send("c2s.activity.fetch", { before: s.runs[s.runs.length - 1]!.startedAt, limit: PAGE });
+    wsClient.send("c2s.activity.fetch", {
+      before: s.runs[s.runs.length - 1]!.startedAt,
+      limit: PAGE,
+    });
   },
 }));

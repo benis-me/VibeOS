@@ -710,7 +710,14 @@ button:not(:disabled),
   text-shadow: 1px 1px 1px rgba(0, 40, 0, 0.5);
 }
 [data-skin="xp"] .vibe-startbtn:hover {
-  background: linear-gradient(to bottom, #86d472 0%, #5cb242 8%, #4aa636 50%, #3f9e2e 92%, #54b242 100%);
+  background: linear-gradient(
+    to bottom,
+    #86d472 0%,
+    #5cb242 8%,
+    #4aa636 50%,
+    #3f9e2e 92%,
+    #54b242 100%
+  );
 }
 [data-skin="xp"] .vibe-startbtn[data-open] {
   box-shadow:
@@ -864,12 +871,24 @@ button:not(:disabled),
   color: #000 !important;
   border: 1px solid #003c74 !important;
   border-radius: 3px !important;
-  background: linear-gradient(to bottom, #fdfefe 0%, #eceadb 47%, #d6d0bf 92%, #e4e0d3 100%) !important;
+  background: linear-gradient(
+    to bottom,
+    #fdfefe 0%,
+    #eceadb 47%,
+    #d6d0bf 92%,
+    #e4e0d3 100%
+  ) !important;
   box-shadow: inset 0 0 0 1px #fff !important;
 }
 [data-skin="xp"] .ai-surface button:hover {
   border-color: #0a246a !important;
-  background: linear-gradient(to bottom, #fff 0%, #f4f2e7 47%, #e0dac9 92%, #efece0 100%) !important;
+  background: linear-gradient(
+    to bottom,
+    #fff 0%,
+    #f4f2e7 47%,
+    #e0dac9 92%,
+    #efece0 100%
+  ) !important;
 }
 [data-skin="xp"] .ai-surface button:active {
   background: linear-gradient(to bottom, #cdc7b6, #e0dccf) !important;
@@ -894,8 +913,16 @@ button:not(:disabled),
   color: #1a1a1a !important;
   border: 1px solid rgba(0, 0, 0, 0.28) !important;
   border-radius: 13px !important;
-  background: linear-gradient(to bottom, #ffffff 0%, #fbfbfb 49%, #e7e7e7 51%, #f4f4f4 100%) !important;
-  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0, 0, 0, 0.12) !important;
+  background: linear-gradient(
+    to bottom,
+    #ffffff 0%,
+    #fbfbfb 49%,
+    #e7e7e7 51%,
+    #f4f4f4 100%
+  ) !important;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgba(0, 0, 0, 0.12) !important;
 }
 [data-skin="aqua"] .ai-surface button:active {
   background: linear-gradient(to bottom, #cfe8ff, #8ec3ff) !important;
@@ -1036,7 +1063,9 @@ button:not(:disabled),
   border: 1px solid rgba(0, 0, 0, 0.25);
   color: #1a1a1a;
   background: linear-gradient(to bottom, #ffffff 0%, #fbfbfb 49%, #e7e7e7 51%, #f4f4f4 100%);
-  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0, 0, 0, 0.12);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgba(0, 0, 0, 0.12);
 }
 [data-skin="aqua"] .vibe-select {
   border-radius: 8px;

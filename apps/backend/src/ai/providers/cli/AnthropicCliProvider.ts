@@ -1,5 +1,11 @@
 import type { ProviderId } from "@vibeos/shared/domain";
-import type { AiProvider, DiscoveredModel, ProviderRunOptions, RunResult, TokenUsage } from "../types.ts";
+import type {
+  AiProvider,
+  DiscoveredModel,
+  ProviderRunOptions,
+  RunResult,
+  TokenUsage,
+} from "../types.ts";
 import { whichBinary } from "../detect.ts";
 import { streamJsonl } from "./exec.ts";
 import { cliEnv } from "./env.ts";
@@ -58,13 +64,19 @@ export class AnthropicCliProvider implements AiProvider {
 
     const args = [
       "-p",
-      "--output-format", "stream-json",
+      "--output-format",
+      "stream-json",
       "--verbose",
-      "--setting-sources", "",
-      "--permission-mode", "bypassPermissions",
-      "--max-turns", "6",
-      "--disallowedTools", "*",
-      "--append-system-prompt", opts.systemPrompt,
+      "--setting-sources",
+      "",
+      "--permission-mode",
+      "bypassPermissions",
+      "--max-turns",
+      "6",
+      "--disallowedTools",
+      "*",
+      "--append-system-prompt",
+      opts.systemPrompt,
     ];
     if (opts.onDelta) args.push("--include-partial-messages");
     if (opts.model) args.push("--model", opts.model);
@@ -81,7 +93,8 @@ export class AnthropicCliProvider implements AiProvider {
       onObject: (o) => mapAnthropic(o, state, opts.onDelta),
     });
 
-    if (opts.abort?.signal.aborted) return { text: state.text, sessionId: state.sessionId, ok: false };
+    if (opts.abort?.signal.aborted)
+      return { text: state.text, sessionId: state.sessionId, ok: false };
     // Salvage: any usable text → ok, even if the run also reported an error
     // (e.g. max-turns) or a non-zero exit.
     if (state.text.trim()) {

@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ChevronRight, Check } from "lucide-react";
 import { create } from "zustand";
@@ -120,7 +114,7 @@ function MenuPanel({ items, x, y, onClose, panelRef, onBack }: PanelProps) {
 
   const openSub = (idx: number, rowEl: HTMLElement) => {
     const item = items[idx];
-    if (!item || item.type !== "submenu") {
+    if (item?.type !== "submenu") {
       setOpen(null);
       return;
     }
@@ -231,7 +225,10 @@ function MenuPanel({ items, x, y, onClose, panelRef, onBack }: PanelProps) {
     onClose();
   };
 
-  const sub = open && items[open.idx]?.type === "submenu" ? (items[open.idx] as Extract<MenuItem, { type: "submenu" }>) : null;
+  const sub =
+    open && items[open.idx]?.type === "submenu"
+      ? (items[open.idx] as Extract<MenuItem, { type: "submenu" }>)
+      : null;
 
   return (
     <div
@@ -248,7 +245,8 @@ function MenuPanel({ items, x, y, onClose, panelRef, onBack }: PanelProps) {
       onContextMenu={(e) => e.preventDefault()}
     >
       {items.map((item, idx) => {
-        if (item.type === "separator") return <div key={idx} className="vibe-menu-sep" role="separator" />;
+        if (item.type === "separator")
+          return <div key={idx} className="vibe-menu-sep" role="separator" />;
         const isSub = item.type === "submenu";
         const disabled = item.type === "item" && item.disabled;
         return (

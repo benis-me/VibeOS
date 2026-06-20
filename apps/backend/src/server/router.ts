@@ -1,16 +1,18 @@
 import type { ServerWebSocket } from "bun";
 import pkg from "../../package.json";
-import type {
-  ClientToServer,
-  WsEnvelope,
-} from "@vibeos/shared/protocol";
+import type { ClientToServer, WsEnvelope } from "@vibeos/shared/protocol";
 import type { AppManifest } from "@vibeos/shared/domain";
 import { inferCapabilities, discoverAllProviders } from "../ai/modelDiscovery.ts";
 import { sendTo, broadcast, type WsData } from "./wsGateway.ts";
 import { bus } from "../events/bus.ts";
 import { kernelState } from "../kernel/kernelState.ts";
 import { ModelPolicy } from "../ai/ModelPolicy.ts";
-import { setActiveProvider, activeProviderId, availableProviderIds, getProvider } from "../ai/providers/index.ts";
+import {
+  setActiveProvider,
+  activeProviderId,
+  availableProviderIds,
+  getProvider,
+} from "../ai/providers/index.ts";
 import { env } from "../config/env.ts";
 import { searchApps } from "../ai/appSearch.ts";
 import { requestWallpaper, storeUpload } from "../ai/imageCache.ts";
@@ -39,7 +41,11 @@ import {
   emptyRecycleBin,
 } from "../db/repositories/VfsRepo.ts";
 import { renderInitialWindow } from "../kernel/windowInit.ts";
-import { listRecent, markRead, get as getNotification } from "../db/repositories/NotificationRepo.ts";
+import {
+  listRecent,
+  markRead,
+  get as getNotification,
+} from "../db/repositories/NotificationRepo.ts";
 import { recentRuns } from "../db/repositories/AgentRepo.ts";
 import { stopRun } from "../ai/SdkManager.ts";
 import { logger } from "../util/log.ts";
@@ -49,10 +55,7 @@ const log = logger("router");
 /** The latest in-flight app search per connection, so a new query preempts it. */
 const appSearchAborts = new WeakMap<ServerWebSocket<WsData>, AbortController>();
 
-export async function handleMessage(
-  ws: ServerWebSocket<WsData>,
-  raw: string,
-): Promise<void> {
+export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): Promise<void> {
   let env: WsEnvelope<unknown>;
   try {
     env = JSON.parse(raw) as WsEnvelope<unknown>;
@@ -76,10 +79,7 @@ export async function handleMessage(
   }
 }
 
-async function dispatch(
-  ws: ServerWebSocket<WsData>,
-  msg: ClientToServer,
-): Promise<void> {
+async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promise<void> {
   switch (msg.type) {
     case "c2s.boot.hello":
       return sendBootState(ws);
@@ -343,7 +343,9 @@ async function dispatch(
         : `Generate the application "${msg.payload.name}".${
             msg.payload.description ? ` It is: ${msg.payload.description}.` : ""
           } Produce a complete, believable, fully usable first screen for this app.`;
-      log.info(`launch ${widget ? "widget" : "app"} "${msg.payload.name}" → window [${w.id.slice(-6)}]`);
+      log.info(
+        `launch ${widget ? "widget" : "app"} "${msg.payload.name}" → window [${w.id.slice(-6)}]`,
+      );
       bus.emit("window.spawnRender", { windowId: w.id, seedPrompt: seed });
       return;
     }
@@ -353,7 +355,11 @@ async function dispatch(
       if (!win) return;
       const snapshot = getSnapshot(msg.payload.windowId);
       if (!snapshot.trim()) {
-        broadcast("s2c.error", { code: "ai_failed", detail: "nothing to save yet", windowId: win.id });
+        broadcast("s2c.error", {
+          code: "ai_failed",
+          detail: "nothing to save yet",
+          windowId: win.id,
+        });
         return;
       }
       const src = getApp(win.appId);
@@ -405,7 +411,11 @@ async function dispatch(
         broadcast("s2c.error", { code: "bad_json" });
         return;
       }
-      const app = await installApp({ name: data.name, icon: data.icon, manifest: data.manifest ?? {} });
+      const app = await installApp({
+        name: data.name,
+        icon: data.icon,
+        manifest: data.manifest ?? {},
+      });
       const shortcut = await ensureShortcut(app.id, app.name, app.icon);
       broadcast("s2c.syscall.appInstalled", { app, shortcut: shortcut ?? undefined });
       log.info(`imported app "${app.name}"`);

@@ -68,13 +68,27 @@ export function BrowserChrome({ windowId, children }: { windowId: string; childr
   return (
     <div className="flex h-full w-full flex-col">
       <div className="vibe-browser-bar flex shrink-0 items-center gap-1 border-b bg-card px-2 py-1.5">
-        <button onClick={() => step(-1)} disabled={!canBack} title={t("browser.back")} className={btn}>
+        <button
+          onClick={() => step(-1)}
+          disabled={!canBack}
+          title={t("browser.back")}
+          className={btn}
+        >
           <ArrowLeft className="size-4" />
         </button>
-        <button onClick={() => step(1)} disabled={!canFwd} title={t("browser.forward")} className={btn}>
+        <button
+          onClick={() => step(1)}
+          disabled={!canFwd}
+          title={t("browser.forward")}
+          className={btn}
+        >
           <ArrowRight className="size-4" />
         </button>
-        <button onClick={() => url && navigate(url)} title={t("browser.reload")} className={cn(btn, "mr-1")}>
+        <button
+          onClick={() => url && navigate(url)}
+          title={t("browser.reload")}
+          className={cn(btn, "mr-1")}
+        >
           <RotateCw className="size-3.5" />
         </button>
         <form

@@ -26,9 +26,13 @@
     "build": "bun run --cwd apps/frontend build",
     "start": "bun run --cwd apps/backend start",
     "typecheck": "bun run --cwd packages/shared typecheck && bun run --cwd apps/backend typecheck && bun run --cwd apps/frontend typecheck",
-    "test": "bun test"
+    "test": "bun test",
+    "lint": "biome lint .",
+    "format": "biome format --write .",
+    "check": "biome check ."
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
     "@types/bun": "^1.3.14",
     "typescript": "^5.7.0"
   }

@@ -7,7 +7,11 @@ import { kernelState } from "./kernelState.ts";
 import { startHttpServer } from "../server/httpServer.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { ModelPolicy } from "../ai/ModelPolicy.ts";
-import { setActiveProvider, activeProviderId, availableProviderIds } from "../ai/providers/index.ts";
+import {
+  setActiveProvider,
+  activeProviderId,
+  availableProviderIds,
+} from "../ai/providers/index.ts";
 import { DEFAULT_PROVIDER } from "@vibeos/shared/domain";
 import { env } from "../config/env.ts";
 
@@ -34,7 +38,9 @@ export async function boot() {
   if (effective !== settings.provider) {
     await updateSettings({ provider: effective });
   }
-  console.log(`[boot] AI provider: ${activeProviderId()} (available: ${available.join(", ") || "none"})`);
+  console.log(
+    `[boot] AI provider: ${activeProviderId()} (available: ${available.join(", ") || "none"})`,
+  );
 
   const kernel = await recordBoot();
   kernelState.load();
@@ -55,9 +61,7 @@ export async function boot() {
         // push the discovered models so Settings can populate.
         broadcast("s2c.models.updated", { models: ModelPolicy.available() });
       })
-      .catch((e) =>
-        console.warn("[models] discovery error:", e instanceof Error ? e.message : e),
-      );
+      .catch((e) => console.warn("[models] discovery error:", e instanceof Error ? e.message : e));
   } else {
     console.log("[boot] AI stub mode — skipping model discovery");
   }

@@ -144,7 +144,13 @@ export async function run(opts: RunOptions): Promise<RunResult> {
         thinking: cfg.thinking,
         sessionId: stream ? opts.sessionId : undefined,
         abort,
-        onDelta: stream && opts.onDelta ? (t) => { arm(); opts.onDelta!(t); } : undefined,
+        onDelta:
+          stream && opts.onDelta
+            ? (t) => {
+                arm();
+                opts.onDelta!(t);
+              }
+            : undefined,
       });
       return {
         result: timedOut ? { ...r, ok: false, error: `timed out after ${env.genTimeoutMs}ms` } : r,

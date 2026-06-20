@@ -22,7 +22,8 @@ export function RecycleBinApp() {
     [nodes],
   );
 
-  const restore = (id: string) => wsClient.send("c2s.vfs.move", { nodeId: id, location: "desktop" });
+  const restore = (id: string) =>
+    wsClient.send("c2s.vfs.move", { nodeId: id, location: "desktop" });
   const remove = (id: string) => wsClient.send("c2s.vfs.delete", { nodeId: id });
   const empty = () => wsClient.send("c2s.vfs.empty", {});
 
@@ -55,7 +56,14 @@ export function RecycleBinApp() {
           </div>
         ) : (
           items.map((n) => (
-            <Row key={n.id} node={n} apps={apps} t={t} onRestore={() => restore(n.id)} onDelete={() => remove(n.id)} />
+            <Row
+              key={n.id}
+              node={n}
+              apps={apps}
+              t={t}
+              onRestore={() => restore(n.id)}
+              onDelete={() => remove(n.id)}
+            />
           ))
         )}
       </div>

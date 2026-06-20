@@ -118,7 +118,7 @@ async function generate(
 ): Promise<void> {
   const win = getWindow(windowId);
   const app = win ? getApp(win.appId) : null;
-  if (!win || !win.isOpen || !app) {
+  if (!win?.isOpen || !app) {
     return;
   }
 
@@ -145,8 +145,7 @@ async function generate(
     isDrag: !!trigger.drag,
     isSpawn: !!trigger.seedPrompt,
   });
-  const regionIds =
-    renderMode === "prefer-incremental" ? extractRegionIds(snapshot) : undefined;
+  const regionIds = renderMode === "prefer-incremental" ? extractRegionIds(snapshot) : undefined;
 
   const prompt = assemblePrompt({
     app,

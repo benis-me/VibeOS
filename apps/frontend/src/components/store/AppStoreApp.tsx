@@ -10,12 +10,32 @@ const GRID = "grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-2.5";
 
 // Seed apps the user can install on demand — the AI generates them fresh on open.
 const TEMPLATES: { name: string; icon: string; description: string }[] = [
-  { name: "Notes", icon: "notebook-pen", description: "A minimal note-taking app with a list and an editor." },
-  { name: "Calculator", icon: "calculator", description: "A clean calculator with a keypad and a running tape." },
-  { name: "Music", icon: "music", description: "A music player with a now-playing view and a playlist." },
-  { name: "Weather", icon: "cloud-sun", description: "Current conditions and a multi-day forecast." },
+  {
+    name: "Notes",
+    icon: "notebook-pen",
+    description: "A minimal note-taking app with a list and an editor.",
+  },
+  {
+    name: "Calculator",
+    icon: "calculator",
+    description: "A clean calculator with a keypad and a running tape.",
+  },
+  {
+    name: "Music",
+    icon: "music",
+    description: "A music player with a now-playing view and a playlist.",
+  },
+  {
+    name: "Weather",
+    icon: "cloud-sun",
+    description: "Current conditions and a multi-day forecast.",
+  },
   { name: "Calendar", icon: "calendar", description: "A month calendar with events." },
-  { name: "Paint", icon: "palette", description: "A drawing canvas with tools and a color palette." },
+  {
+    name: "Paint",
+    icon: "palette",
+    description: "A drawing canvas with tools and a color palette.",
+  },
 ];
 
 export function AppStoreApp() {
@@ -31,7 +51,11 @@ export function AppStoreApp() {
   const exportApp = (id: string) => wsClient.send("c2s.app.export", { appId: id });
   const installTemplate = (tpl: (typeof TEMPLATES)[number]) =>
     wsClient.send("c2s.app.import", {
-      json: JSON.stringify({ name: tpl.name, icon: tpl.icon, manifest: { description: tpl.description } }),
+      json: JSON.stringify({
+        name: tpl.name,
+        icon: tpl.icon,
+        manifest: { description: tpl.description },
+      }),
     });
   const doImport = () => {
     if (!importText.trim()) return;
@@ -48,7 +72,13 @@ export function AppStoreApp() {
         ) : (
           <div className={GRID}>
             {installed.map((a) => (
-              <AppCard key={a.id} app={a} onOpen={() => open(a.id)} onExport={() => exportApp(a.id)} t={t} />
+              <AppCard
+                key={a.id}
+                app={a}
+                onOpen={() => open(a.id)}
+                onExport={() => exportApp(a.id)}
+                t={t}
+              />
             ))}
           </div>
         )}
@@ -106,7 +136,12 @@ function AppCard({
   return (
     <div className="vibe-group flex flex-col gap-2 rounded-xl border bg-card p-3">
       <button onClick={onOpen} className="flex items-start gap-2.5 text-left">
-        <AppIcon name={app.icon} presetId={app.presetId} label={app.name} className="size-7 shrink-0" />
+        <AppIcon
+          name={app.icon}
+          presetId={app.presetId}
+          label={app.name}
+          className="size-7 shrink-0"
+        />
         <div className="min-w-0">
           <div className="truncate text-[13px] font-medium">{app.name}</div>
           {subtitle && (
@@ -141,9 +176,17 @@ function AppCard({
 }
 
 function SectionTitle({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <h2 className={"mb-3 text-[13px] font-medium text-foreground/70 " + (className ?? "")}>{children}</h2>;
+  return (
+    <h2 className={`mb-3 text-[13px] font-medium text-foreground/70 ${className ?? ""}`}>
+      {children}
+    </h2>
+  );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-xl border border-dashed py-8 text-center text-sm text-muted-foreground">{children}</div>;
+  return (
+    <div className="rounded-xl border border-dashed py-8 text-center text-sm text-muted-foreground">
+      {children}
+    </div>
+  );
 }

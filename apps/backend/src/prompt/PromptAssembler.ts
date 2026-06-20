@@ -54,8 +54,20 @@ export function decideRenderMode(input: {
 }
 
 export function assemblePrompt(input: AssembleInput): string {
-  const { app, memory, recent, globalState, windowSize, op, drag, seedPrompt, firstRender, renderMode, regionIds, userProfile } =
-    input;
+  const {
+    app,
+    memory,
+    recent,
+    globalState,
+    windowSize,
+    op,
+    drag,
+    seedPrompt,
+    firstRender,
+    renderMode,
+    regionIds,
+    userProfile,
+  } = input;
   const parts: string[] = [];
 
   const gs: Record<string, unknown> = { ...compact(globalState) };
@@ -84,7 +96,10 @@ export function assemblePrompt(input: AssembleInput): string {
 
   if (recent.length > 0) {
     const lines = recent
-      .map((r) => `- ${r.opKind} ${summarizeOp(r.opPayload)}${r.resultSummary ? ` → ${r.resultSummary}` : ""}`)
+      .map(
+        (r) =>
+          `- ${r.opKind} ${summarizeOp(r.opPayload)}${r.resultSummary ? ` → ${r.resultSummary}` : ""}`,
+      )
       .join("\n");
     parts.push(`[RECENT INTERACTIONS]\n${lines}`);
   }
@@ -125,7 +140,7 @@ export function assemblePrompt(input: AssembleInput): string {
     renderMode === "force-full"
       ? `[RENDER MODE: FULL]\nReturn the COMPLETE window body in <vibeos-html>. Tag stable, updatable parts with data-vibeos-region="<stable-id>" so future changes can be patched incrementally. Do NOT return bare region fragments this time.`
       : `[RENDER MODE: INCREMENTAL PREFERRED]\nThe window is already rendered (see CURRENT UI${
-          regionIds && regionIds.length ? `, regions: ${regionIds.join(", ")}` : ""
+          regionIds?.length ? `, regions: ${regionIds.join(", ")}` : ""
         }). DECIDE which fits this action:
 - If the action changes only part(s) of the screen → return ONLY those data-vibeos-region elements (for accumulating regions like terminal/chat/list, include ALL their existing content plus the new part). This is the default — prefer it.
 - If the action structurally replaces the screen (page navigation, switching to a totally different view) → return the FULL body instead.
@@ -164,7 +179,7 @@ function compact(state: Record<string, unknown>): Record<string, unknown> {
 function summarizeOp(payload: unknown): string {
   try {
     const s = JSON.stringify(payload);
-    return s.length > 160 ? s.slice(0, 160) + "…" : s;
+    return s.length > 160 ? `${s.slice(0, 160)}…` : s;
   } catch {
     return "";
   }
@@ -172,7 +187,7 @@ function summarizeOp(payload: unknown): string {
 
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
-  return s.slice(0, max) + `\n…[truncated ${s.length - max} chars]`;
+  return `${s.slice(0, max)}\n…[truncated ${s.length - max} chars]`;
 }
 
 /**

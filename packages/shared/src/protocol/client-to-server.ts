@@ -16,12 +16,7 @@ export interface AiOp {
   formData?: Record<string, string>;
 }
 
-export type DragPayloadKind =
-  | "text"
-  | "image"
-  | "file"
-  | "desktop-object"
-  | "app-shortcut";
+export type DragPayloadKind = "text" | "image" | "file" | "desktop-object" | "app-shortcut";
 
 export interface DragPayload {
   kind: DragPayloadKind;

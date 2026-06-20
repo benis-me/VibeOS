@@ -67,7 +67,9 @@ export function StartMenu({ open, onClose, onAppSearch }: Props) {
           >
             <Search className="size-4 text-muted-foreground" />
             <span className="flex-1 text-sm">{t("startmenu.appSearch")}</span>
-            <span className="text-[10px] text-muted-foreground">{t("startmenu.appSearchHint")}</span>
+            <span className="text-[10px] text-muted-foreground">
+              {t("startmenu.appSearchHint")}
+            </span>
           </button>
 
           <AppSection title={t("startmenu.system")} apps={system} onLaunch={launch} />

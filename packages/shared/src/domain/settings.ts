@@ -165,7 +165,11 @@ export const AI_PROVIDERS: readonly ProviderCatalogEntry[] = [
       { id: "openai/gpt-5.5", name: "OpenAI: GPT-5.5", capabilities: TEXT },
       { id: "anthropic/claude-opus-4-8", name: "Anthropic: Claude Opus 4.8", capabilities: TEXT },
       { id: "google/gemini-3.5-flash", name: "Google: Gemini 3.5 Flash", capabilities: TEXT },
-      { id: "google/gemini-2.5-flash-image", name: "Google: Gemini 2.5 Flash Image", capabilities: IMG },
+      {
+        id: "google/gemini-2.5-flash-image",
+        name: "Google: Gemini 2.5 Flash Image",
+        capabilities: IMG,
+      },
     ],
   },
   {

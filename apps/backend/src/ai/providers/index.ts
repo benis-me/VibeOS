@@ -4,7 +4,13 @@ import type { AiProvider } from "./types.ts";
 import { whichBinary } from "./detect.ts";
 import { hasApiKey } from "./config.ts";
 
-export type { AiProvider, DiscoveredModel, ProviderRunOptions, RunResult, ThinkingConfig } from "./types.ts";
+export type {
+  AiProvider,
+  DiscoveredModel,
+  ProviderRunOptions,
+  RunResult,
+  ThinkingConfig,
+} from "./types.ts";
 
 /**
  * Lazy provider loaders: only the SDK for a provider that's actually used gets

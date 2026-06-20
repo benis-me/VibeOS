@@ -1,6 +1,12 @@
 import { tmpdir } from "node:os";
 import type { Effort } from "@vibeos/shared/domain";
-import type { AiProvider, DiscoveredModel, ProviderRunOptions, RunResult, TokenUsage } from "./types.ts";
+import type {
+  AiProvider,
+  DiscoveredModel,
+  ProviderRunOptions,
+  RunResult,
+  TokenUsage,
+} from "./types.ts";
 import { whichBinary } from "./detect.ts";
 import { streamJsonl } from "./cli/exec.ts";
 import { logger } from "../../util/log.ts";
@@ -53,9 +59,7 @@ class CodexProvider implements AiProvider {
     const effort = mapEffort(opts.effort);
     if (effort) flags.push("-c", `model_reasoning_effort="${effort}"`);
 
-    const args = opts.sessionId
-      ? ["exec", "resume", opts.sessionId, ...flags]
-      : ["exec", ...flags];
+    const args = opts.sessionId ? ["exec", "resume", opts.sessionId, ...flags] : ["exec", ...flags];
     // No system-prompt flag in Codex → prepend it (with the anti-agent preamble)
     // to the prompt.
     const stdin = `${CODEX_PREAMBLE}\n\n${opts.systemPrompt}\n\n${opts.prompt}`;
@@ -69,7 +73,8 @@ class CodexProvider implements AiProvider {
       onObject: (o) => mapCodex(o, state, opts.onDelta),
     });
 
-    if (opts.abort?.signal.aborted) return { text: state.text, sessionId: state.sessionId, ok: false };
+    if (opts.abort?.signal.aborted)
+      return { text: state.text, sessionId: state.sessionId, ok: false };
     if (state.text.trim()) {
       return { text: state.text, sessionId: state.sessionId, ok: true, usage: state.usage };
     }
@@ -153,7 +158,11 @@ async function discoverViaCli(): Promise<DiscoveredModel[]> {
     const models = Array.isArray(json.models) ? json.models : [];
     return models
       .filter((m) => m.slug && m.visibility !== "hide" && m.visibility !== "hidden")
-      .map((m) => ({ modelId: m.slug!, name: m.display_name ?? m.slug!, description: m.description }));
+      .map((m) => ({
+        modelId: m.slug!,
+        name: m.display_name ?? m.slug!,
+        description: m.description,
+      }));
   } catch (e) {
     log.warn(`model discovery failed: ${e instanceof Error ? e.message : e}`);
     return [];

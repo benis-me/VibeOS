@@ -15,10 +15,7 @@ export function BootScreen() {
         </div>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span
-            className={
-              "size-2 rounded-full " +
-              (connected ? "bg-run glow-run breathe" : "bg-warn breathe")
-            }
+            className={`size-2 rounded-full ${connected ? "bg-run glow-run breathe" : "bg-warn breathe"}`}
           />
           {phaseLabel}
         </div>

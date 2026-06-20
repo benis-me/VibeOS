@@ -11,7 +11,9 @@ describe("extractStreamingHtml", () => {
   });
 
   test("returns the body once closed", () => {
-    expect(extractStreamingHtml("<vibeos-html><div>hi</div></vibeos-html>tail")).toBe("<div>hi</div>");
+    expect(extractStreamingHtml("<vibeos-html><div>hi</div></vibeos-html>tail")).toBe(
+      "<div>hi</div>",
+    );
   });
 });
 
@@ -36,7 +38,9 @@ describe("parseAiOutput", () => {
       `<vibeos-html><div data-vibeos-region="root"><p>x</p></div></vibeos-html>`,
     );
     expect(out.html).toBeUndefined();
-    expect(out.regions).toEqual([{ region: "root", html: `<div data-vibeos-region="root"><p>x</p></div>` }]);
+    expect(out.regions).toEqual([
+      { region: "root", html: `<div data-vibeos-region="root"><p>x</p></div>` },
+    ]);
   });
 
   test("region block plus other content → full replace, not a patch", () => {

@@ -32,7 +32,7 @@ function emit(level: Level, tag: string, msg: string, extra?: unknown): void {
 function safe(v: unknown): string {
   try {
     const s = JSON.stringify(v);
-    return s && s.length > 600 ? s.slice(0, 600) + "…" : (s ?? String(v));
+    return s && s.length > 600 ? `${s.slice(0, 600)}…` : (s ?? String(v));
   } catch {
     return String(v);
   }

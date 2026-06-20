@@ -5,10 +5,7 @@ import { Window } from "./Window";
 
 export function WindowManager() {
   const windows = useWindowStore((s) => s.windows);
-  const list = useMemo(
-    () => Object.values(windows).filter((w) => w.isOpen),
-    [windows],
-  );
+  const list = useMemo(() => Object.values(windows).filter((w) => w.isOpen), [windows]);
 
   return (
     <AnimatePresence>

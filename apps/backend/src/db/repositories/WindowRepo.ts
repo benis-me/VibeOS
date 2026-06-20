@@ -55,9 +55,7 @@ export function getWindow(id: string): WindowState | null {
 export function findOpenWindowByApp(appId: string): WindowState | null {
   const db = getDb();
   const row = db
-    .query<WindowRow, [string]>(
-      "SELECT * FROM windows WHERE app_id = ? AND is_open = 1 LIMIT 1",
-    )
+    .query<WindowRow, [string]>("SELECT * FROM windows WHERE app_id = ? AND is_open = 1 LIMIT 1")
     .get(appId);
   return row ? toWindow(row) : null;
 }
@@ -84,7 +82,8 @@ type Geo = { x: number; y: number; w: number; h: number };
 export function getGeometry(appId: string): Geo | null {
   const db = getDb();
   return (
-    db.query<Geo, [string]>("SELECT x, y, w, h FROM app_geometry WHERE app_id = ?").get(appId) ?? null
+    db.query<Geo, [string]>("SELECT x, y, w, h FROM app_geometry WHERE app_id = ?").get(appId) ??
+    null
   );
 }
 
@@ -129,10 +128,8 @@ export function openWindow(input: {
     const remembered = input.rect ? null : getGeometry(input.appId);
     const w = input.size?.w ?? 760;
     const h = input.size?.h ?? 520;
-    const r =
-      input.rect ??
-      remembered ??
-      {
+    const r = input.rect ??
+      remembered ?? {
         // cascade so multiple windows don't stack exactly on top of each other
         x: 70 + (z % 8) * 30,
         y: 60 + (z % 8) * 30,
@@ -143,7 +140,20 @@ export function openWindow(input: {
     db.query(
       `INSERT INTO windows (id, app_id, title, kind, x, y, w, h, z, sort_order, state, is_open, focused, opened_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 1, 1, ?, ?)`,
-    ).run(id, input.appId, input.title, input.kind ?? "app", r.x, r.y, r.w, r.h, z, order, now, now);
+    ).run(
+      id,
+      input.appId,
+      input.title,
+      input.kind ?? "app",
+      r.x,
+      r.y,
+      r.w,
+      r.h,
+      z,
+      order,
+      now,
+      now,
+    );
     return getWindow(id)!;
   });
 }
@@ -171,10 +181,7 @@ export function focusWindow(id: string): Promise<WindowState | null> {
   });
 }
 
-export function setWindowState(
-  id: string,
-  state: WindowDisplayState,
-): Promise<WindowState | null> {
+export function setWindowState(id: string, state: WindowDisplayState): Promise<WindowState | null> {
   return enqueue(() => {
     const db = getDb();
     db.query("UPDATE windows SET state = ?, updated_at = ? WHERE id = ?").run(
@@ -192,9 +199,14 @@ export function moveWindow(
 ): Promise<WindowState | null> {
   return enqueue(() => {
     const db = getDb();
-    db.query(
-      "UPDATE windows SET x = ?, y = ?, w = ?, h = ?, updated_at = ? WHERE id = ?",
-    ).run(rect.x, rect.y, rect.w, rect.h, Date.now(), id);
+    db.query("UPDATE windows SET x = ?, y = ?, w = ?, h = ?, updated_at = ? WHERE id = ?").run(
+      rect.x,
+      rect.y,
+      rect.w,
+      rect.h,
+      Date.now(),
+      id,
+    );
     return getWindow(id);
   });
 }

@@ -25,8 +25,6 @@ export const useVfsStore = create<VfsStoreState>((set, get) => ({
       for (const id of ids) delete nodes[id];
       return { nodes };
     }),
-  desktop: () =>
-    Object.values(get().nodes).filter((n) => n.location === "desktop"),
-  recyclebin: () =>
-    Object.values(get().nodes).filter((n) => n.location === "recyclebin"),
+  desktop: () => Object.values(get().nodes).filter((n) => n.location === "desktop"),
+  recyclebin: () => Object.values(get().nodes).filter((n) => n.location === "recyclebin"),
 }));

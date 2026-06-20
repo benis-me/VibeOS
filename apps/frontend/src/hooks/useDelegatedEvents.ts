@@ -35,7 +35,10 @@ function collectFields(scope: HTMLElement): { fields: Record<string, string>; pr
       f.getAttribute("aria-label") ||
       (f.id ? `#${f.id}` : "");
     if (key && fields[key] === undefined) fields[key] = val.slice(0, 2000);
-    if (!primary && (f.tagName === "TEXTAREA" || /^(text|search|email|tel|url|number|password|)$/.test(type))) {
+    if (
+      !primary &&
+      (f.tagName === "TEXTAREA" || /^(text|search|email|tel|url|number|password|)$/.test(type))
+    ) {
       primary = val;
     }
   }
@@ -48,7 +51,8 @@ function collectFields(scope: HTMLElement): { fields: Record<string, string>; pr
  * Returns null when there are no fields around (e.g. a calculator keypad).
  */
 function nearestFieldScope(el: HTMLElement, root: HTMLElement): HTMLElement | null {
-  const FIELD = "input:not([type='button']):not([type='submit']):not([type='reset']), textarea, select";
+  const FIELD =
+    "input:not([type='button']):not([type='submit']):not([type='reset']), textarea, select";
   let cur: HTMLElement | null = el.parentElement;
   while (cur) {
     if (cur.querySelector(FIELD)) return cur;
@@ -107,12 +111,13 @@ export function useDelegatedEvents(
       });
       // 2) belt-and-suspenders: collect EVERY input/textarea/select value, even
       // unnamed ones, keyed by name → action → placeholder. AI often omits name.
-      const fields = form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
-        "input, textarea, select",
-      );
+      const fields = form.querySelectorAll<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >("input, textarea, select");
       let primary = "";
       for (const f of fields) {
-        const key = f.getAttribute("name") || f.dataset.vibeosAction || f.getAttribute("placeholder") || "";
+        const key =
+          f.getAttribute("name") || f.dataset.vibeosAction || f.getAttribute("placeholder") || "";
         if (key && fd[key] === undefined) fd[key] = f.value;
         // remember the first non-empty text value as the "primary" input
         if (!primary && f.value && /^(INPUT|TEXTAREA)$/.test(f.tagName)) primary = f.value;
@@ -216,8 +221,7 @@ export function useDelegatedEvents(
       // an input would fire a generation.
       const isToggleControl =
         tag === "SELECT" ||
-        (tag === "INPUT" &&
-          /^(checkbox|radio|range|color|file)$/.test(target.type ?? ""));
+        (tag === "INPUT" && /^(checkbox|radio|range|color|file)$/.test(target.type ?? ""));
       if (!isToggleControl) return;
 
       onOp({
@@ -258,14 +262,24 @@ export function useDelegatedEvents(
       if (el.matches("[data-vibeos-drag]")) {
         const kind = el.dataset.dragKind ?? "text";
         payload = {
-          kind: ["text", "image", "file", "desktop-object", "app-shortcut"].includes(kind) ? kind : "text",
+          kind: ["text", "image", "file", "desktop-object", "app-shortcut"].includes(kind)
+            ? kind
+            : "text",
           ref: el.dataset.dragRef ?? text,
           label: el.dataset.dragLabel ?? text.slice(0, 80),
         };
       } else if (el.tagName === "IMG") {
-        payload = { kind: "image", ref: (el as HTMLImageElement).src, label: (el as HTMLImageElement).alt || "image" };
+        payload = {
+          kind: "image",
+          ref: (el as HTMLImageElement).src,
+          label: (el as HTMLImageElement).alt || "image",
+        };
       } else if (el.tagName === "A") {
-        payload = { kind: "text", ref: (el as HTMLAnchorElement).href, label: text.slice(0, 80) || "link" };
+        payload = {
+          kind: "text",
+          ref: (el as HTMLAnchorElement).href,
+          label: text.slice(0, 80) || "link",
+        };
       }
       if (!payload) return;
       e.dataTransfer.setData("application/x-vibeos-drag", JSON.stringify(payload));

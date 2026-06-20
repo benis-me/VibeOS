@@ -11,10 +11,6 @@ export interface WsEnvelope<T = unknown> {
   payload: T;
 }
 
-export function makeEnvelope<T>(
-  type: string,
-  payload: T,
-  id: string,
-): WsEnvelope<T> {
+export function makeEnvelope<T>(type: string, payload: T, id: string): WsEnvelope<T> {
   return { v: PROTOCOL_VERSION, id, ts: Date.now(), type, payload };
 }

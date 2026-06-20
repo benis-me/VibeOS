@@ -72,7 +72,11 @@ export function SettingsApp() {
   const CATEGORIES: { id: CategoryId; icon: React.ReactNode; label: string }[] = [
     { id: "providers", icon: <Server className="size-3.5" />, label: t("settings.cat.providers") },
     { id: "models", icon: <Boxes className="size-3.5" />, label: t("settings.cat.models") },
-    { id: "general", icon: <SlidersHorizontal className="size-3.5" />, label: t("settings.cat.general") },
+    {
+      id: "general",
+      icon: <SlidersHorizontal className="size-3.5" />,
+      label: t("settings.cat.general"),
+    },
     { id: "profile", icon: <User className="size-3.5" />, label: t("settings.cat.profile") },
     { id: "about", icon: <Info className="size-3.5" />, label: t("settings.cat.about") },
   ];
@@ -94,7 +98,9 @@ export function SettingsApp() {
               <span
                 className={cn(
                   "flex size-[22px] items-center justify-center rounded-[6px] transition-colors",
-                  active ? "bg-brand text-white shadow-sm" : "bg-foreground/[0.06] text-muted-foreground",
+                  active
+                    ? "bg-brand text-white shadow-sm"
+                    : "bg-foreground/[0.06] text-muted-foreground",
                 )}
               >
                 {c.icon}
@@ -151,8 +157,16 @@ function GeneralPane() {
             value={theme}
             onChange={setTheme}
             options={[
-              { value: "light", label: t("settings.theme.light"), icon: <Sun className="size-3.5" /> },
-              { value: "dark", label: t("settings.theme.dark"), icon: <Moon className="size-3.5" /> },
+              {
+                value: "light",
+                label: t("settings.theme.light"),
+                icon: <Sun className="size-3.5" />,
+              },
+              {
+                value: "dark",
+                label: t("settings.theme.dark"),
+                icon: <Moon className="size-3.5" />,
+              },
             ]}
           />
         </Row>
@@ -272,7 +286,13 @@ function WallpaperRow() {
                 {t("settings.wallpaper.reset")}
               </button>
             )}
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPick} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onPick}
+            />
           </div>
 
           <div className="mt-2 flex items-center gap-2">
@@ -433,11 +453,15 @@ function ProvidersPane() {
     patch(selected, { models: next });
     setDraft(null);
   };
-  const removeModel = (id: string) => patch(selected, { models: custom.filter((m) => m.id !== id) });
+  const removeModel = (id: string) =>
+    patch(selected, { models: custom.filter((m) => m.id !== id) });
 
   const ProviderButton = ({ id, label }: { id: ProviderId; label: string }) => {
     const isCli = AI_PROVIDERS.find((p) => p.id === id)?.kind === "cli";
-    const on = isCli ? available.includes(id) : settings.apiProviders[id]?.enabled !== false && !!(settings.apiProviders[id]?.apiKey || available.includes(id));
+    const on = isCli
+      ? available.includes(id)
+      : settings.apiProviders[id]?.enabled !== false &&
+        !!(settings.apiProviders[id]?.apiKey || available.includes(id));
     return (
       <button
         onClick={() => setSelected(id)}
@@ -446,7 +470,9 @@ function ProvidersPane() {
           selected === id ? "bg-accent text-foreground" : "text-foreground/80 hover:bg-accent/50",
         )}
       >
-        <span className={cn("size-1.5 shrink-0 rounded-full", on ? "bg-run" : "bg-muted-foreground/30")} />
+        <span
+          className={cn("size-1.5 shrink-0 rounded-full", on ? "bg-run" : "bg-muted-foreground/30")}
+        />
         <span className="flex-1 truncate">{label}</span>
       </button>
     );
@@ -495,7 +521,11 @@ function ProvidersPane() {
                       available.includes(selected) ? "bg-run" : "bg-muted-foreground/40",
                     )}
                   />
-                  {t(available.includes(selected) ? "settings.providers.installed" : "settings.providers.notFound")}
+                  {t(
+                    available.includes(selected)
+                      ? "settings.providers.installed"
+                      : "settings.providers.notFound",
+                  )}
                 </span>
               </Row>
               <div className="px-3.5 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
@@ -537,8 +567,14 @@ function ProvidersPane() {
                     }}
                     className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-[12px] text-foreground/80 transition-colors hover:bg-accent"
                   >
-                    <RefreshCw className={cn("size-3.5", fetching === selected && "animate-spin")} />
-                    {t(fetching === selected ? "settings.providers.fetching" : "settings.providers.fetch")}
+                    <RefreshCw
+                      className={cn("size-3.5", fetching === selected && "animate-spin")}
+                    />
+                    {t(
+                      fetching === selected
+                        ? "settings.providers.fetching"
+                        : "settings.providers.fetch",
+                    )}
                   </button>
                 )}
               </div>
@@ -577,10 +613,14 @@ function ProvidersPane() {
               {draft ? (
                 <div className="mt-2.5 space-y-2.5 rounded-xl border bg-card p-3.5">
                   <div className="text-[13px] font-medium">
-                    {draft.original ? t("settings.providers.edit") : t("settings.providers.addModelBtn")}
+                    {draft.original
+                      ? t("settings.providers.edit")
+                      : t("settings.providers.addModelBtn")}
                   </div>
                   <label className="block">
-                    <span className="mb-1 block text-[11px] text-muted-foreground">{t("settings.providers.modelName")}</span>
+                    <span className="mb-1 block text-[11px] text-muted-foreground">
+                      {t("settings.providers.modelName")}
+                    </span>
                     <input
                       value={draft.name}
                       onChange={(e) => setDraft({ ...draft, name: e.target.value })}
@@ -589,7 +629,9 @@ function ProvidersPane() {
                     />
                   </label>
                   <label className="block">
-                    <span className="mb-1 block text-[11px] text-muted-foreground">{t("settings.providers.modelId")}</span>
+                    <span className="mb-1 block text-[11px] text-muted-foreground">
+                      {t("settings.providers.modelId")}
+                    </span>
                     <input
                       value={draft.id}
                       onChange={(e) => setDraft({ ...draft, id: e.target.value })}
@@ -599,7 +641,9 @@ function ProvidersPane() {
                     />
                   </label>
                   <div>
-                    <span className="mb-1.5 block text-[11px] text-muted-foreground">{t("settings.providers.capabilities")}</span>
+                    <span className="mb-1.5 block text-[11px] text-muted-foreground">
+                      {t("settings.providers.capabilities")}
+                    </span>
                     <div className="flex flex-wrap gap-1.5">
                       {CAPS.map((c) => (
                         <button
@@ -673,7 +717,11 @@ function DefaultModelsPane() {
     for (const p of AI_PROVIDERS) {
       if (imageOnly ? !p.imageCapable : p.textCapable === false) continue;
       if (!isEnabled(p)) continue;
-      const merged = mergeModels(p.seedModels, providerModels[p.id], settings.apiProviders[p.id]?.models);
+      const merged = mergeModels(
+        p.seedModels,
+        providerModels[p.id],
+        settings.apiProviders[p.id]?.models,
+      );
       for (const m of merged) {
         const isImg = m.capabilities?.includes("image");
         if (imageOnly ? !isImg : isImg) continue;
@@ -686,7 +734,12 @@ function DefaultModelsPane() {
   // Build a picker's options, keeping the current selection visible even if its
   // provider/model isn't in the live list. `emptyLabel` names the cleared state
   // (roles: "auto"; image: "off — no image generation").
-  const withCurrent = (opts: ComboOption[], provider?: string, model?: string, emptyLabel?: string) => {
+  const withCurrent = (
+    opts: ComboOption[],
+    provider?: string,
+    model?: string,
+    emptyLabel?: string,
+  ) => {
     const value = provider && model ? `${provider}::${model}` : "";
     const options: ComboOption[] = [
       { value: "", label: emptyLabel ?? t("settings.model.auto") },
@@ -711,7 +764,9 @@ function DefaultModelsPane() {
   const imageOptions = buildOptions(true);
   const img = settings.prefs.imageModel ?? {};
   const setImage = (partial: { provider?: string; model?: string }) =>
-    wsClient.send("c2s.settings.update", { partial: { prefs: { imageModel: { ...img, ...partial } } } });
+    wsClient.send("c2s.settings.update", {
+      partial: { prefs: { imageModel: { ...img, ...partial } } },
+    });
   const imgPick = withCurrent(imageOptions, img.provider, img.model, t("settings.models.imageOff"));
 
   return (
@@ -736,22 +791,30 @@ function DefaultModelsPane() {
             <Row label={t("settings.role.effort")}>
               <Select
                 value={cfg.effort ?? ""}
-                onChange={(v) => patchRole(role, { effort: (v || undefined) as Effort | undefined })}
+                onChange={(v) =>
+                  patchRole(role, { effort: (v || undefined) as Effort | undefined })
+                }
               >
                 <option value="">{t("settings.effort.default")}</option>
                 {EFFORTS.map((ef) => (
-                  <option key={ef} value={ef}>{ef}</option>
+                  <option key={ef} value={ef}>
+                    {ef}
+                  </option>
                 ))}
               </Select>
             </Row>
             <Row label={t("settings.role.thinking")}>
               <Select
                 value={cfg.thinking ?? ""}
-                onChange={(v) => patchRole(role, { thinking: (v || undefined) as ThinkingMode | undefined })}
+                onChange={(v) =>
+                  patchRole(role, { thinking: (v || undefined) as ThinkingMode | undefined })
+                }
               >
                 <option value="">{t("settings.thinking.default")}</option>
                 {THINKING_MODES.map((tm) => (
-                  <option key={tm} value={tm}>{t(`settings.thinking.${tm}`)}</option>
+                  <option key={tm} value={tm}>
+                    {t(`settings.thinking.${tm}`)}
+                  </option>
                 ))}
               </Select>
             </Row>
@@ -766,7 +829,9 @@ function DefaultModelsPane() {
         </div>
         <Row label={t("settings.role.model")}>
           {imageOptions.length === 0 ? (
-            <span className="text-[12px] text-muted-foreground">{t("settings.models.noImageProvider")}</span>
+            <span className="text-[12px] text-muted-foreground">
+              {t("settings.models.noImageProvider")}
+            </span>
           ) : (
             <Combobox
               value={imgPick.value}
@@ -785,8 +850,7 @@ function DefaultModelsPane() {
 function ProfilePane() {
   const t = useT();
   const profile = useSettingsStore((s) => s.settings?.userProfile ?? "");
-  const save = (v: string) =>
-    wsClient.send("c2s.settings.update", { partial: { userProfile: v } });
+  const save = (v: string) => wsClient.send("c2s.settings.update", { partial: { userProfile: v } });
   return (
     <Pane title={t("settings.cat.profile")}>
       <p className="mb-3 max-w-prose text-[13px] leading-relaxed text-muted-foreground">
@@ -812,7 +876,9 @@ function AboutPane() {
     <Pane title={t("settings.cat.about")}>
       <Group>
         <Row label={t("settings.about.system")}>
-          <span className="text-[13px] font-medium">{version ? `VibeOS ${version}` : "VibeOS"}</span>
+          <span className="text-[13px] font-medium">
+            {version ? `VibeOS ${version}` : "VibeOS"}
+          </span>
         </Row>
         <Row label={t("settings.about.boots")}>
           <span className="text-[13px] font-medium">{bootCount}</span>
@@ -967,7 +1033,6 @@ function Combobox({
               <div className="flex shrink-0 items-center gap-2 border-b px-2.5">
                 <Search className="size-3.5 shrink-0 text-muted-foreground" />
                 <input
-                  autoFocus
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder={searchPlaceholder}
@@ -976,7 +1041,9 @@ function Combobox({
               </div>
               <div className="min-h-0 flex-1 overflow-auto p-1">
                 {filtered.length === 0 ? (
-                  <div className="px-2 py-4 text-center text-xs text-muted-foreground">{emptyLabel}</div>
+                  <div className="px-2 py-4 text-center text-xs text-muted-foreground">
+                    {emptyLabel}
+                  </div>
                 ) : (
                   groups.map((g, gi) => (
                     <div key={g.name ?? `_g${gi}`}>
@@ -1000,7 +1067,11 @@ function Combobox({
                         >
                           <span className="min-w-0 flex-1">
                             <span className="block truncate">{o.label}</span>
-                            {o.sub && <span className="block truncate text-[11px] text-muted-foreground">{o.sub}</span>}
+                            {o.sub && (
+                              <span className="block truncate text-[11px] text-muted-foreground">
+                                {o.sub}
+                              </span>
+                            )}
                           </span>
                           {o.value === value && <Check className="size-3.5 shrink-0" />}
                         </button>
@@ -1025,7 +1096,10 @@ function GroupLabel({ children }: { children: React.ReactNode }) {
 function Group({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div
-      className={cn("vibe-group divide-y divide-border overflow-hidden rounded-xl border bg-card", className)}
+      className={cn(
+        "vibe-group divide-y divide-border overflow-hidden rounded-xl border bg-card",
+        className,
+      )}
     >
       {children}
     </div>
@@ -1045,7 +1119,9 @@ function Row({
     <div className="flex min-h-[2.5rem] items-center justify-between gap-4 px-3.5 py-2">
       <div className="min-w-0">
         <div className="text-[13px]">{label}</div>
-        {hint && <div className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{hint}</div>}
+        {hint && (
+          <div className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{hint}</div>
+        )}
       </div>
       <div className="shrink-0">{children}</div>
     </div>

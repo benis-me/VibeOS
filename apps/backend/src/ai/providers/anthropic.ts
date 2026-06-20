@@ -41,7 +41,9 @@ class AnthropicProvider implements AiProvider {
       return {
         text: full,
         ok: true,
-        usage: usage ? { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens } : undefined,
+        usage: usage
+          ? { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }
+          : undefined,
       };
     } catch (e) {
       if (opts.abort?.signal.aborted) return { text: "", ok: false };

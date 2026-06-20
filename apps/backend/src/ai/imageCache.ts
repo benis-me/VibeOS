@@ -13,7 +13,10 @@ const inflight = new Map<string, Promise<GeneratedImage>>();
 
 /** Stable content id: identical (model, ratio, prompt) never regenerates. */
 export function imageId(provider: string, model: string, aspect: string, prompt: string): string {
-  return createHash("sha256").update(`${provider}|${model}|${aspect}|${prompt}`).digest("hex").slice(0, 32);
+  return createHash("sha256")
+    .update(`${provider}|${model}|${aspect}|${prompt}`)
+    .digest("hex")
+    .slice(0, 32);
 }
 
 function ensureImage(
@@ -56,7 +59,9 @@ function ensureImage(
 }
 
 /** Serve a stored image, or await an in-flight generation for it (then serve). */
-export async function getImageForServe(id: string): Promise<{ mime: string; bytes: Uint8Array } | null> {
+export async function getImageForServe(
+  id: string,
+): Promise<{ mime: string; bytes: Uint8Array } | null> {
   const stored = getImage(id);
   if (stored) return stored;
   const p = inflight.get(id);
@@ -108,7 +113,8 @@ export async function storeUpload(dataUrl: string): Promise<string | null> {
 // Optionally consume an immediately-following close tag so empty placeholders
 // like `<div data-vibe-img …></div>` convert cleanly to a real <img>.
 // Tolerant of whitespace around `=` (some models emit `attr = "value"`).
-const VIBE_IMG = /<([a-z][\w-]*)\b([^>]*\bdata-vibe-img\s*=\s*(["'])([\s\S]*?)\3[^>]*)>(?:\s*<\/\1\s*>)?/gi;
+const VIBE_IMG =
+  /<([a-z][\w-]*)\b([^>]*\bdata-vibe-img\s*=\s*(["'])([\s\S]*?)\3[^>]*)>(?:\s*<\/\1\s*>)?/gi;
 
 function decodeEntities(s: string): string {
   return s
@@ -130,7 +136,9 @@ export function rewriteImages(html: string): string {
   const im = loadSettings().prefs.imageModel;
   if (!im?.provider || !im?.model) {
     if (hasTag) {
-      log.warn("data-vibe-img present but NO image model configured — set Settings → Default Models → Image");
+      log.warn(
+        "data-vibe-img present but NO image model configured — set Settings → Default Models → Image",
+      );
     }
     return html;
   }
@@ -141,7 +149,9 @@ export function rewriteImages(html: string): string {
     const prompt = decodeEntities(String(rawPrompt)).trim();
     if (!prompt) return whole;
     matched++;
-    const ratio = decodeEntities(attrs.match(/\bdata-vibe-ratio\s*=\s*(["'])([\s\S]*?)\1/i)?.[2] ?? "1:1");
+    const ratio = decodeEntities(
+      attrs.match(/\bdata-vibe-ratio\s*=\s*(["'])([\s\S]*?)\1/i)?.[2] ?? "1:1",
+    );
     const id = imageId(im.provider!, im.model!, ratio, prompt);
     ensureImage(id, im.provider!, im.model!, ratio, prompt);
     // Normalize to a real <img>: carry over the element's attributes (minus any

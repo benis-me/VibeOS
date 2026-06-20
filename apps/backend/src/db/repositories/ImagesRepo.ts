@@ -8,9 +8,7 @@ interface ImageRow {
 
 export function getImage(id: string): { mime: string; bytes: Uint8Array } | null {
   const db = getDb();
-  const row = db
-    .query<ImageRow, [string]>("SELECT mime, bytes FROM images WHERE id = ?")
-    .get(id);
+  const row = db.query<ImageRow, [string]>("SELECT mime, bytes FROM images WHERE id = ?").get(id);
   return row ? { mime: row.mime, bytes: row.bytes } : null;
 }
 

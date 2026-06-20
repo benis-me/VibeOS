@@ -92,8 +92,10 @@ const zh: Dict = {
   "settings.cap.image": "图像",
   "settings.cap.reasoning": "推理",
   "settings.cap.tools": "工具",
-  "settings.profile.hint": "写一点关于你自己的信息（称呼、偏好、正在做的项目）。所有 AI 生成的应用都会参考它，让一切更懂你、跨窗口更连贯。",
-  "settings.profile.placeholder": "例如：我叫 Ben，偏好深色极简界面，正在做一个独立游戏和一个 AI 操作系统…",
+  "settings.profile.hint":
+    "写一点关于你自己的信息（称呼、偏好、正在做的项目）。所有 AI 生成的应用都会参考它，让一切更懂你、跨窗口更连贯。",
+  "settings.profile.placeholder":
+    "例如：我叫 Ben，偏好深色极简界面，正在做一个独立游戏和一个 AI 操作系统…",
   // Settings — appearance
   "settings.theme": "主题",
   "settings.theme.light": "浅色",
@@ -117,7 +119,8 @@ const zh: Dict = {
   "settings.provider": "引擎",
   "settings.provider.hint": "驱动界面生成的 AI 后端。",
   "settings.provider.cliHint": "本地 CLI 子进程，需已安装并登录对应 CLI。",
-  "settings.provider.apiHint": "通过 Vercel AI SDK 调用 OpenAI 兼容接口，用环境变量 OPENROUTER_API_KEY 配置密钥。",
+  "settings.provider.apiHint":
+    "通过 Vercel AI SDK 调用 OpenAI 兼容接口，用环境变量 OPENROUTER_API_KEY 配置密钥。",
   "settings.models": "模型与任务配置",
   "settings.models.discovering": "正在发现可用模型…（就绪前使用默认模型）",
   "settings.role.model": "模型",
@@ -130,7 +133,8 @@ const zh: Dict = {
   "settings.thinking.adaptive": "自适应",
   "settings.thinking.enabled": "开启",
   "settings.role.ui-generation.label": "界面生成（实时）",
-  "settings.role.ui-generation.hint": "用户操作时实时生成窗口界面。建议用强模型、关闭 thinking 以求快速。",
+  "settings.role.ui-generation.hint":
+    "用户操作时实时生成窗口界面。建议用强模型、关闭 thinking 以求快速。",
   "settings.role.system-event.label": "系统事件（后台）",
   "settings.role.system-event.hint": "定时生成氛围通知。用最快的模型即可。",
   "settings.role.maintenance.label": "维护（后台）",
@@ -258,7 +262,7 @@ const en: Dict = {
   "settings.providers.models": "Models",
   "settings.providers.fetch": "Fetch models",
   "settings.providers.fetching": "Fetching…",
-  "settings.providers.noModels": "No models yet — click \"Fetch models\"",
+  "settings.providers.noModels": 'No models yet — click "Fetch models"',
   "settings.providers.addModel": "Add custom model id…",
   "settings.providers.add": "Add",
   "settings.providers.remove": "Remove",
@@ -275,7 +279,8 @@ const en: Dict = {
   "settings.models.image": "Image Model",
   "settings.models.imageHint": "Generates image elements inside UIs in real time.",
   "settings.models.imageOff": "Off (no image generation)",
-  "settings.models.noImageProvider": "Configure an image-capable provider under Model Providers first",
+  "settings.models.noImageProvider":
+    "Configure an image-capable provider under Model Providers first",
   "settings.cap.text": "Text",
   "settings.cap.vision": "Vision",
   "settings.cap.image": "Image",
@@ -284,14 +289,17 @@ const en: Dict = {
   "settings.cat.profile": "Personalization",
   "settings.cat.activity": "Activity",
   "settings.cat.about": "About",
-  "settings.profile.hint": "Tell VibeOS about yourself (name, preferences, projects you're working on). Every AI-generated app uses this to feel personalized and coherent across windows.",
-  "settings.profile.placeholder": "e.g. I'm Ben, I prefer dark minimal UIs, I'm building an indie game and an AI operating system…",
+  "settings.profile.hint":
+    "Tell VibeOS about yourself (name, preferences, projects you're working on). Every AI-generated app uses this to feel personalized and coherent across windows.",
+  "settings.profile.placeholder":
+    "e.g. I'm Ben, I prefer dark minimal UIs, I'm building an indie game and an AI operating system…",
   "settings.theme": "Theme",
   "settings.theme.light": "Light",
   "settings.theme.dark": "Dark",
   "settings.skin": "Skin",
   "settings.skin.default": "Default",
-  "settings.skin.hint": "Overall visual style (independent of light/dark). XP / Aqua are first-cut; chrome deepens later.",
+  "settings.skin.hint":
+    "Overall visual style (independent of light/dark). XP / Aqua are first-cut; chrome deepens later.",
   "settings.wallpaper": "Wallpaper",
   "settings.wallpaper.hint": "Upload an image, or generate one with AI.",
   "settings.wallpaper.upload": "Upload",
@@ -306,7 +314,8 @@ const en: Dict = {
   "settings.provider": "Engine",
   "settings.provider.hint": "The AI backend that drives generation.",
   "settings.provider.cliHint": "Local CLI subprocess — install and sign in to the matching CLI.",
-  "settings.provider.apiHint": "Calls an OpenAI-compatible API via the Vercel AI SDK; set OPENROUTER_API_KEY.",
+  "settings.provider.apiHint":
+    "Calls an OpenAI-compatible API via the Vercel AI SDK; set OPENROUTER_API_KEY.",
   "settings.models": "Models & tasks",
   "settings.models.discovering": "Discovering models… (using defaults until ready)",
   "settings.role.model": "Model",
@@ -319,11 +328,14 @@ const en: Dict = {
   "settings.thinking.adaptive": "Adaptive",
   "settings.thinking.enabled": "On",
   "settings.role.ui-generation.label": "UI generation (realtime)",
-  "settings.role.ui-generation.hint": "Generates window UI live on user actions. Prefer a strong model with thinking off for speed.",
+  "settings.role.ui-generation.hint":
+    "Generates window UI live on user actions. Prefer a strong model with thinking off for speed.",
   "settings.role.system-event.label": "System events (background)",
-  "settings.role.system-event.hint": "Periodically invents ambient notifications. The fastest model is fine.",
+  "settings.role.system-event.hint":
+    "Periodically invents ambient notifications. The fastest model is fine.",
   "settings.role.maintenance.label": "Maintenance (background)",
-  "settings.role.maintenance.hint": "Consolidates memory and prunes logs. The fastest model is fine.",
+  "settings.role.maintenance.hint":
+    "Consolidates memory and prunes logs. The fastest model is fine.",
   "settings.about.system": "System",
   "settings.about.boots": "Boot count",
   "settings.about.engine": "Engine",

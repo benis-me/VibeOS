@@ -2,12 +2,7 @@ import { z } from "zod";
 
 /** Zod schemas validating the AI's structured output (the syscall block). */
 
-export const notificationKindSchema = z.enum([
-  "info",
-  "success",
-  "warning",
-  "error",
-]);
+export const notificationKindSchema = z.enum(["info", "success", "warning", "error"]);
 
 export const vfsLocationSchema = z.enum(["desktop", "folder", "recyclebin"]);
 

@@ -42,42 +42,47 @@ export function NotificationCenter({ open, onClose }: Props) {
           style={anchor}
           className="vibe-notif z-[9999] flex max-h-[70vh] w-96 origin-bottom-right flex-col rounded-xl border bg-popover/95 shadow-2xl backdrop-blur sheen"
         >
-      <div className="flex items-center justify-between border-b px-4 py-2.5">
-        <span className="text-sm font-medium">{t("notif.title")}</span>
-        <button
-          onClick={() => wsClient.send("c2s.notification.read", { id: "all" })}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-        >
-          <CheckCheck className="size-3.5" /> {t("notif.markAllRead")}
-        </button>
-      </div>
-      <div className="flex-1 overflow-auto p-2">
-        {notifications.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">{t("notif.empty")}</div>
-        ) : (
-          notifications.map((n) => (
+          <div className="flex items-center justify-between border-b px-4 py-2.5">
+            <span className="text-sm font-medium">{t("notif.title")}</span>
             <button
-              key={n.id}
-              onClick={() => {
-                wsClient.send("c2s.notification.click", { id: n.id });
-                onClose();
-              }}
-              className={cn(
-                "flex w-full flex-col items-start rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent",
-                !n.read && "bg-accent/40",
-              )}
+              onClick={() => wsClient.send("c2s.notification.read", { id: "all" })}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
-              <div className="flex w-full items-center gap-2">
-                {!n.read && <span className="size-1.5 rounded-full bg-brand" />}
-                <span className="flex-1 truncate text-sm font-medium">{n.title}</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {new Date(n.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                </span>
-              </div>
-              {n.body && <span className="mt-0.5 text-xs text-muted-foreground">{n.body}</span>}
+              <CheckCheck className="size-3.5" /> {t("notif.markAllRead")}
             </button>
-          ))
-        )}
+          </div>
+          <div className="flex-1 overflow-auto p-2">
+            {notifications.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                {t("notif.empty")}
+              </div>
+            ) : (
+              notifications.map((n) => (
+                <button
+                  key={n.id}
+                  onClick={() => {
+                    wsClient.send("c2s.notification.click", { id: n.id });
+                    onClose();
+                  }}
+                  className={cn(
+                    "flex w-full flex-col items-start rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent",
+                    !n.read && "bg-accent/40",
+                  )}
+                >
+                  <div className="flex w-full items-center gap-2">
+                    {!n.read && <span className="size-1.5 rounded-full bg-brand" />}
+                    <span className="flex-1 truncate text-sm font-medium">{n.title}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(n.createdAt).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                  {n.body && <span className="mt-0.5 text-xs text-muted-foreground">{n.body}</span>}
+                </button>
+              ))
+            )}
           </div>
         </motion.div>
       )}

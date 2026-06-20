@@ -84,15 +84,18 @@ export function AiHtmlSurface({ windowId, html }: Props) {
     if (!el) return;
     const onErr = (e: Event) => {
       const img = e.target as HTMLImageElement;
-      if (!img || img.tagName !== "IMG" || !/\/api\/img\//.test(img.src)) return;
+      if (img?.tagName !== "IMG" || !/\/api\/img\//.test(img.src)) return;
       const n = Number(img.dataset.vibeRetry ?? "0");
       if (n >= 6) return;
       img.dataset.vibeRetry = String(n + 1);
       const base = img.src.replace(/[?&]r=\d+$/, "");
       const sep = base.includes("?") ? "&" : "?";
-      setTimeout(() => {
-        img.src = `${base}${sep}r=${n + 1}`;
-      }, 1000 + n * 1500);
+      setTimeout(
+        () => {
+          img.src = `${base}${sep}r=${n + 1}`;
+        },
+        1000 + n * 1500,
+      );
     };
     el.addEventListener("error", onErr, true); // capture — error doesn't bubble
     return () => el.removeEventListener("error", onErr, true);

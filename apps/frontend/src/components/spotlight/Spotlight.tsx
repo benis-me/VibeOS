@@ -113,65 +113,69 @@ export function Spotlight({ open, onClose }: Props) {
             className="w-[min(620px,92vw)] overflow-hidden rounded-2xl border bg-popover/95 shadow-2xl sheen"
             onPointerDown={(e) => e.stopPropagation()}
           >
-        <div className="flex items-center gap-3 px-4">
-          {loading ? (
-            <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" />
-          ) : (
-            <Search className="size-5 shrink-0 text-muted-foreground" />
-          )}
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={onKeyDown}
-            placeholder={t("spotlight.placeholder")}
-            className="h-14 flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
-          />
-        </div>
+            <div className="flex items-center gap-3 px-4">
+              {loading ? (
+                <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" />
+              ) : (
+                <Search className="size-5 shrink-0 text-muted-foreground" />
+              )}
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={onKeyDown}
+                placeholder={t("spotlight.placeholder")}
+                className="h-14 flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
+              />
+            </div>
 
-        {results.length > 0 && (
-          <div className="max-h-80 overflow-auto border-t p-1.5">
-            {results.map((r, i) => {
-              const isWidget = r.kind === "widget";
-              // results are sorted by kind, so a header shows at each boundary.
-              const showHeader = i === 0 || results[i - 1]?.kind !== r.kind;
-              return (
-                <Fragment key={`${r.name}-${i}`}>
-                  {showHeader && (
-                    <div className="flex items-center gap-1.5 px-3 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground">
-                      {isWidget ? <LayoutGrid className="size-3" /> : <AppWindow className="size-3" />}
-                      {isWidget ? t("spotlight.kindWidget") : t("spotlight.kindApp")}
-                    </div>
-                  )}
-                  <button
-                    onPointerEnter={() => setActive(i)}
-                    onClick={() => launch(r, isWidget)}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
-                      i === active ? "bg-accent" : "hover:bg-accent/60",
-                    )}
-                  >
-                    <AppIcon name={r.icon} label={r.name} className="size-6" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{r.name}</span>
-                      {r.description && (
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {r.description}
-                        </span>
+            {results.length > 0 && (
+              <div className="max-h-80 overflow-auto border-t p-1.5">
+                {results.map((r, i) => {
+                  const isWidget = r.kind === "widget";
+                  // results are sorted by kind, so a header shows at each boundary.
+                  const showHeader = i === 0 || results[i - 1]?.kind !== r.kind;
+                  return (
+                    <Fragment key={`${r.name}-${i}`}>
+                      {showHeader && (
+                        <div className="flex items-center gap-1.5 px-3 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground">
+                          {isWidget ? (
+                            <LayoutGrid className="size-3" />
+                          ) : (
+                            <AppWindow className="size-3" />
+                          )}
+                          {isWidget ? t("spotlight.kindWidget") : t("spotlight.kindApp")}
+                        </div>
                       )}
-                    </span>
-                  </button>
-                </Fragment>
-              );
-            })}
-          </div>
-        )}
+                      <button
+                        onPointerEnter={() => setActive(i)}
+                        onClick={() => launch(r, isWidget)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+                          i === active ? "bg-accent" : "hover:bg-accent/60",
+                        )}
+                      >
+                        <AppIcon name={r.icon} label={r.name} className="size-6" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{r.name}</span>
+                          {r.description && (
+                            <span className="block truncate text-xs text-muted-foreground">
+                              {r.description}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    </Fragment>
+                  );
+                })}
+              </div>
+            )}
 
-        {query.trim().length >= 2 && !loading && results.length === 0 && (
-          <div className="border-t px-4 py-6 text-center text-sm text-muted-foreground">
-            {t("spotlight.noResults")}
-          </div>
-        )}
+            {query.trim().length >= 2 && !loading && results.length === 0 && (
+              <div className="border-t px-4 py-6 text-center text-sm text-muted-foreground">
+                {t("spotlight.noResults")}
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}

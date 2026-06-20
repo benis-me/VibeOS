@@ -45,13 +45,82 @@ export function getApp(id: string): AppDescriptor | null {
 
 // icon = a lucide-react icon name (open-source icon set), rendered by <AppIcon>.
 const PRESETS: Array<{ id: PresetAppId; name: string; icon: string; manifest: AppManifest }> = [
-  { id: "browser", name: "Browser", icon: "globe", manifest: { description: "A web browser into the hallucinated internet.", category: "system", defaultSize: { w: 880, h: 600 }, chrome: "browser" } },
-  { id: "command-line", name: "Terminal", icon: "square-terminal", manifest: { description: "A command line into the VibeOS shell.", category: "system", defaultSize: { w: 720, h: 460 } } },
-  { id: "file-manager", name: "Files", icon: "folder", manifest: { description: "Browse the virtual filesystem.", category: "system", defaultSize: { w: 760, h: 520 } } },
-  { id: "settings", name: "Settings", icon: "settings", manifest: { description: "System settings.", category: "system", defaultSize: { w: 900, h: 620 }, minSize: { w: 850, h: 480 }, singleInstance: true } },
-  { id: "activity-monitor", name: "Activity Monitor", icon: "activity", manifest: { description: "Live view of AI agent runs, models, latency and token cost.", category: "system", defaultSize: { w: 720, h: 560 }, singleInstance: true } },
-  { id: "app-store", name: "App Store", icon: "layout-grid", manifest: { description: "Browse, install, export and share apps.", category: "system", defaultSize: { w: 820, h: 580 }, singleInstance: true } },
-  { id: "recycle-bin", name: "Recycle Bin", icon: "trash-2", manifest: { description: "Restore or permanently delete items you've thrown away.", category: "system", defaultSize: { w: 640, h: 500 }, singleInstance: true } },
+  {
+    id: "browser",
+    name: "Browser",
+    icon: "globe",
+    manifest: {
+      description: "A web browser into the hallucinated internet.",
+      category: "system",
+      defaultSize: { w: 880, h: 600 },
+      chrome: "browser",
+    },
+  },
+  {
+    id: "command-line",
+    name: "Terminal",
+    icon: "square-terminal",
+    manifest: {
+      description: "A command line into the VibeOS shell.",
+      category: "system",
+      defaultSize: { w: 720, h: 460 },
+    },
+  },
+  {
+    id: "file-manager",
+    name: "Files",
+    icon: "folder",
+    manifest: {
+      description: "Browse the virtual filesystem.",
+      category: "system",
+      defaultSize: { w: 760, h: 520 },
+    },
+  },
+  {
+    id: "settings",
+    name: "Settings",
+    icon: "settings",
+    manifest: {
+      description: "System settings.",
+      category: "system",
+      defaultSize: { w: 900, h: 620 },
+      minSize: { w: 850, h: 480 },
+      singleInstance: true,
+    },
+  },
+  {
+    id: "activity-monitor",
+    name: "Activity Monitor",
+    icon: "activity",
+    manifest: {
+      description: "Live view of AI agent runs, models, latency and token cost.",
+      category: "system",
+      defaultSize: { w: 720, h: 560 },
+      singleInstance: true,
+    },
+  },
+  {
+    id: "app-store",
+    name: "App Store",
+    icon: "layout-grid",
+    manifest: {
+      description: "Browse, install, export and share apps.",
+      category: "system",
+      defaultSize: { w: 820, h: 580 },
+      singleInstance: true,
+    },
+  },
+  {
+    id: "recycle-bin",
+    name: "Recycle Bin",
+    icon: "trash-2",
+    manifest: {
+      description: "Restore or permanently delete items you've thrown away.",
+      category: "system",
+      defaultSize: { w: 640, h: 500 },
+      singleInstance: true,
+    },
+  },
 ];
 
 /** Seed preset apps on first boot (idempotent: keyed by preset id). */

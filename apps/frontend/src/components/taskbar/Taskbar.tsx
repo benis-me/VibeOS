@@ -87,7 +87,12 @@ export function Taskbar({
                     : "text-muted-foreground hover:bg-accent/60",
                 )}
               >
-                <AppIcon name={app?.icon} presetId={app?.presetId} label={app?.name ?? w.title} className="size-4" />
+                <AppIcon
+                  name={app?.icon}
+                  presetId={app?.presetId}
+                  label={app?.name ?? w.title}
+                  className="size-4"
+                />
                 <span className="vibe-taskitem-label truncate">{w.title}</span>
               </Reorder.Item>
             );

@@ -16,7 +16,11 @@ function client() {
   if (clientCache?.key !== key) {
     clientCache = {
       key,
-      client: createOpenAICompatible({ name: "openrouter", baseURL: env.aiBaseUrl, apiKey: env.aiApiKey }),
+      client: createOpenAICompatible({
+        name: "openrouter",
+        baseURL: env.aiBaseUrl,
+        apiKey: env.aiApiKey,
+      }),
     };
   }
   return clientCache.client;
@@ -60,7 +64,9 @@ class OpenRouterProvider implements AiProvider {
       return {
         text: full,
         ok: true,
-        usage: usage ? { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens } : undefined,
+        usage: usage
+          ? { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }
+          : undefined,
       };
     } catch (e) {
       if (opts.abort?.signal.aborted) return { text: "", ok: false };

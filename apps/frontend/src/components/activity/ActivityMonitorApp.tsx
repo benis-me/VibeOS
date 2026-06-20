@@ -98,8 +98,15 @@ export function ActivityMonitorApp() {
           <Metric label={t("activity.runs")} value={String(summary.count)} />
           <Metric label={t("activity.tokens")} value={fmtTokens(summary.tokens)} />
           <Metric label={t("activity.cost")} value={fmtCost(summary.cost)} />
-          <Metric label={t("activity.avgLatency")} value={summary.avgMs ? `${(summary.avgMs / 1000).toFixed(1)}s` : "—"} />
-          <Metric label={t("activity.errRate")} value={`${(summary.errRate * 100).toFixed(0)}%`} warn={summary.errRate > 0.2} />
+          <Metric
+            label={t("activity.avgLatency")}
+            value={summary.avgMs ? `${(summary.avgMs / 1000).toFixed(1)}s` : "—"}
+          />
+          <Metric
+            label={t("activity.errRate")}
+            value={`${(summary.errRate * 100).toFixed(0)}%`}
+            warn={summary.errRate > 0.2}
+          />
         </div>
 
         <div className="grid grid-cols-[1.7fr_1fr] gap-5 px-5 pb-4">
@@ -131,7 +138,10 @@ export function ActivityMonitorApp() {
                       )}
                       style={{ height: `${Math.max(total === 0 ? 6 : 3, h)}%` }}
                     >
-                      <div className="w-full rounded-t-[2px] bg-brand" style={{ height: `${outShare}%` }} />
+                      <div
+                        className="w-full rounded-t-[2px] bg-brand"
+                        style={{ height: `${outShare}%` }}
+                      />
                     </div>
                   </div>
                 );
@@ -163,7 +173,12 @@ export function ActivityMonitorApp() {
       </div>
 
       {/* ---- runs table ---- */}
-      <div className={cn(COLS, "shrink-0 border-b bg-muted/30 px-5 py-1.5 text-[10px] font-medium uppercase text-muted-foreground")}>
+      <div
+        className={cn(
+          COLS,
+          "shrink-0 border-b bg-muted/30 px-5 py-1.5 text-[10px] font-medium uppercase text-muted-foreground",
+        )}
+      >
         <span>{t("activity.col.app")}</span>
         <span>{t("activity.col.summary")}</span>
         <span>{t("activity.col.model")}</span>
@@ -193,12 +208,24 @@ function RunRow({ r, t }: { r: AgentRun; t: T }) {
   const dur = r.endedAt ? `${((r.endedAt - r.startedAt) / 1000).toFixed(1)}s` : "·";
   const total = tok(r);
   return (
-    <div className={cn(COLS, "items-center border-b border-border/50 px-5 py-2 text-[12px] transition-colors hover:bg-accent/30")}>
+    <div
+      className={cn(
+        COLS,
+        "items-center border-b border-border/50 px-5 py-2 text-[12px] transition-colors hover:bg-accent/30",
+      )}
+    >
       <div className="min-w-0">
         <div className="truncate font-medium">{r.appName ?? t(`activity.role.${r.role}`)}</div>
-        <div className="truncate text-[10px] text-muted-foreground">{t(`activity.role.${r.role}`)}</div>
+        <div className="truncate text-[10px] text-muted-foreground">
+          {t(`activity.role.${r.role}`)}
+        </div>
       </div>
-      <div className={cn("min-w-0 truncate", r.status === "error" ? "text-destructive" : "text-muted-foreground")}>
+      <div
+        className={cn(
+          "min-w-0 truncate",
+          r.status === "error" ? "text-destructive" : "text-muted-foreground",
+        )}
+      >
         {r.status === "error" ? r.error : (r.summary ?? "—")}
       </div>
       <div className="min-w-0 truncate text-[11px] text-muted-foreground" title={r.model}>
@@ -209,7 +236,9 @@ function RunRow({ r, t }: { r: AgentRun; t: T }) {
         <span className="truncate text-muted-foreground">{t(`activity.status.${r.status}`)}</span>
       </div>
       <div className="text-right tabular-nums text-muted-foreground">{dur}</div>
-      <div className="text-right tabular-nums text-muted-foreground">{total ? fmtTokens(total) : "—"}</div>
+      <div className="text-right tabular-nums text-muted-foreground">
+        {total ? fmtTokens(total) : "—"}
+      </div>
       <div className="text-right tabular-nums text-muted-foreground">{fmtCost(r.costUsd ?? 0)}</div>
       <div className="flex justify-end">
         {r.status === "running" ? (
@@ -232,14 +261,27 @@ function Metric({ label, value, warn }: { label: string; value: string; warn?: b
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[10px] text-muted-foreground">{label}</span>
-      <span className={cn("text-[15px] font-semibold tabular-nums leading-none", warn && "text-destructive")}>
+      <span
+        className={cn(
+          "text-[15px] font-semibold tabular-nums leading-none",
+          warn && "text-destructive",
+        )}
+      >
         {value}
       </span>
     </div>
   );
 }
 
-function Panel({ title, aside, children }: { title: string; aside?: React.ReactNode; children: React.ReactNode }) {
+function Panel({
+  title,
+  aside,
+  children,
+}: {
+  title: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-lg border bg-card/40 p-3">
       <div className="mb-2 flex items-center justify-between">
