@@ -31,6 +31,9 @@ const DEFAULTS: Record<AgentRole, { effort: RoleModelConfig["effort"]; thinking:
   "ui-generation": { effort: "medium", thinking: "disabled" },
   "system-event": { effort: "low", thinking: "disabled" },
   maintenance: { effort: "low", thinking: "disabled" },
+  // Image generation doesn't use ModelPolicy (it reads prefs.imageModel); this
+  // entry only keeps the record total for the AgentRole union.
+  "image-generation": { effort: "low", thinking: "disabled" },
 };
 
 class ModelPolicyImpl {
@@ -40,6 +43,7 @@ class ModelPolicyImpl {
     "ui-generation": { effort: "medium", thinking: { type: "disabled" } },
     "system-event": { effort: "low", thinking: { type: "disabled" } },
     maintenance: { effort: "low", thinking: { type: "disabled" } },
+    "image-generation": { effort: "low", thinking: { type: "disabled" } },
   };
 
   async discover(overrides: ModelPolicyOverrides = {}): Promise<void> {
@@ -61,16 +65,19 @@ class ModelPolicyImpl {
       "ui-generation": strong,
       "system-event": fast,
       maintenance: fast,
+      "image-generation": undefined,
     };
     const envOverride: Record<AgentRole, string | undefined> = {
       "ui-generation": env.modelUiOverride,
       "system-event": env.modelFastOverride,
       maintenance: env.modelFastOverride,
+      "image-generation": undefined,
     };
     const fallback: Record<AgentRole, string | undefined> = {
       "ui-generation": fast,
       "system-event": strong,
       maintenance: strong,
+      "image-generation": undefined,
     };
 
     const next = {} as Record<AgentRole, RoleModelConfig>;

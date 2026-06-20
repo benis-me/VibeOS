@@ -87,6 +87,9 @@ export function systemPromptFor(role: AgentRole): string {
       return SYSTEM_EVENT_ROLE;
     case "maintenance":
       return MAINTENANCE_ROLE;
+    default:
+      // image-generation doesn't go through this text path.
+      return "";
   }
 }
 
