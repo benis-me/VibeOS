@@ -2,25 +2,26 @@ import type { ServerWebSocket } from "bun";
 import pkg from "../../package.json";
 import type { ClientToServer, WsEnvelope } from "@vibeos/shared/protocol";
 import { parseClientMessage } from "@vibeos/shared/protocol";
-import type { AppManifest } from "@vibeos/shared/domain";
-import { inferCapabilities, discoverAllProviders } from "../ai/modelDiscovery.ts";
+import { discoverAllProviders } from "../ai/modelDiscovery.ts";
 import { sendTo, broadcast, type WsData } from "./wsGateway.ts";
 import { bus } from "../events/bus.ts";
 import { kernelState } from "../kernel/kernelState.ts";
 import { ModelPolicy } from "../ai/ModelPolicy.ts";
-import {
-  setActiveProvider,
-  activeProviderId,
-  availableProviderIds,
-  getProvider,
-} from "../ai/providers/index.ts";
+import { availableProviderIds } from "../ai/providers/index.ts";
 import { env } from "../config/env.ts";
 import { searchApps } from "../ai/appSearch.ts";
 import { runCommand } from "../ai/commandPalette.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
-import { requestWallpaper, storeUpload } from "../ai/imageCache.ts";
-import { loadSettings, updateSettings } from "../db/repositories/SettingsRepo.ts";
-import { listApps, getApp, ensureTransientApp, installApp } from "../db/repositories/AppRepo.ts";
+import { handleAppLaunch, handleAppSave, handleAppExport, handleAppImport } from "./appHandlers.ts";
+import {
+  handleSettingsUpdate,
+  handleProviderScan,
+  handleProviderFetchModels,
+  handleWallpaperUpload,
+  handleWallpaperGenerate,
+} from "./settingsHandlers.ts";
+import { loadSettings } from "../db/repositories/SettingsRepo.ts";
+import { listApps, getApp, ensureTransientApp } from "../db/repositories/AppRepo.ts";
 import {
   listOpenWindows,
   openWindow,
@@ -38,8 +39,6 @@ import {
   listByLocation,
   moveNode,
   getNode,
-  createNode,
-  ensureShortcut,
   deleteNode,
   emptyRecycleBin,
 } from "../db/repositories/VfsRepo.ts";
@@ -183,91 +182,20 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
       return;
     }
 
-    case "c2s.settings.update": {
-      const prevProvider = activeProviderId();
-      const settings = await updateSettings(msg.payload.partial);
-      broadcast("s2c.settings.changed", { settings });
+    case "c2s.settings.update":
+      return handleSettingsUpdate(msg.payload);
 
-      if (msg.payload.partial.provider && settings.provider !== prevProvider) {
-        // Switching backends: activate it, then re-discover its models. Clear
-        // the stale list immediately so Settings shows the "discovering" state.
-        setActiveProvider(settings.provider);
-        log.info(`AI provider → ${settings.provider}`);
-        broadcast("s2c.models.updated", { models: [] });
-        if (!env.aiStub) {
-          void ModelPolicy.discover(settings.modelOverrides)
-            .then(() => broadcast("s2c.models.updated", { models: ModelPolicy.available() }))
-            .catch((e) =>
-              log.warn(`model re-discovery failed: ${e instanceof Error ? e.message : e}`),
-            );
-        }
-      } else if (msg.payload.partial.modelOverrides) {
-        ModelPolicy.recompute(settings.modelOverrides);
-      }
-      return;
-    }
+    case "c2s.wallpaper.upload":
+      return handleWallpaperUpload(ws, msg.payload);
 
-    case "c2s.wallpaper.upload": {
-      const path = await storeUpload(msg.payload.dataUrl);
-      if (!path) {
-        sendTo(ws, "s2c.error", { code: "wallpaper_bad_image" });
-        return;
-      }
-      const settings = await updateSettings({ prefs: { wallpaper: path } });
-      broadcast("s2c.settings.changed", { settings });
-      return;
-    }
+    case "c2s.wallpaper.generate":
+      return handleWallpaperGenerate(ws, msg.payload);
 
-    case "c2s.wallpaper.generate": {
-      const path = requestWallpaper(msg.payload.prompt);
-      if (!path) {
-        sendTo(ws, "s2c.error", { code: "wallpaper_no_image_model" });
-        return;
-      }
-      // The path serves once generation finishes (the /api/img route awaits it);
-      // persist it now so the desktop swaps to it the moment it's ready.
-      const settings = await updateSettings({ prefs: { wallpaper: path } });
-      broadcast("s2c.settings.changed", { settings });
-      return;
-    }
+    case "c2s.provider.scan":
+      return handleProviderScan();
 
-    case "c2s.provider.scan": {
-      // On-demand: re-detect which CLIs are installed and re-discover the active
-      // provider's models. Availability is instant; models discover in the
-      // background (clear the list first so Settings shows the scanning state).
-      broadcast("s2c.providers.updated", { availableProviders: availableProviderIds() });
-      if (!env.aiStub) {
-        broadcast("s2c.models.updated", { models: [] });
-        void ModelPolicy.discover(loadSettings().modelOverrides)
-          .then(() => broadcast("s2c.models.updated", { models: ModelPolicy.available() }))
-          .catch((e) => log.warn(`scan discovery failed: ${e instanceof Error ? e.message : e}`));
-        // Re-discover every provider's models for the picker.
-        discoverAllProviders();
-      }
-      return;
-    }
-
-    case "c2s.provider.fetchModels": {
-      // Refresh one provider's model list and broadcast it. Discovered lists are
-      // ephemeral (not persisted) so they never overwrite user-added models.
-      const { providerId } = msg.payload;
-      try {
-        const provider = await getProvider(providerId);
-        const discovered = await provider.discoverModels();
-        broadcast("s2c.provider.models", {
-          providerId,
-          models: discovered.map((m) => ({
-            id: m.modelId,
-            name: m.name,
-            capabilities: inferCapabilities(m.modelId),
-          })),
-        });
-      } catch (e) {
-        log.warn(`fetchModels(${providerId}) failed: ${e instanceof Error ? e.message : e}`);
-        broadcast("s2c.provider.models", { providerId, models: [] });
-      }
-      return;
-    }
+    case "c2s.provider.fetchModels":
+      return handleProviderFetchModels(msg.payload);
 
     case "c2s.notification.read": {
       await markRead(msg.payload.id);
@@ -355,103 +283,17 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
       return;
     }
 
-    case "c2s.app.launch": {
-      // Spawn a fresh window (or desktop widget) and generate it live.
-      const appId = await ensureTransientApp();
-      const widget = !!msg.payload.widget;
-      const w = await openWindow({
-        appId,
-        title: msg.payload.name,
-        kind: widget ? "widget" : "app",
-        rect: widget ? { x: 60, y: 60, w: 320, h: 260 } : { x: 140, y: 90, w: 820, h: 580 },
-      });
-      await ensureMemory(w.id, appId);
-      broadcast("s2c.window.opened", { window: w });
-      const seed = widget
-        ? `Generate a compact desktop WIDGET called "${msg.payload.name}".${
-            msg.payload.description ? ` It is: ${msg.payload.description}.` : ""
-          } It must be a small, glanceable, self-contained panel WITHOUT any window chrome that fills its area (e.g. a clock, weather, stocks, a mini to-do or player). It sits on a FROSTED-GLASS surface: use a fully TRANSPARENT background (no opaque page/container background — at most subtle translucent layers), and high-contrast, legible text and icons that read clearly over a blurred backdrop. Keep it minimal and visually striking.`
-        : `Generate the application "${msg.payload.name}".${
-            msg.payload.description ? ` It is: ${msg.payload.description}.` : ""
-          } Produce a complete, believable, fully usable first screen for this app.`;
-      log.info(
-        `launch ${widget ? "widget" : "app"} "${msg.payload.name}" → window [${w.id.slice(-6)}]`,
-      );
-      bus.emit("window.spawnRender", { windowId: w.id, seedPrompt: seed });
-      return;
-    }
+    case "c2s.app.launch":
+      return handleAppLaunch(msg.payload);
 
-    case "c2s.app.save": {
-      const win = getWindow(msg.payload.windowId);
-      if (!win) return;
-      const snapshot = getSnapshot(msg.payload.windowId);
-      if (!snapshot.trim()) {
-        broadcast("s2c.error", {
-          code: "ai_failed",
-          detail: "nothing to save yet",
-          windowId: win.id,
-        });
-        return;
-      }
-      const src = getApp(win.appId);
-      const name = (msg.payload.name ?? win.title ?? src?.name ?? "App").trim() || "App";
-      const app = await installApp({
-        name,
-        icon: msg.payload.icon ?? src?.icon ?? "app-window",
-        manifest: {
-          description: src?.manifest.description,
-          defaultSize: src?.manifest.defaultSize,
-          seedHtml: snapshot,
-        },
-      });
-      const shortcut = await ensureShortcut(app.id, app.name, app.icon);
-      broadcast("s2c.syscall.appInstalled", { app, shortcut: shortcut ?? undefined });
-      log.info(`saved window [${win.id.slice(-6)}] as app "${name}"`);
-      return;
-    }
+    case "c2s.app.save":
+      return handleAppSave(msg.payload);
 
-    case "c2s.app.export": {
-      const app = getApp(msg.payload.appId);
-      if (!app) return;
-      const data = JSON.stringify(
-        { vibeapp: 1, name: app.name, icon: app.icon, manifest: app.manifest },
-        null,
-        2,
-      );
-      const node = await createNode({
-        name: `${app.name}.vibeapp`,
-        type: "file",
-        mime: "application/vibeapp+json",
-        content: data,
-        location: "desktop",
-      });
-      broadcast("s2c.syscall.fileCreated", { node });
-      log.info(`exported app "${app.name}" → ${node.name}`);
-      return;
-    }
+    case "c2s.app.export":
+      return handleAppExport(msg.payload);
 
-    case "c2s.app.import": {
-      type VibeApp = { name?: string; icon?: string; manifest?: AppManifest };
-      let data: VibeApp | null = null;
-      try {
-        data = JSON.parse(msg.payload.json) as VibeApp;
-      } catch {
-        /* ignore */
-      }
-      if (!data || typeof data.name !== "string" || !data.name.trim()) {
-        broadcast("s2c.error", { code: "bad_json" });
-        return;
-      }
-      const app = await installApp({
-        name: data.name,
-        icon: data.icon,
-        manifest: data.manifest ?? {},
-      });
-      const shortcut = await ensureShortcut(app.id, app.name, app.icon);
-      broadcast("s2c.syscall.appInstalled", { app, shortcut: shortcut ?? undefined });
-      log.info(`imported app "${app.name}"`);
-      return;
-    }
+    case "c2s.app.import":
+      return handleAppImport(msg.payload);
 
     case "c2s.activity.fetch": {
       const limit = Math.min(Math.max(msg.payload.limit ?? 40, 1), 100);
