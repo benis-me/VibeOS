@@ -219,14 +219,29 @@ export function AppIcon({ name, presetId, label, className }: Props) {
   const base = (label ?? name ?? "").trim();
   const ascii = base.replace(/[^A-Za-z0-9]/g, "");
   const monogram = ascii ? ascii.slice(0, 2).toUpperCase() : ([...base][0] ?? "?");
+  // Draw the monogram as scalable SVG text so it fills the box proportionally
+  // at every icon size (size-4 … size-7), the way a real glyph does — a fixed
+  // font-size looked tiny inside the larger boxes.
   return (
     <span
       className={cn(
-        "inline-flex size-5 items-center justify-center rounded-[5px] bg-muted text-[10px] font-semibold text-muted-foreground",
+        "inline-flex size-5 items-center justify-center overflow-hidden rounded-[5px] bg-muted text-muted-foreground",
         className,
       )}
     >
-      {monogram}
+      <svg viewBox="0 0 24 24" className="size-full" aria-hidden="true">
+        <text
+          x="12"
+          y="12"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fill="currentColor"
+          fontSize={monogram.length > 1 ? 12 : 15}
+          fontWeight={600}
+        >
+          {monogram}
+        </text>
+      </svg>
     </span>
   );
 }
