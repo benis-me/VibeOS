@@ -5,7 +5,8 @@ export type PresetAppId =
   | "settings"
   | "activity-monitor"
   | "app-store"
-  | "recycle-bin";
+  | "recycle-bin"
+  | "welcome";
 
 export type AppKind = "preset" | "virtual";
 
@@ -15,6 +16,7 @@ export const NATIVE_PRESET_APPS: PresetAppId[] = [
   "activity-monitor",
   "app-store",
   "recycle-bin",
+  "welcome",
 ];
 
 export interface AppManifest {

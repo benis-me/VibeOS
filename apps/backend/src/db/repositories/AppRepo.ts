@@ -121,6 +121,20 @@ const PRESETS: Array<{ id: PresetAppId; name: string; icon: string; manifest: Ap
       singleInstance: true,
     },
   },
+  {
+    id: "welcome",
+    name: "Welcome",
+    // Rendered via PRESET_ICONS (Phosphor HandWaving); this is just metadata.
+    icon: "hand-waving",
+    manifest: {
+      // Width matches the client's content column so its self-fit measurement is
+      // accurate; height is just an initial value (the window fits its content).
+      description: "Get started with VibeOS — try generating your first app.",
+      category: "system",
+      defaultSize: { w: 460, h: 500 },
+      singleInstance: true,
+    },
+  },
 ];
 
 /** Seed preset apps on first boot (idempotent: keyed by preset id). */

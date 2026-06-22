@@ -4,6 +4,7 @@ import { recordBoot } from "../db/repositories/KernelRepo.ts";
 import { ensureSettings, updateSettings } from "../db/repositories/SettingsRepo.ts";
 import { seedPresets } from "../db/repositories/AppRepo.ts";
 import { kernelState } from "./kernelState.ts";
+import { openWelcomeOnFirstBoot } from "./windowInit.ts";
 import { startHttpServer } from "../server/httpServer.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { ModelPolicy } from "../ai/ModelPolicy.ts";
@@ -46,6 +47,9 @@ export async function boot() {
   kernelState.load();
   kernelState.setBootCount(kernel.bootCount);
   console.log(`[boot] boot #${kernel.bootCount}`);
+
+  // Cold start: greet the user with the Welcome app on the very first boot.
+  if (kernel.bootCount === 1) await openWelcomeOnFirstBoot();
 
   // Start serving immediately so the WebSocket is available right away.
   const server = startHttpServer();

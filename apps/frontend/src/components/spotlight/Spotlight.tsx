@@ -12,10 +12,12 @@ import { cn } from "@/lib/utils";
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** Prefilled on open (e.g. a "> command" from the welcome screen). */
+  initialQuery?: string;
 }
 
 /** Mac-Spotlight-style AI app search. */
-export function Spotlight({ open, onClose }: Props) {
+export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<AppSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,16 +35,16 @@ export function Spotlight({ open, onClose }: Props) {
   const isCommand = query.trimStart().startsWith(">");
   const commandText = query.replace(/^\s*>\s*/, "");
 
-  // Focus the box and reset when opened.
+  // Focus the box and reset when opened, seeding any prefilled query.
   useEffect(() => {
     if (open) {
-      setQuery("");
+      setQuery(initialQuery);
       setResults([]);
       setActive(0);
       setRunning(false);
       setTimeout(() => inputRef.current?.focus(), 30);
     }
-  }, [open]);
+  }, [open, initialQuery]);
 
   // AI command finished: stop the spinner and close on success (the AI's own
   // notify syscall surfaces the result to the user).

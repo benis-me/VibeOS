@@ -206,7 +206,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
         onContextMenu={(e) => openContextMenu(e, appContentMenu({ t, win, native: !!native }))}
       >
         {native ? (
-          native()
+          native(win.id)
         ) : Chrome ? (
           <Chrome windowId={win.id}>
             <AiHtmlSurface windowId={win.id} html={html} />

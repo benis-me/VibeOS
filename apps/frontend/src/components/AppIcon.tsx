@@ -59,6 +59,8 @@ import {
   GraduationCap,
   Bug,
   Lightning,
+  Sparkle,
+  HandWaving,
   type Icon,
 } from "@phosphor-icons/react";
 import type { PresetAppId } from "@vibeos/shared";
@@ -73,6 +75,7 @@ const PRESET_ICONS: Record<PresetAppId, Icon> = {
   "activity-monitor": Pulse,
   "app-store": Storefront,
   "recycle-bin": TrashSimple,
+  welcome: HandWaving,
 };
 
 /** Maps the (lucide-style) icon names the AI emits onto Phosphor icons. */
@@ -187,6 +190,8 @@ const ICONS: Record<string, Icon> = {
   bolt: Lightning,
   zap: Lightning,
   energy: Lightning,
+  sparkle: Sparkle,
+  sparkles: Sparkle,
 };
 
 interface Props {
