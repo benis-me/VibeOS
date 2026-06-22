@@ -219,29 +219,24 @@ export function AppIcon({ name, presetId, label, className }: Props) {
   const base = (label ?? name ?? "").trim();
   const ascii = base.replace(/[^A-Za-z0-9]/g, "");
   const monogram = ascii ? ascii.slice(0, 2).toUpperCase() : ([...base][0] ?? "?");
-  // Draw the monogram as scalable SVG text so it fills the box proportionally
-  // at every icon size (size-4 … size-7), the way a real glyph does — a fixed
-  // font-size looked tiny inside the larger boxes.
+  // The monogram IS the <svg> (not a <span> wrapping one) so skin rules that
+  // size `.vibe-taskitem svg` (e.g. the Dock's 26px) apply to it exactly like a
+  // real glyph. The rounded tile + letter live inside the viewBox, so the whole
+  // thing scales with the icon at every size (Dock, start menu, desktop).
   return (
-    <span
-      className={cn(
-        "inline-flex size-5 items-center justify-center overflow-hidden rounded-[5px] bg-muted text-muted-foreground",
-        className,
-      )}
-    >
-      <svg viewBox="0 0 24 24" className="size-full" aria-hidden="true">
-        <text
-          x="12"
-          y="12"
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="currentColor"
-          fontSize={monogram.length > 1 ? 12 : 15}
-          fontWeight={600}
-        >
-          {monogram}
-        </text>
-      </svg>
-    </span>
+    <svg viewBox="0 0 24 24" className={cn("size-5", className)} aria-hidden="true">
+      <rect width="24" height="24" rx="6" style={{ fill: "var(--muted)" }} />
+      <text
+        x="12"
+        y="12"
+        textAnchor="middle"
+        dominantBaseline="central"
+        style={{ fill: "var(--muted-foreground)" }}
+        fontSize={monogram.length > 1 ? 12 : 15}
+        fontWeight={600}
+      >
+        {monogram}
+      </text>
+    </svg>
   );
 }
