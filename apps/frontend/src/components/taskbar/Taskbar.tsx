@@ -57,7 +57,10 @@ export function Taskbar({
           {startLabel}
         </button>
 
-        <div className="mx-1 h-5 w-px bg-border" />
+        {/* Divider between "Apps" and the running-apps strip. With nothing
+            running the tray already has its own divider, so this one would just
+            float beside an empty strip — drop it until an app opens. */}
+        {windows.length > 0 && <div className="mx-1 h-5 w-px bg-border" />}
 
         <Reorder.Group
           axis="x"
