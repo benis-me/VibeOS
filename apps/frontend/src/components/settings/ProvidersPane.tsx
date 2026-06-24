@@ -40,12 +40,17 @@ export function ProvidersPane() {
   const models = mergeModels(cat?.seedModels, providerModels[selected], custom);
   const isCustom = (id: string) => custom.some((m) => m.id === id);
 
-  // Clear the fetching spinner once models arrive (or after a timeout).
+  // Safety net to clear the fetching spinner if the result broadcast never
+  // arrives. Generous because a Local Agent's live discovery (CodeBuddy's PTY
+  // `/model list` scrape) can take ~40s; normal completion clears it instantly
+  // below the moment fresh models land.
   useEffect(() => {
     if (!fetching) return;
-    const tmo = setTimeout(() => setFetching(null), 8000);
+    const tmo = setTimeout(() => setFetching(null), 60000);
     return () => clearTimeout(tmo);
-  }, [fetching, settings.apiProviders]);
+  }, [fetching]);
+  // …or the moment fresh models land (discovered, or a saved custom model).
+  useEffect(() => setFetching(null), [providerModels, settings.apiProviders]);
   // Drop any in-progress model edit when switching providers.
   useEffect(() => setDraft(null), [selected]);
 
@@ -96,6 +101,139 @@ export function ProvidersPane() {
     );
   };
 
+  // Model list + add/edit/remove of custom model ids. Shared by Local Agents and
+  // API Providers: a CLI like CodeBuddy can't enumerate its account models, so
+  // users add the ids by hand here — stored the same way (apiProviders[id].models)
+  // and merged into the Default Models picker for every provider kind.
+  const modelsManager = (
+    <>
+      <div className="mb-2 ml-1 mt-7 flex items-center justify-between">
+        <h2 className="text-[13px] font-medium text-foreground/70">
+          {t("settings.providers.models")} · {models.length}
+        </h2>
+        {(cat?.modelsEndpoint || cat?.kind === "cli") && (
+          <button
+            onClick={() => {
+              setFetching(selected);
+              wsClient.send("c2s.provider.fetchModels", { providerId: selected });
+            }}
+            className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-[12px] text-foreground/80 transition-colors hover:bg-accent"
+          >
+            <RefreshCw className={cn("size-3.5", fetching === selected && "animate-spin")} />
+            {t(
+              fetching === selected ? "settings.providers.fetching" : "settings.providers.fetch",
+            )}
+          </button>
+        )}
+      </div>
+      {models.length > 0 && (
+        <Group>
+          {models.map((m) => (
+            <div key={m.id} className="group/m flex items-center gap-3 px-3.5 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px]">{m.name}</div>
+                <div className="truncate text-[11px] text-muted-foreground">{m.id}</div>
+              </div>
+              <Caps caps={m.capabilities} t={t} />
+              {isCustom(m.id) && (
+                <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover/m:opacity-100">
+                  <button
+                    onClick={() => startEdit(m)}
+                    title={t("settings.providers.edit")}
+                    className="text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                  <button
+                    onClick={() => removeModel(m.id)}
+                    title={t("settings.providers.remove")}
+                    className="text-muted-foreground transition-colors hover:text-destructive"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </Group>
+      )}
+
+      {draft ? (
+        <div className="mt-2.5 space-y-2.5 rounded-xl border bg-card p-3.5">
+          <div className="text-[13px] font-medium">
+            {draft.original ? t("settings.providers.edit") : t("settings.providers.addModelBtn")}
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-[11px] text-muted-foreground">
+              {t("settings.providers.modelName")}
+            </span>
+            <input
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              placeholder={t("settings.providers.modelName")}
+              className="vibe-input w-full rounded-lg border bg-background px-2.5 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[11px] text-muted-foreground">
+              {t("settings.providers.modelId")}
+            </span>
+            <input
+              value={draft.id}
+              onChange={(e) => setDraft({ ...draft, id: e.target.value })}
+              placeholder={t("settings.providers.modelId")}
+              spellCheck={false}
+              className="vibe-input w-full rounded-lg border bg-background px-2.5 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+            />
+          </label>
+          <div>
+            <span className="mb-1.5 block text-[11px] text-muted-foreground">
+              {t("settings.providers.capabilities")}
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {CAPS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => toggleCap(c)}
+                  className={cn(
+                    "rounded-md border px-2 py-1 text-[11px] transition-colors",
+                    draft.caps.includes(c)
+                      ? "border-brand bg-brand/10 text-foreground"
+                      : "text-muted-foreground hover:bg-accent/50",
+                  )}
+                >
+                  {t(`settings.cap.${c}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              onClick={() => setDraft(null)}
+              className="rounded-lg px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent/50"
+            >
+              {t("settings.providers.cancel")}
+            </button>
+            <button
+              onClick={saveDraft}
+              className="vibe-btn rounded-lg border bg-card px-2.5 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-accent"
+            >
+              {t("settings.providers.save")}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={startAdd}
+          className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+        >
+          <Plus className="size-3.5" />
+          {t("settings.providers.addModelBtn")}
+        </button>
+      )}
+    </>
+  );
+
   return (
     <Pane title={t("settings.cat.providers")}>
       <div className="flex gap-5">
@@ -130,26 +268,30 @@ export function ProvidersPane() {
           </div>
 
           {cat?.kind === "cli" ? (
-            <Group>
-              <Row label={t("settings.providers.status")}>
-                <span className="flex items-center gap-1.5 text-[13px]">
-                  <span
-                    className={cn(
-                      "size-1.5 rounded-full",
-                      available.includes(selected) ? "bg-run" : "bg-muted-foreground/40",
+            <>
+              <Group>
+                <Row label={t("settings.providers.status")}>
+                  <span className="flex items-center gap-1.5 text-[13px]">
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        available.includes(selected) ? "bg-run" : "bg-muted-foreground/40",
+                      )}
+                    />
+                    {t(
+                      available.includes(selected)
+                        ? "settings.providers.installed"
+                        : "settings.providers.notFound",
                     )}
-                  />
-                  {t(
-                    available.includes(selected)
-                      ? "settings.providers.installed"
-                      : "settings.providers.notFound",
-                  )}
-                </span>
-              </Row>
-              <div className="px-3.5 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
-                {t("settings.providers.cliHint")}
-              </div>
-            </Group>
+                  </span>
+                </Row>
+                <div className="px-3.5 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                  {t("settings.providers.cliHint")}
+                </div>
+              </Group>
+
+              {available.includes(selected) && modelsManager}
+            </>
           ) : (
             <>
               <Group>
@@ -173,136 +315,7 @@ export function ProvidersPane() {
                 )}
               </Group>
 
-              <div className="mb-2 ml-1 mt-7 flex items-center justify-between">
-                <h2 className="text-[13px] font-medium text-foreground/70">
-                  {t("settings.providers.models")} · {models.length}
-                </h2>
-                {cat?.modelsEndpoint && (
-                  <button
-                    onClick={() => {
-                      setFetching(selected);
-                      wsClient.send("c2s.provider.fetchModels", { providerId: selected });
-                    }}
-                    className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-[12px] text-foreground/80 transition-colors hover:bg-accent"
-                  >
-                    <RefreshCw
-                      className={cn("size-3.5", fetching === selected && "animate-spin")}
-                    />
-                    {t(
-                      fetching === selected
-                        ? "settings.providers.fetching"
-                        : "settings.providers.fetch",
-                    )}
-                  </button>
-                )}
-              </div>
-              {models.length > 0 && (
-                <Group>
-                  {models.map((m) => (
-                    <div key={m.id} className="group/m flex items-center gap-3 px-3.5 py-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13px]">{m.name}</div>
-                        <div className="truncate text-[11px] text-muted-foreground">{m.id}</div>
-                      </div>
-                      <Caps caps={m.capabilities} t={t} />
-                      {isCustom(m.id) && (
-                        <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover/m:opacity-100">
-                          <button
-                            onClick={() => startEdit(m)}
-                            title={t("settings.providers.edit")}
-                            className="text-muted-foreground transition-colors hover:text-foreground"
-                          >
-                            <Pencil className="size-3.5" />
-                          </button>
-                          <button
-                            onClick={() => removeModel(m.id)}
-                            title={t("settings.providers.remove")}
-                            className="text-muted-foreground transition-colors hover:text-destructive"
-                          >
-                            <X className="size-3.5" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </Group>
-              )}
-
-              {draft ? (
-                <div className="mt-2.5 space-y-2.5 rounded-xl border bg-card p-3.5">
-                  <div className="text-[13px] font-medium">
-                    {draft.original
-                      ? t("settings.providers.edit")
-                      : t("settings.providers.addModelBtn")}
-                  </div>
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] text-muted-foreground">
-                      {t("settings.providers.modelName")}
-                    </span>
-                    <input
-                      value={draft.name}
-                      onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                      placeholder={t("settings.providers.modelName")}
-                      className="vibe-input w-full rounded-lg border bg-background px-2.5 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[11px] text-muted-foreground">
-                      {t("settings.providers.modelId")}
-                    </span>
-                    <input
-                      value={draft.id}
-                      onChange={(e) => setDraft({ ...draft, id: e.target.value })}
-                      placeholder={t("settings.providers.modelId")}
-                      spellCheck={false}
-                      className="vibe-input w-full rounded-lg border bg-background px-2.5 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-                    />
-                  </label>
-                  <div>
-                    <span className="mb-1.5 block text-[11px] text-muted-foreground">
-                      {t("settings.providers.capabilities")}
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {CAPS.map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => toggleCap(c)}
-                          className={cn(
-                            "rounded-md border px-2 py-1 text-[11px] transition-colors",
-                            draft.caps.includes(c)
-                              ? "border-brand bg-brand/10 text-foreground"
-                              : "text-muted-foreground hover:bg-accent/50",
-                          )}
-                        >
-                          {t(`settings.cap.${c}`)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <button
-                      onClick={() => setDraft(null)}
-                      className="rounded-lg px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent/50"
-                    >
-                      {t("settings.providers.cancel")}
-                    </button>
-                    <button
-                      onClick={saveDraft}
-                      className="vibe-btn rounded-lg border bg-card px-2.5 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-accent"
-                    >
-                      {t("settings.providers.save")}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={startAdd}
-                  className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-[12px] text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
-                >
-                  <Plus className="size-3.5" />
-                  {t("settings.providers.addModelBtn")}
-                </button>
-              )}
+              {modelsManager}
             </>
           )}
         </div>

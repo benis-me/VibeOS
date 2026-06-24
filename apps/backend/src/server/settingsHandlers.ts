@@ -62,7 +62,10 @@ export async function handleProviderFetchModels(
   const { providerId } = p;
   try {
     const provider = await getProvider(providerId);
-    const discovered = await provider.discoverModels();
+    // This is the explicit, user-triggered fetch — prefer heavyweight live
+    // discovery (e.g. CodeBuddy's PTY `/model list` scrape) when the provider
+    // offers it; it never runs on boot/scan.
+    const discovered = await (provider.discoverModelsLive?.() ?? provider.discoverModels());
     broadcast("s2c.provider.models", {
       providerId,
       models: discovered.map((m) => ({

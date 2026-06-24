@@ -69,4 +69,11 @@ export interface AiProvider {
   run(opts: ProviderRunOptions): Promise<RunResult>;
   /** Best-effort model list for Settings; returns [] if it can't enumerate. */
   discoverModels(): Promise<DiscoveredModel[]>;
+  /**
+   * Heavyweight, user-triggered discovery for providers whose model list can't
+   * be read cheaply (e.g. a CLI that only lists models in its interactive TUI,
+   * scraped via a PTY). Only called from the explicit "Fetch models" action —
+   * never on boot/scan. Falls back to {@link discoverModels} when absent.
+   */
+  discoverModelsLive?(): Promise<DiscoveredModel[]>;
 }

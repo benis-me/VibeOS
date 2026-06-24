@@ -9,6 +9,7 @@ import type {
 import { whichBinary } from "../detect.ts";
 import { streamJsonl } from "./exec.ts";
 import { cliEnv } from "./env.ts";
+import { scrapeModelList } from "./scrapeModelList.ts";
 import { logger } from "../../../util/log.ts";
 
 export interface AnthropicCliConfig {
@@ -19,11 +20,17 @@ export interface AnthropicCliConfig {
   /** Models to offer when live discovery yields nothing. */
   fallbackModels?: DiscoveredModel[];
   /**
-   * Discover models by parsing `<bin> --help` (CodeBuddy lists its supported
-   * models there as `Currently supported: (id, id, …)`). Claude has no such
-   * list, so it relies on {@link fallbackModels} aliases instead.
+   * Discover models by parsing `<bin> --help` (older CodeBuddy listed its
+   * supported models there as `Currently supported: (id, id, …)`). Claude has no
+   * such list, so it relies on {@link fallbackModels} aliases instead.
    */
   discoverViaHelp?: boolean;
+  /**
+   * Provider lists its models only in the interactive `/model list` TUI (current
+   * CodeBuddy). Enables {@link AnthropicCliProvider.discoverModelsLive}, a slow
+   * PTY scrape run ONLY on the user's explicit "Fetch models" click.
+   */
+  liveModelList?: boolean;
 }
 
 interface MapState {
@@ -47,6 +54,7 @@ export class AnthropicCliProvider implements AiProvider {
   private readonly bin: string;
   private readonly fallbackModels: DiscoveredModel[];
   private readonly discoverViaHelp: boolean;
+  private readonly liveModelList: boolean;
   private readonly log: ReturnType<typeof logger>;
 
   constructor(cfg: AnthropicCliConfig) {
@@ -55,6 +63,7 @@ export class AnthropicCliProvider implements AiProvider {
     this.bin = cfg.bin;
     this.fallbackModels = cfg.fallbackModels ?? [];
     this.discoverViaHelp = cfg.discoverViaHelp ?? false;
+    this.liveModelList = cfg.liveModelList ?? false;
     this.log = logger(`provider:${cfg.id}`);
   }
 
@@ -112,6 +121,17 @@ export class AnthropicCliProvider implements AiProvider {
       if (fromHelp.length) return fromHelp;
     }
     return this.fallbackModels;
+  }
+
+  /**
+   * User-triggered live discovery: scrape the interactive `/model list` TUI via a
+   * PTY (CodeBuddy's only programmatic source). Slow — never call on boot/scan.
+   * Falls back to the cheap path if the provider doesn't advertise a TUI list.
+   */
+  async discoverModelsLive(): Promise<DiscoveredModel[]> {
+    if (!this.liveModelList) return this.discoverModels();
+    const live = await scrapeModelList(this.bin);
+    return live.length ? live : this.discoverModels();
   }
 }
 

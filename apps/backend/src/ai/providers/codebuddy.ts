@@ -9,6 +9,9 @@ export const codebuddyProvider = new AnthropicCliProvider({
   id: "codebuddy",
   label: "CodeBuddy",
   bin: "codebuddy",
-  // The codebuddy CLI lists its models in `--help` (Currently supported: (…)).
-  discoverViaHelp: true,
+  // Current CodeBuddy (2.109+) no longer lists models in `--help`; its account
+  // model list lives only behind the interactive `/model list` TUI. The default
+  // set is pre-seeded in the shared catalog; "Fetch models" scrapes the live list
+  // via a PTY (slow, user-triggered only — see discoverModelsLive).
+  liveModelList: true,
 });
