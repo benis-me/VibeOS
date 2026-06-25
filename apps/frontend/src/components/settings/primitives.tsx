@@ -160,8 +160,10 @@ export function Switch({
     >
       <span
         className={cn(
-          "vibe-switch-knob absolute top-0.5 size-[22px] rounded-full bg-white shadow-sm transition-all",
-          checked ? "left-[20px]" : "left-0.5",
+          "vibe-switch-knob absolute top-0.5 size-[22px] rounded-full shadow-sm transition-all",
+          // On (brand track) needs an inverting knob so it stays visible in dark
+          // mode where --brand is near-white; off (faint track) keeps a white knob.
+          checked ? "left-[20px] bg-brand-foreground" : "left-0.5 bg-white",
         )}
       />
     </button>

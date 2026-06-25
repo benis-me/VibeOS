@@ -205,7 +205,7 @@ function WallpaperRow() {
               type="button"
               onClick={onGenerate}
               disabled={!imageOn || !prompt.trim() || !!busy}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-brand/90 disabled:opacity-50"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-[12px] font-medium text-brand-foreground transition-colors hover:bg-brand/90 disabled:opacity-50"
             >
               {busy === "generate" ? (
                 <Loader2 className="size-3.5 animate-spin" />

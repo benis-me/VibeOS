@@ -55,7 +55,7 @@ export function SettingsApp() {
                 className={cn(
                   "flex size-[22px] items-center justify-center rounded-[6px] transition-colors",
                   active
-                    ? "bg-brand text-white shadow-sm"
+                    ? "bg-brand text-brand-foreground shadow-sm"
                     : "bg-foreground/[0.06] text-muted-foreground",
                 )}
               >

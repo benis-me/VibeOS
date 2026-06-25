@@ -29,6 +29,7 @@
   --ring: oklch(0.708 0 0);
 
   --brand: oklch(0.28 0 0);
+  --brand-foreground: oklch(0.985 0 0);
   --run: oklch(0.6 0.15 150);
   --warn: oklch(0.72 0.15 70);
   --idle: oklch(0.75 0 0);
@@ -79,6 +80,9 @@
   --ring: oklch(0.556 0 0);
 
   --brand: oklch(0.92 0 0);
+  /* Brand inverts to near-white in dark, so its on-color must invert too —
+     otherwise text/icons/knobs hardcoded to white vanish on a near-white fill. */
+  --brand-foreground: oklch(0.205 0 0);
   --run: oklch(0.74 0.16 152);
   --warn: oklch(0.8 0.15 75);
   --idle: oklch(0.45 0 0);
@@ -196,6 +200,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --color-run: var(--run);
   --color-warn: var(--warn);
   --color-idle: var(--idle);
