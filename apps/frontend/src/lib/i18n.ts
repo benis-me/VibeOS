@@ -120,6 +120,7 @@ const zh: Dict = {
   "settings.wallpaper.upload": "上传图片",
   "settings.wallpaper.reset": "恢复默认",
   "settings.wallpaper.generate": "AI 生成",
+  "settings.wallpaper.generating": "生成中……",
   "settings.wallpaper.promptPlaceholder": "描述你想要的壁纸……",
   "settings.wallpaper.needModel": "开启「图像生成模型」后才能使用 AI 生成。",
   // Settings — general
@@ -332,6 +333,7 @@ const en: Dict = {
   "settings.wallpaper.upload": "Upload",
   "settings.wallpaper.reset": "Reset",
   "settings.wallpaper.generate": "Generate",
+  "settings.wallpaper.generating": "Generating…",
   "settings.wallpaper.promptPlaceholder": "Describe the wallpaper you want…",
   "settings.wallpaper.needModel": "Turn on an image model to generate wallpapers.",
   "settings.language": "Language",

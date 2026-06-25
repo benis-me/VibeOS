@@ -82,11 +82,35 @@ function WallpaperRow() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState<null | "upload" | "generate">(null);
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
 
-  // The desktop swaps the moment settings.changed lands; clear the spinner then.
-  // A server error (e.g. generation failed) also releases it.
-  useEffect(() => setBusy(null), [wallpaper]);
+  // Hold the spinner until the wallpaper image is actually READY. Generation
+  // persists the /api/img path at once (settings.changed lands immediately), but
+  // the bytes aren't produced until the route is first awaited — so wait for the
+  // new image to load rather than clearing the instant the path changes.
+  useEffect(
+    () =>
+      wsClient.on("s2c.settings.changed", ({ settings }) => {
+        if (!busyRef.current) return;
+        const wp = settings.prefs.wallpaper;
+        if (!wp) return setBusy(null);
+        const img = new Image();
+        const done = () => setBusy(null);
+        img.onload = done;
+        img.onerror = done;
+        img.src = `${API_BASE}${wp}`;
+      }),
+    [],
+  );
+  // A server error (generation failed / no model) releases the spinner, and a
+  // hard backstop guarantees it can never get stuck if no signal ever arrives.
   useEffect(() => wsClient.on("s2c.error", () => setBusy(null)), []);
+  useEffect(() => {
+    if (!busy) return;
+    const tmo = setTimeout(() => setBusy(null), 120_000);
+    return () => clearTimeout(tmo);
+  }, [busy]);
 
   const wallpaperUrl = wallpaper ? `${API_BASE}${wallpaper}` : null;
 
@@ -183,8 +207,12 @@ function WallpaperRow() {
               disabled={!imageOn || !prompt.trim() || !!busy}
               className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-brand/90 disabled:opacity-50"
             >
-              <Sparkles className="size-3.5" />
-              {t("settings.wallpaper.generate")}
+              {busy === "generate" ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
+              {t(busy === "generate" ? "settings.wallpaper.generating" : "settings.wallpaper.generate")}
             </button>
           </div>
           {!imageOn && (
