@@ -8,7 +8,7 @@ const SUMMARY_BUDGET = 1200;
 
 /**
  * - "force-full": the OS is certain a full render is needed (first paint,
- *   spawned window, drag-drop, or no snapshot yet). Not negotiable.
+ *   spawned window, or no patchable snapshot yet). Not negotiable.
  * - "prefer-incremental": a normal interaction on an already-rendered window.
  *   The OS *suggests* incremental, but the AI — which understands the semantics
  *   of the action — may upgrade to a full render when the change is structural
@@ -44,10 +44,10 @@ export interface AssembleInput {
 export function decideRenderMode(input: {
   firstRender: boolean;
   hasSnapshot: boolean;
-  isDrag: boolean;
+  hasRegions: boolean;
   isSpawn: boolean;
 }): RenderMode {
-  if (input.firstRender || input.isSpawn || input.isDrag || !input.hasSnapshot) {
+  if (input.firstRender || input.isSpawn || !input.hasSnapshot || !input.hasRegions) {
     return "force-full";
   }
   return "prefer-incremental";
@@ -130,7 +130,10 @@ export function assemblePrompt(input: AssembleInput): string {
       (op.sel ? ` target="${op.sel}"` : "") +
       (op.value !== undefined ? ` value="${op.value}"` : "") +
       (op.dataset && Object.keys(op.dataset).length ? ` data=${JSON.stringify(op.dataset)}` : "") +
-      (op.formData ? ` form=${JSON.stringify(op.formData)}` : "");
+      (op.formData ? ` form=${JSON.stringify(op.formData)}` : "") +
+      (op.regionPath?.length
+        ? ` regionPath=${JSON.stringify(op.regionPath)} (nearest first; other affected regions may also change)`
+        : "");
   } else {
     opLine = `Update the interface.`;
   }
@@ -138,12 +141,13 @@ export function assemblePrompt(input: AssembleInput): string {
   // Render-mode directive: the OS decides the BASELINE, the AI decides edge cases.
   const modeDirective =
     renderMode === "force-full"
-      ? `[RENDER MODE: FULL]\nReturn the COMPLETE window body in <vibeos-html>. Tag stable, updatable parts with data-vibeos-region="<stable-id>" so future changes can be patched incrementally. Do NOT return bare region fragments this time.`
+      ? `[RENDER MODE: FULL]\nReturn the COMPLETE window body in <vibeos-html mode="full">. Tag separate, updatable parts with unique data-vibeos-region="<stable-id>" so future changes can be patched incrementally. Do NOT return bare region fragments this time.`
       : `[RENDER MODE: INCREMENTAL PREFERRED]\nThe window is already rendered (see CURRENT UI${
           regionIds?.length ? `, regions: ${regionIds.join(", ")}` : ""
         }). DECIDE which fits this action:
-- If the action changes only part(s) of the screen → return ONLY those data-vibeos-region elements (for accumulating regions like terminal/chat/list, include ALL their existing content plus the new part). This is the default — prefer it.
-- If the action structurally replaces the screen (page navigation, switching to a totally different view) → return the FULL body instead.
+- If the action changes only part(s) of the screen → use <vibeos-html mode="regions"> and return ONLY those existing data-vibeos-region elements (for accumulating regions like terminal/chat/list, include ALL their existing content plus the new part). This is the default — prefer it.
+- To insert/delete a region or change its layout, replace its existing parent region. Never return both an ancestor and its descendant, never invent a target id. Leave unrelated input and scroll regions untouched.
+- If the action structurally replaces the screen (page navigation, switching to a totally different view) → use <vibeos-html mode="full"> with the FULL body instead.
 Choose deliberately before you write: do not re-emit the whole window for a small change, and do not emit a fragment when the layout truly changed.`;
 
   parts.push(`[OPERATION]\n${opLine}\n\n${modeDirective}`);

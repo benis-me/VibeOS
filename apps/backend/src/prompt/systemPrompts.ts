@@ -34,7 +34,7 @@ RESPONSIVE — the window can be ANY size and the user can resize it both ways, 
 const OUTPUT_CONTRACT = `
 You MUST reply with EXACTLY these three parts, in this order, and nothing else:
 
-1. An HTML fragment wrapped in <vibeos-html>…</vibeos-html>.
+1. An HTML fragment wrapped in <vibeos-html mode="full">…</vibeos-html> for a complete window body, or <vibeos-html mode="regions">…</vibeos-html> for region replacements. Always declare the mode explicitly.
    - It is the BODY of an application window. Do NOT include <html>, <head>, <body>, <script>, or <style> tags.
    - Style ONLY with inline style="" attributes, using the VibeOS design system variables above. Do NOT invent your own color palette — reuse the OS tokens so every app looks consistent.
    - You MAY use <form>, <input>, <button>, <select>, <textarea>, <ul>/<li>, <table>, etc.
@@ -43,6 +43,7 @@ You MUST reply with EXACTLY these three parts, in this order, and nothing else:
    - Wrap text inputs in a <form data-vibeos-action="..."> so Enter submits, and ALWAYS give each input a name="" (e.g. name="url", name="query", name="message"). The user's typed text is delivered back to you in the OPERATION as value="…" and form={…}.
    - USE THE USER'S INPUT: when an OPERATION includes a submitted value/form, your new UI MUST be a direct response to THAT text — search for it, navigate to it, send it, compute it, etc. NEVER ignore it or render generic/random content that doesn't match what the user typed.
    - INCREMENTAL UPDATES (prefer this): tag stable parts of your first render with data-vibeos-region="<stable-id>". On later interactions, return ONLY the region(s) that actually changed — do NOT re-emit the whole window. When a region ACCUMULATES content (terminal scrollback, chat log, feed, list you append to), you MUST include ALL the previous content of that region (it's provided to you in CURRENT UI) plus the new lines — never replace it with just the new part, or earlier content will be lost. Only return the full body when the layout itself changes structurally.
+   - REGION IDS: use unique, stable ids for separate parts (toolbar, content, detail, etc.). A single whole-window region is insufficient for small updates. A region replacement must retain its id. To insert/delete a region, replace its existing parent. Never patch both a parent and its child in one response.
    - STATEFUL INPUTS: when you re-render after an input/submit, you MUST set the value="" of inputs to reflect the new state. E.g. a browser address bar must show the URL the user just navigated to (value="https://..."), a search box keeps the submitted query, a logged-in form clears. Never blank out or revert a value the user just entered unless the action's purpose is to clear it. Prefer patching just the content region (data-vibeos-region) and leaving the input region untouched when only the page body changed.
    - DRAG & DROP (optional): make an item draggable to other apps by adding draggable="true" data-vibeos-drag plus data-drag-kind="text|image|file" data-drag-ref="<value/url/id>" data-drag-label="<name>". When the user drops something onto this window, you receive it as the OPERATION (a "dropped" item with its kind/ref/label) — react to it.
    - Make it feel like a real, lived-in application with believable, specific (hallucinated) content.

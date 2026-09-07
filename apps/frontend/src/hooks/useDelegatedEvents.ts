@@ -103,7 +103,15 @@ export function useDelegatedEvents(
     const root = ref.current;
     if (!root) return;
 
-    const submitForm = (form: HTMLFormElement, action?: string) => {
+    const emit = (el: HTMLElement, op: AiOp) => {
+      const regionPath: string[] = [];
+      for (let cur: HTMLElement | null = el; cur && cur !== root; cur = cur.parentElement) {
+        if (cur.dataset.vibeosRegion) regionPath.push(cur.dataset.vibeosRegion);
+      }
+      onOp({ ...op, regionPath });
+    };
+
+    const submitForm = (form: HTMLFormElement, action?: string, origin: HTMLElement = form) => {
       const fd: Record<string, string> = {};
       // 1) named fields via FormData
       new FormData(form).forEach((v, k) => {
@@ -122,7 +130,7 @@ export function useDelegatedEvents(
         // remember the first non-empty text value as the "primary" input
         if (!primary && f.value && /^(INPUT|TEXTAREA)$/.test(f.tagName)) primary = f.value;
       }
-      onOp({
+      emit(origin, {
         kind: "submit",
         action: action ?? form.dataset.vibeosAction ?? "submit",
         // surface the main value explicitly so the AI can't miss it
@@ -162,7 +170,7 @@ export function useDelegatedEvents(
         btn.type === "submit" ||
         ((btn.tagName === "BUTTON" || (btn as HTMLInputElement).type === "submit") && !btn.type);
       if (form && isSubmit) {
-        submitForm(form, el.dataset.vibeosAction);
+        submitForm(form, el.dataset.vibeosAction, el);
         return;
       }
 
@@ -172,7 +180,7 @@ export function useDelegatedEvents(
       // Attach the surrounding fields so the agent sees what was typed.
       const scope = nearestFieldScope(el, root);
       const collected = scope ? collectFields(scope) : null;
-      onOp({
+      emit(el, {
         kind: "click",
         action: el.dataset.vibeosAction ?? ds.action ?? describe(el),
         // ALWAYS include a description (tag + label + text). Controls that share
@@ -196,7 +204,7 @@ export function useDelegatedEvents(
       if (!el) return;
       e.preventDefault();
       const ds = collectDataset(el);
-      onOp({
+      emit(el, {
         kind: "click",
         action: el.dataset.vibeosAction ?? ds.action ?? describe(el),
         sel: describe(el),
@@ -208,7 +216,8 @@ export function useDelegatedEvents(
       // Always stop the native submit so the browser never navigates/reloads.
       e.preventDefault();
       e.stopPropagation();
-      submitForm(e.target as HTMLFormElement);
+      const form = e.target as HTMLFormElement;
+      submitForm(form, undefined, e.submitter ?? form);
     };
 
     const onChange = (e: Event) => {
@@ -224,7 +233,7 @@ export function useDelegatedEvents(
         (tag === "INPUT" && /^(checkbox|radio|range|color|file)$/.test(target.type ?? ""));
       if (!isToggleControl) return;
 
-      onOp({
+      emit(target, {
         kind: "change",
         action: target.dataset.vibeosAction ?? target.name ?? "change",
         dataset: collectDataset(target),
@@ -241,7 +250,7 @@ export function useDelegatedEvents(
       // Enter on a free-text input = commit (forms handle their own submit).
       if (e.key !== "Enter" || target.form) return;
       e.preventDefault();
-      onOp({
+      emit(target, {
         kind: "key",
         action: target.dataset.vibeosAction ?? target.name ?? "enter",
         dataset: collectDataset(target),

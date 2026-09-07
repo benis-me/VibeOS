@@ -18,11 +18,43 @@ describe("applyRegionsServer", () => {
     );
   });
 
-  test("appends a region that isn't present yet", () => {
-    const out = applyRegionsServer(`<div data-vibeos-region="a">1</div>`, [
-      { region: "b", html: `<div data-vibeos-region="b">2</div>` },
-    ]);
-    expect(out).toBe(`<div data-vibeos-region="a">1</div><div data-vibeos-region="b">2</div>`);
+  test("rejects missing targets instead of appending unrelated content", () => {
+    expect(() =>
+      applyRegionsServer(`<div data-vibeos-region="a">1</div>`, [
+        { region: "b", html: `<div data-vibeos-region="b">2</div>` },
+      ]),
+    ).toThrow();
+  });
+
+  test("rejects duplicate, overlapping, or malformed replacements as one batch", () => {
+    const current =
+      '<main data-vibeos-region="outer"><div data-vibeos-region="inner">old</div></main>';
+    const inner = { region: "inner", html: '<div data-vibeos-region="inner">new</div>' };
+    for (const patches of [
+      [inner, inner],
+      [inner, { region: "outer", html: current }],
+      [{ region: "inner", html: '<div data-vibeos-region="other">wrong target</div>' }],
+      [{ region: "inner", html: '<div data-vibeos-region="inner">incomplete' }],
+      [
+        {
+          region: "inner",
+          html: '<div data-vibeos-region="inner"><b data-vibeos-region="outer">duplicate</b></div>',
+        },
+      ],
+    ])
+      expect(() => applyRegionsServer(current, patches)).toThrow();
+    expect(() => applyRegionsServer(current + current, [inner])).toThrow();
+  });
+
+  test("updates sibling regions together while retaining the surrounding page", () => {
+    const current =
+      '<main><header>keep</header><div data-vibeos-region="a">1</div><div data-vibeos-region="b">2</div></main>';
+    expect(
+      applyRegionsServer(current, [
+        { region: "a", html: '<div data-vibeos-region="a">3</div>' },
+        { region: "b", html: '<div data-vibeos-region="b">4</div>' },
+      ]),
+    ).toBe(current.replace(">1<", ">3<").replace(">2<", ">4<"));
   });
 
   test("replacing a nested-content region doesn't stop at the first close tag", () => {

@@ -1,46 +1,51 @@
 import { syscallSchema, type ParsedAiOutput } from "@vibeos/shared/prompt";
 
-const HTML_OPEN = "<vibeos-html>";
+const HTML_OPEN = /<vibeos-html\b([^>]*)>/i;
 const HTML_CLOSE = "</vibeos-html>";
 const SUMMARY_RE = /<vibeos-summary>([\s\S]*?)<\/vibeos-summary>/i;
 const SYSCALL_RE = /```vibeos-syscall\s*([\s\S]*?)```/i;
 
 /** Incrementally extract the streaming HTML body for live patching. */
 export function extractStreamingHtml(buffer: string): string | null {
-  const start = buffer.indexOf(HTML_OPEN);
-  if (start === -1) return null;
-  const from = start + HTML_OPEN.length;
+  const open = HTML_OPEN.exec(buffer);
+  if (!open) return null;
+  const from = open.index + open[0].length;
   const end = buffer.indexOf(HTML_CLOSE, from);
   return end === -1 ? buffer.slice(from) : buffer.slice(from, end);
 }
 
 /** Parse the complete AI output into its structured parts. */
-export function parseAiOutput(full: string): ParsedAiOutput {
-  const html = extractFullHtml(full);
+export function parseAiOutput(full: string, legacyMode?: "full"): ParsedAiOutput {
   const summary = SUMMARY_RE.exec(full)?.[1]?.trim() ?? "";
   const syscalls = parseSyscalls(full);
 
   const result: ParsedAiOutput = { syscalls, summary };
 
-  if (html !== null) {
+  const open = HTML_OPEN.exec(full);
+  if (open) {
+    const from = open.index + open[0].length;
+    const end = full.indexOf(HTML_CLOSE, from);
+    const declaredMode = /\bmode\s*=\s*["']([^"']*)["']/i.exec(open[1] ?? "")?.[1];
+    if (
+      end === -1 ||
+      (declaredMode !== undefined && declaredMode !== "full" && declaredMode !== "regions")
+    ) {
+      result.renderError = "Incomplete HTML envelope or invalid render mode";
+      return result;
+    }
+    const html = full.slice(from, end).trim();
     const regions = extractRegions(html);
-    // If the body is *only* region blocks (no other meaningful content), treat
-    // as a patch; otherwise treat as a full replacement.
-    if (regions.length > 0 && isOnlyRegions(html, regions)) {
+    const onlyRegions = regions.length > 0 && isOnlyRegions(html, regions);
+    const mode = declaredMode ?? legacyMode;
+    if (!html || (mode === "regions" && !onlyRegions)) {
+      result.renderError = "Expected complete region blocks with stable ids";
+    } else if (mode !== "full" && onlyRegions) {
       result.regions = regions;
     } else {
       result.html = html.trim();
     }
   }
   return result;
-}
-
-function extractFullHtml(full: string): string | null {
-  const start = full.indexOf(HTML_OPEN);
-  if (start === -1) return null;
-  const from = start + HTML_OPEN.length;
-  const end = full.indexOf(HTML_CLOSE, from);
-  return end === -1 ? full.slice(from).trim() : full.slice(from, end).trim();
 }
 
 const VOID_TAGS = new Set([

@@ -15,7 +15,7 @@ import { kernelState } from "../kernel/kernelState.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 import { assemblePrompt, decideRenderMode } from "../prompt/PromptAssembler.ts";
 import { run, recordSummary } from "../ai/SdkManager.ts";
-import { parseAiOutput, extractStreamingHtml, extractRegions } from "../ai/streamParser.ts";
+import { parseAiOutput, extractStreamingHtml } from "../ai/streamParser.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
 import { applyRegionsServer, extractRegionIds } from "./regionMerge.ts";
 import { rewriteImages } from "../ai/imageCache.ts";
@@ -67,9 +67,17 @@ function dispatch(windowId: string, trigger: Trigger): void {
 
   void generate(windowId, trigger, gen, abort)
     .catch((e) => {
-      if (abort.signal.aborted) return; // expected on preemption
+      if (genCounter.get(windowId) !== gen) return;
       log.error(`generate threw [${windowId.slice(-6)}]`, e instanceof Error ? e.message : e);
+      if (!getMemory(windowId)?.htmlSnapshot) {
+        broadcast("s2c.ui.patch", { windowId, mode: "full", html: "", done: true });
+      }
       broadcast("s2c.ui.busy", { windowId, busy: false });
+      broadcast("s2c.error", {
+        code: "ai_failed",
+        detail: e instanceof Error ? e.message : String(e),
+        windowId,
+      });
     })
     .finally(() => {
       // Only clear if we're still the current run (a newer one may have replaced us).
@@ -123,6 +131,7 @@ async function generate(
   }
 
   await ensureMemory(windowId, app.id);
+  if (isStale(windowId, gen, abort)) return;
   const memory = getMemory(windowId);
   const firstRender = trigger.firstRender ?? false;
 
@@ -137,15 +146,15 @@ async function generate(
   }
 
   const snapshot = memory?.htmlSnapshot ?? "";
+  const regionIds = extractRegionIds(snapshot);
   // Decide render mode BEFORE calling the AI — the model is then told exactly
   // which mode to use, rather than guessing.
   const renderMode = decideRenderMode({
     firstRender,
     hasSnapshot: snapshot.trim().length > 0,
-    isDrag: !!trigger.drag,
+    hasRegions: regionIds.length > 0 && new Set(regionIds).size === regionIds.length,
     isSpawn: !!trigger.seedPrompt,
   });
-  const regionIds = renderMode === "prefer-incremental" ? extractRegionIds(snapshot) : undefined;
 
   const prompt = assemblePrompt({
     app,
@@ -174,131 +183,100 @@ async function generate(
   );
   const t0 = performance.now();
 
-  // Stream the HTML body to the client as it arrives (full-replace frames).
-  let buffer = "";
-  let lastStreamed = "";
-  // Per-region content already streamed this run (id → html), so a region that
-  // closed on an earlier delta isn't re-broadcast on every subsequent one.
-  const streamedRegions = new Map<string, string>();
-  const result = await run({
-    role: "ui-generation",
-    trigger: firstRender ? "user" : "event",
-    prompt,
-    // No sessionId → every op is a fresh, self-contained conversation.
-    abort,
-    appName: app.name,
-    onDelta: (text) => {
-      if (isStale(windowId, gen, abort)) return; // superseded — stop streaming
-      buffer += text;
-      const body = extractStreamingHtml(buffer);
-      if (body === null) return;
-
-      if (renderMode === "force-full") {
-        // Full render: the streamed body IS the whole window, so push it as a
-        // growing full-replace frame.
-        if (body !== lastStreamed && body.length > lastStreamed.length) {
+  const canCommit = () => !isStale(windowId, gen, abort);
+  let repairReason = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (!canCommit()) return;
+    let buffer = "";
+    let lastStreamed = "";
+    const fullRequired = renderMode === "force-full" || attempt > 0;
+    const result = await run({
+      role: "ui-generation",
+      trigger: firstRender ? "user" : "event",
+      prompt:
+        attempt === 0
+          ? prompt
+          : `${prompt}\n\n[RENDER REPAIR: FULL REQUIRED]\nThe previous output was rejected: ${repairReason}. It was NOT applied and none of its syscalls ran. Respond to the original operation using CURRENT UI. Return the COMPLETE window body in <vibeos-html mode="full">; no region patch this time.`,
+      // Every attempt is stateless, including a repair of invalid output.
+      abort,
+      appName: app.name,
+      onDelta: (text) => {
+        // ponytail: stream only first paint; existing windows commit one validated
+        // batch. Streaming edits would need transactional preview + rollback.
+        if (!canCommit() || snapshot.trim() || attempt > 0) return;
+        buffer += text;
+        const body = extractStreamingHtml(buffer);
+        if (body !== null && body.length > lastStreamed.length) {
           lastStreamed = body;
           broadcast("s2c.ui.patch", { windowId, mode: "full", html: body, streaming: true });
         }
-        return;
+      },
+    });
+
+    if (!canCommit()) {
+      if (genCounter.get(windowId) === gen) throw new Error(result.error ?? "Generation aborted");
+      return;
+    }
+    if (!result.ok) throw new Error(result.error ?? "Generation failed");
+
+    const parsed = parseAiOutput(result.text, fullRequired ? "full" : undefined);
+    let html: string | undefined;
+    let regions = parsed.regions;
+    try {
+      if (parsed.renderError) throw new Error(parsed.renderError);
+      if (regions?.length) {
+        if (fullRequired) throw new Error("A complete window body is required");
+        html = applyRegionsServer(snapshot, regions);
+      } else if (parsed.html !== undefined) {
+        html = parsed.html;
+      } else if (!parsed.syscalls.length) {
+        throw new Error("The model returned no UI or system action");
       }
+    } catch (error) {
+      repairReason = error instanceof Error ? error.message : String(error);
+      await recordSummary(result.runId, `Rejected UI: ${repairReason}`);
+      if (!canCommit()) return;
+      if (attempt === 1) throw error;
+      log.warn(`Invalid UI [${windowId.slice(-6)}]: ${repairReason}; retrying full render`);
+      continue;
+    }
 
-      // Incremental render: stream each data-vibeos-region as soon as it closes.
-      // extractRegions is depth-aware and silently skips a region whose end tag
-      // hasn't arrived yet, so we never push an unbalanced fragment into the DOM,
-      // and the client merges each patch into its intact snapshot (no clobber).
-      const regions = extractRegions(body);
-      if (regions.length === 0) return;
-      // If the AI actually upgraded to a full structural replace it writes a
-      // whole new body, so complete NON-region elements show up next to the
-      // regions. Don't stream region-by-region then — that would stack half a
-      // new layout over the old one; let the final full patch swap it in one go.
-      let rest = body;
-      for (const r of regions) rest = rest.replace(r.html, "");
-      if (/<\/[a-zA-Z][\w-]*\s*>/.test(rest)) return;
-      // Crucial: if a data-vibeos-region attribute STILL remains in `rest`, an
-      // outer region container is mid-stream and the regions we just closed are
-      // its CHILDREN. The final parse keys off that outer region (extractRegions
-      // is depth-aware and skips nested ones), so streaming the inner children
-      // now patches at the wrong granularity: the client can't find those ids in
-      // its snapshot, appends them OUTSIDE the container, and the closing outer
-      // patch then reshuffles the DOM — making parts of the app vanish. Wait for
-      // the outer region to close; we'll stream it as one unit, matching `done`.
-      if (/data-vibeos-region/.test(rest)) return;
-
-      const fresh = regions.filter((r) => streamedRegions.get(r.region) !== r.html);
-      if (fresh.length === 0) return;
-      for (const r of fresh) streamedRegions.set(r.region, r.html);
-      broadcast("s2c.ui.patch", { windowId, mode: "regions", regions: fresh, streaming: true });
-    },
-  });
-
-  if (isStale(windowId, gen, abort)) {
-    // Superseded by a newer action → that run owns the UI; just drop this one.
-    // Aborted while still current → the hang guard fired; the window would be
-    // stuck on a spinner, so clear it and surface the failure.
-    if (genCounter.get(windowId) !== gen) {
-      log.debug(`⏭ ${app.name} [${windowId.slice(-6)}] result discarded (superseded)`);
+    if (html !== undefined) {
+      // Image generation starts only after the output has passed validation.
+      html = rewriteImages(html);
+      regions = regions?.map((r) => ({ ...r, html: rewriteImages(r.html) }));
+      // Evaluate the guard INSIDE the single-writer queue, not just before awaiting it.
+      if (!(await saveSnapshot(windowId, html, canCommit)) || !canCommit()) return;
+      broadcast(
+        "s2c.ui.patch",
+        regions?.length
+          ? { windowId, mode: "regions", regions, done: true }
+          : { windowId, mode: "full", html, done: true },
+      );
     } else {
-      log.warn(`⏱ ${app.name} [${windowId.slice(-6)}] aborted (${result.error ?? "timeout"})`);
+      // Clear any first-paint preview when a successful response has only syscalls.
+      if (!snapshot.trim() && lastStreamed) {
+        broadcast("s2c.ui.patch", { windowId, mode: "full", html: snapshot, done: true });
+      }
       broadcast("s2c.ui.busy", { windowId, busy: false });
-      broadcast("s2c.error", { code: "ai_failed", detail: result.error, windowId });
+    }
+
+    const what =
+      parsed.summary ||
+      (regions?.length
+        ? `Patched ${regions.length} region(s)`
+        : html !== undefined
+          ? "Rendered full window"
+          : "No output");
+    log.info(
+      `✓ ${app.name} [${windowId.slice(-6)}] ${regions?.length ? `${regions.length} region(s)` : "full"}, ${(performance.now() - t0).toFixed(0)}ms`,
+    );
+    if (parsed.summary) await saveSummary(windowId, parsed.summary, canCommit);
+    await recordSummary(result.runId, what);
+    if (!canCommit()) return;
+    if (parsed.syscalls.length > 0) {
+      await Syscalls.execute(parsed.syscalls, { windowId, appId: app.id, source: "syscall" });
     }
     return;
-  }
-
-  const dt = (performance.now() - t0).toFixed(0);
-
-  const parsed = parseAiOutput(result.text);
-
-  const current = memory?.htmlSnapshot ?? "";
-  if (parsed.html !== undefined) {
-    // Resolve <img data-vibe-img> placeholders → /api/img/:id (generates + caches).
-    const html = rewriteImages(parsed.html);
-    await saveSnapshot(windowId, html);
-    broadcast("s2c.ui.patch", { windowId, mode: "full", html, done: true });
-    log.info(
-      `✓ ${app.name} [${windowId.slice(-6)}] full render ${html.length} chars, ${parsed.syscalls.length} syscall(s) in ${dt}ms`,
-    );
-  } else if (parsed.regions && parsed.regions.length > 0) {
-    const regions = parsed.regions.map((r) => ({ ...r, html: rewriteImages(r.html) }));
-    const merged = applyRegionsServer(current, regions);
-    await saveSnapshot(windowId, merged);
-    broadcast("s2c.ui.patch", { windowId, mode: "regions", regions, done: true });
-    log.info(
-      `✓ ${app.name} [${windowId.slice(-6)}] patched ${regions.length} region(s), ${parsed.syscalls.length} syscall(s) in ${dt}ms`,
-    );
-  } else {
-    broadcast("s2c.ui.busy", { windowId, busy: false });
-    log.warn(
-      `⚠ ${app.name} [${windowId.slice(-6)}] no HTML returned (ok=${result.ok}, text ${result.text.length} chars) in ${dt}ms`,
-    );
-    if (!result.ok) {
-      broadcast("s2c.error", {
-        code: "ai_failed",
-        detail: result.error,
-        windowId,
-      });
-    }
-  }
-
-  if (parsed.summary) {
-    await saveSummary(windowId, parsed.summary);
-    log.debug(`  summary: ${parsed.summary}`);
-  }
-
-  // Record what this run produced, for the Activity Monitor.
-  const what =
-    parsed.summary ||
-    (parsed.html !== undefined
-      ? "Rendered full window"
-      : parsed.regions?.length
-        ? `Patched ${parsed.regions.length} region(s)`
-        : "No output");
-  await recordSummary(result.runId, what);
-
-  if (parsed.syscalls.length > 0) {
-    log.debug(`  syscalls: ${parsed.syscalls.map((c) => c.type).join(", ")}`);
-    await Syscalls.execute(parsed.syscalls, { windowId, appId: app.id, source: "syscall" });
   }
 }

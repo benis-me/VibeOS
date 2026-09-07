@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import { sanitizeAiHtml } from "@/lib/sanitize";
+import { replaceRegions } from "@/lib/patch";
 import { wsClient, API_BASE } from "@/lib/ws";
 import { useDelegatedEvents } from "@/hooks/useDelegatedEvents";
 import { useWindowStore } from "@/stores/windowStore";
 
 interface Props {
   windowId: string;
-  html: string;
 }
 
 /**
  * Per-window scroll position, kept module-level so it survives both innerHTML
- * rebuilds (every patch/full render replaces the content) and any remount.
+ * full replacements and any remount.
  */
 const scrollMemory = new Map<string, number>();
 
@@ -31,7 +31,7 @@ function inputKey(el: HTMLInputElement | HTMLTextAreaElement): string {
  * Renders sanitized AI-generated HTML and routes all interactions back to the
  * backend as operations. The AI never gets to run code in the shell.
  */
-export function AiHtmlSurface({ windowId, html }: Props) {
+export function AiHtmlSurface({ windowId }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const busy = useWindowStore((s) => s.busy[windowId]);
 
@@ -62,19 +62,67 @@ export function AiHtmlSurface({ windowId, html }: Props) {
 
   useDelegatedEvents(ref, onOp);
 
-  // Inject the sanitized HTML ONLY when it actually changes — never on a plain
-  // re-render (window drag / focus / z-order). Setting innerHTML rebuilds the
-  // whole DOM subtree (which resets scroll and costs CPU), so gating it on
-  // [html] keeps drags smooth and scroll stable, and means other windows
-  // re-rendering can't disturb this one. /api/img paths are rewritten to the
-  // backend origin (in dev the backend is on a different port than Vite).
+  // Subscribe synchronously: React may batch renders, but no region patch may be skipped.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    let out = html ? sanitizeAiHtml(html) : "";
-    if (API_BASE && out) out = out.replace(/(["'])\/api\/img\//g, `$1${API_BASE}/api/img/`);
-    el.innerHTML = out;
-  }, [html]);
+    const render = (state: ReturnType<typeof useWindowStore.getState>, local: boolean) => {
+      const html = state.snapshots[windowId] ?? "";
+      let out = html ? sanitizeAiHtml(html) : "";
+      if (API_BASE && out) out = out.replace(/(["'])\/api\/img\//g, `$1${API_BASE}/api/img/`);
+      const patch = local ? state.patches[windowId] : undefined;
+      const active = document.activeElement;
+      const scroll = el.scrollTop || scrollMemory.get(windowId) || 0;
+      if (patch?.mode === "regions") {
+        // Sanitize the complete document first; sanitizing a bare <tr> drops its context.
+        const next = document.createElement("div");
+        next.innerHTML = out;
+        try {
+          replaceRegions(
+            el,
+            (patch.regions ?? []).map(({ region }) => {
+              const target = next.querySelector(`[data-vibeos-region="${CSS.escape(region)}"]`);
+              if (!target) throw new Error(`Sanitized region missing: ${region}`);
+              return { region, html: target.outerHTML };
+            }),
+          );
+        } catch {
+          el.innerHTML = out;
+        }
+      } else {
+        el.innerHTML = out;
+      }
+      el.scrollTop = scroll;
+      const p = preserved.current;
+      preserved.current = null;
+      if (!p || active?.isConnected) return;
+      for (const f of el.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+        "input, textarea",
+      )) {
+        if (inputKey(f) !== p.key) continue;
+        if (patch?.mode !== "regions" && !f.value) f.value = p.value;
+        if (p.caret != null) {
+          try {
+            f.focus({ preventScroll: true });
+            f.setSelectionRange(p.caret, p.caret);
+          } catch {
+            /* Some input types do not support selection. */
+          }
+        }
+        break;
+      }
+    };
+    render(useWindowStore.getState(), false);
+    return useWindowStore.subscribe((state, previous) => {
+      if (
+        state.snapshots[windowId] !== previous.snapshots[windowId] ||
+        (state.patches[windowId]?.mode === "regions" &&
+          state.patches[windowId] !== previous.patches[windowId])
+      ) {
+        render(state, true);
+      }
+    });
+  }, [windowId]);
 
   // Retry generated images that fail to load (e.g. the held request was cut
   // short, or a transient error) instead of leaving a broken image. The image
@@ -105,18 +153,6 @@ export function AiHtmlSurface({ windowId, html }: Props) {
   const onScroll = useCallback(() => {
     if (ref.current) scrollMemory.set(windowId, ref.current.scrollTop);
   }, [windowId]);
-
-  // After every render (a patch replaces innerHTML → scrollTop snaps to 0; a
-  // focus change can remount the surface), put the scroll back. Guarded so it
-  // only undoes a reset, never fights live scrolling. The saved value lives in
-  // the module-level map, so it deliberately survives unmount/remount — we do
-  // NOT clear it on unmount, or a remount would lose the position.
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const saved = scrollMemory.get(windowId);
-    if (saved && el.scrollTop === 0) el.scrollTop = saved;
-  });
 
   // Drop TARGET: accept a drag from any app (or the OS) and route it to the
   // backend, which asks the agent to react to it.
@@ -152,31 +188,6 @@ export function AiHtmlSurface({ windowId, html }: Props) {
     },
     [windowId],
   );
-
-  // After the HTML is applied, restore a preserved input value if the AI's new
-  // markup left the matching field blank (so navigation/search keep your text).
-  useLayoutEffect(() => {
-    const p = preserved.current;
-    if (!p || !ref.current) return;
-    preserved.current = null;
-    const fields = ref.current.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
-      "input, textarea",
-    );
-    for (const f of fields) {
-      if (inputKey(f) === p.key && !f.value) {
-        f.value = p.value;
-        if (p.caret != null && "setSelectionRange" in f) {
-          try {
-            f.focus();
-            f.setSelectionRange(p.caret, p.caret);
-          } catch {
-            /* ignore */
-          }
-        }
-        break;
-      }
-    }
-  }, [html]);
 
   return (
     <div className="relative h-full w-full overflow-hidden" onDragOver={onDragOver} onDrop={onDrop}>

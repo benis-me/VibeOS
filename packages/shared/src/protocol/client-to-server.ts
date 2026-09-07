@@ -14,6 +14,8 @@ export interface AiOp {
   value?: string;
   /** Serialized form fields for submit. */
   formData?: Record<string, string>;
+  /** Region containing the control, followed by its ancestor regions. */
+  regionPath?: string[];
 }
 
 export type DragPayloadKind = "text" | "image" | "file" | "desktop-object" | "app-shortcut";

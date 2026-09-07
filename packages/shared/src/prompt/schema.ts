@@ -60,6 +60,7 @@ export type ParsedSyscallBatch = z.infer<typeof syscallBatchSchema>;
 
 /** The fully parsed AI output. */
 export interface ParsedAiOutput {
+  renderError?: string;
   /** Full HTML body (mode 'full'). */
   html?: string;
   /** Region replacements (mode 'regions'). */

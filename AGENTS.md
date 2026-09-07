@@ -77,11 +77,15 @@ This environment injects a broken `NODE_OPTIONS` preload that crashes any
 
 - **AI render modes**: the OS decides a baseline before calling the AI
   (`PromptAssembler.decideRenderMode` → `force-full` | `prefer-incremental`),
-  tells the model, then `streamParser.parseAiOutput` finalizes by what came back:
-  HTML containing only `data-vibeos-region` blocks → incremental patch
-  (`mode:"regions"`), otherwise full replace (`mode:"full"`). Region extraction
-  is depth-aware (handles nested elements) in both `streamParser.ts` and
-  `agents/regionMerge.ts` — do not "simplify" it back to a single regex.
+  and the model declares `<vibeos-html mode="full|regions">`. Legacy unmarked
+  output is still inferred from its region blocks (forced-full operations use
+  the complete body). Region extraction stays depth-aware in `streamParser.ts`
+  and `agents/regionMerge.ts` — do not simplify it to a single regex. Missing,
+  duplicate, overlapping, or malformed region targets trigger one full repair;
+  rejected output has no syscalls. Only first paint streams; existing windows
+  apply a validated, persisted batch. `AiHtmlSurface` replaces target DOM nodes
+  directly while the store retains a complete snapshot. Browser regression:
+  run the command documented in `test/regions.browser.html`.
 - **Per-window scheduling** (`agents/UiGenerationAgent.ts`): different windows
   run in parallel; within one window a new action **preempts** (aborts) the
   in-flight one ("latest wins"). Generation is stateless, so a preempt just
@@ -91,7 +95,8 @@ This environment injects a broken `NODE_OPTIONS` preload that crashes any
   editable inputs are passed through natively (never trigger generation). Forms
   are intercepted in the capture phase so they never reload the page. A click that
   isn't a form submit still collects nearby field values (the AI often omits a
-  `<form>`), so submits carry what was typed.
+  `<form>`), so submits carry what was typed. Operations include `regionPath`
+  (the control's region followed by its ancestors) as model context.
 - **Context menus** (`components/contextmenu/`): OS right-click. `openContextMenu`
   feeds a per-location menu (`menus.tsx`); panels are skin-styled via `.vibe-menu*`
   and submenus use a safety-triangle hover. Don't trigger native browser menus.

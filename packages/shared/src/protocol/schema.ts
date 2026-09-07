@@ -14,6 +14,7 @@ const aiOp = z.object({
   dataset: z.record(z.string(), z.string()).optional(),
   value: z.string().optional(),
   formData: z.record(z.string(), z.string()).optional(),
+  regionPath: z.array(z.string()).optional(),
 });
 
 const dragPayload = z.object({

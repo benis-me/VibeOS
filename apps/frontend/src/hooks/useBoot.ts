@@ -10,7 +10,6 @@ import { useActivityStore } from "@/stores/activityStore";
 import { useChromeStore } from "@/stores/chromeStore";
 import { browserLocale, translate } from "@/lib/i18n";
 import { ulid } from "@vibeos/shared/util";
-import { applyRegions } from "@/lib/patch";
 
 /** Connects the websocket and wires every s2c.* frame into the stores. */
 export function useBoot(): void {
@@ -101,11 +100,11 @@ export function useBoot(): void {
     offs.push(
       wsClient.on("s2c.ui.patch", (p) => {
         const store = useWindowStore.getState();
-        if (p.mode === "full" && p.html !== undefined) {
-          store.setSnapshot(p.windowId, p.html);
-        } else if (p.mode === "regions" && p.regions) {
-          const current = store.snapshots[p.windowId] ?? "";
-          store.setSnapshot(p.windowId, applyRegions(current, p.regions));
+        try {
+          store.applyPatch(p);
+        } catch {
+          // The local tree is out of sync; restore the authoritative snapshot.
+          wsClient.send("c2s.boot.hello", {});
         }
         if (p.done) store.setBusy(p.windowId, false);
       }),

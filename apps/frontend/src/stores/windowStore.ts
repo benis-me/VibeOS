@@ -1,10 +1,13 @@
 import { create } from "zustand";
 import type { WindowState } from "@vibeos/shared";
+import type { UiPatchPayload } from "@vibeos/shared/protocol";
+import { applyRegions } from "@/lib/patch";
 
 interface WindowStoreState {
   windows: Record<string, WindowState>;
   /** Per-window AI HTML snapshot (rendered content). */
   snapshots: Record<string, string>;
+  patches: Record<string, UiPatchPayload>;
   /** Windows currently waiting on an AI response. */
   busy: Record<string, boolean>;
   setAll: (windows: WindowState[], snapshots: Record<string, string>) => void;
@@ -12,19 +15,20 @@ interface WindowStoreState {
   remove: (id: string) => void;
   reorder: (ids: string[]) => void;
   focus: (id: string) => void;
-  setSnapshot: (id: string, html: string) => void;
+  applyPatch: (patch: UiPatchPayload) => void;
   setBusy: (id: string, busy: boolean) => void;
 }
 
 export const useWindowStore = create<WindowStoreState>((set) => ({
   windows: {},
   snapshots: {},
+  patches: {},
   busy: {},
   setAll: (windows, snapshots) =>
     set(() => {
       const map: Record<string, WindowState> = {};
       for (const w of windows) map[w.id] = w;
-      return { windows: map, snapshots };
+      return { windows: map, snapshots, patches: {} };
     }),
   upsert: (w) => set((s) => ({ windows: { ...s.windows, [w.id]: w } })),
   reorder: (ids) =>
@@ -39,11 +43,13 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
     set((s) => {
       const windows = { ...s.windows };
       const snapshots = { ...s.snapshots };
+      const patches = { ...s.patches };
       const busy = { ...s.busy };
       delete windows[id];
       delete snapshots[id];
+      delete patches[id];
       delete busy[id];
-      return { windows, snapshots, busy };
+      return { windows, snapshots, patches, busy };
     }),
   focus: (id) =>
     set((s) => {
@@ -64,6 +70,16 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
       }
       return { windows };
     }),
-  setSnapshot: (id, html) => set((s) => ({ snapshots: { ...s.snapshots, [id]: html } })),
+  applyPatch: (patch) =>
+    set((s) => ({
+      snapshots: {
+        ...s.snapshots,
+        [patch.windowId]:
+          patch.mode === "full"
+            ? (patch.html ?? s.snapshots[patch.windowId] ?? "")
+            : applyRegions(s.snapshots[patch.windowId] ?? "", patch.regions ?? []),
+      },
+      patches: { ...s.patches, [patch.windowId]: patch },
+    })),
   setBusy: (id, busy) => set((s) => ({ busy: { ...s.busy, [id]: busy } })),
 }));

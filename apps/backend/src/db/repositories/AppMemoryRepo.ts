@@ -55,19 +55,30 @@ export function ensureMemory(windowId: string, appId: string): Promise<void> {
   });
 }
 
-export function saveSnapshot(windowId: string, html: string): Promise<void> {
+export function saveSnapshot(
+  windowId: string,
+  html: string,
+  canWrite = () => true,
+): Promise<boolean> {
   return enqueue(() => {
+    if (!canWrite()) return false;
     const db = getDb();
     db.query("UPDATE app_memory SET html_snapshot = ?, updated_at = ? WHERE window_id = ?").run(
       html,
       Date.now(),
       windowId,
     );
+    return true;
   });
 }
 
-export function saveSummary(windowId: string, summary: string): Promise<void> {
+export function saveSummary(
+  windowId: string,
+  summary: string,
+  canWrite = () => true,
+): Promise<void> {
   return enqueue(() => {
+    if (!canWrite()) return;
     const db = getDb();
     db.query("UPDATE app_memory SET episode_summary = ?, updated_at = ? WHERE window_id = ?").run(
       summary,

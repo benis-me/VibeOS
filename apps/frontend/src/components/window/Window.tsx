@@ -3,7 +3,6 @@ import { motion, useReducedMotion } from "motion/react";
 import { Minus, Square, X, Copy, Save } from "lucide-react";
 import type { WindowState } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
-import { useWindowStore } from "@/stores/windowStore";
 import { useAppStore } from "@/stores/appStore";
 import { useWindowDrag } from "@/hooks/useWindowDrag";
 import { AiHtmlSurface } from "./AiHtmlSurface";
@@ -19,7 +18,6 @@ import { windowMenu, appContentMenu } from "@/components/contextmenu/menus";
 // Memoized so dragging/focusing one window doesn't re-render every other
 // window's surface (which would re-inject HTML and stutter the drag).
 export const Window = memo(function Window({ win }: { win: WindowState }) {
-  const html = useWindowStore((s) => s.snapshots[win.id] ?? "");
   const app = useAppStore((s) => s.apps[win.appId]);
   const { onMoveHandle, onResize } = useWindowDrag(win.id);
   const t = useT();
@@ -209,10 +207,10 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
           native(win.id)
         ) : Chrome ? (
           <Chrome windowId={win.id}>
-            <AiHtmlSurface windowId={win.id} html={html} />
+            <AiHtmlSurface windowId={win.id} />
           </Chrome>
         ) : (
-          <AiHtmlSurface windowId={win.id} html={html} />
+          <AiHtmlSurface windowId={win.id} />
         )}
       </div>
 

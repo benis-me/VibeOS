@@ -18,6 +18,29 @@ describe("extractStreamingHtml", () => {
 });
 
 describe("parseAiOutput", () => {
+  test("explicit mode distinguishes a full root region from a region patch", () => {
+    const body = '<main data-vibeos-region="root">new page</main>';
+    expect(parseAiOutput(`<vibeos-html mode="full">${body}</vibeos-html>`).html).toBe(body);
+    expect(parseAiOutput(`<vibeos-html mode="regions">${body}</vibeos-html>`).regions).toEqual([
+      { region: "root", html: body },
+    ]);
+    expect(parseAiOutput(`<vibeos-html>${body}</vibeos-html>`, "full").html).toBe(body);
+    expect(extractStreamingHtml('<vibeos-html mode="full"><main>')).toBe("<main>");
+  });
+
+  test("incomplete or invalid declared patches cannot become a full page", () => {
+    for (const output of [
+      '<vibeos-html mode="regions"><div>not a region</div></vibeos-html>',
+      '<vibeos-html mode="regions"><div data-vibeos-region="a">unfinished',
+      '<vibeos-html mode="unknown"><div>invalid mode</div></vibeos-html>',
+    ]) {
+      const result = parseAiOutput(output);
+      expect(result.renderError).toBeDefined();
+      expect(result.html).toBeUndefined();
+      expect(result.regions).toBeUndefined();
+    }
+  });
+
   test("full body → html mode, with summary + syscalls", () => {
     const out = parseAiOutput(
       `<vibeos-html><div style="padding:8px"><h1>Hi</h1></div></vibeos-html>
