@@ -1,3 +1,4 @@
+import { useSkinStore } from "@/stores/skinStore";
 import { useEffect } from "react";
 import { wsClient } from "@/lib/ws";
 import { useConnectionStore } from "@/stores/connectionStore";
@@ -44,6 +45,7 @@ export function useBoot(): void {
           models: p.models,
           availableProviders: p.availableProviders,
         });
+        useSkinStore.getState().set(p.skins);
         settings.set(p.settings);
         // First boot: no language chosen yet → follow the browser and persist it
         // so AI generation (backend-side) matches the UI language too.
@@ -58,6 +60,11 @@ export function useBoot(): void {
         notif.setAll(p.notifications);
         useActivityStore.getState().setAll(p.agentRuns);
       }),
+    );
+
+    offs.push(
+      wsClient.on("s2c.skin.state", (p) => useSkinStore.getState().set(p)),
+      wsClient.on("s2c.skin.progress", (p) => useSkinStore.getState().progress(p.request)),
     );
 
     offs.push(wsClient.on("s2c.boot.ready", () => conn.setBootPhase("ready")));

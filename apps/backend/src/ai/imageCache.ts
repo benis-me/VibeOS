@@ -26,11 +26,16 @@ function ensureImage(
   aspect: string,
   prompt: string,
   appName = "ImageGen",
+  abort?: AbortSignal,
 ): void {
   if (hasImage(id) || inflight.has(id)) return;
   log.debug(`generating ${id} (${provider}/${model}, ${aspect})`);
   // Track each generation as an AgentRun so it shows in the Activity Monitor.
-  const p = (async () => {
+  const forget = () => {
+    if (inflight.get(id) === p) inflight.delete(id);
+  };
+  let p!: Promise<GeneratedImage>;
+  p = (async () => {
     const run = await AgentRepo.startRun({
       role: "image-generation",
       trigger: "event",
@@ -39,7 +44,20 @@ function ensureImage(
     });
     broadcast("s2c.agent.run", { run });
     try {
-      const r = await generateImage(provider, model, prompt, aspect);
+      let r: GeneratedImage;
+      try {
+        r = await generateImage(provider, model, prompt, aspect, abort);
+      } catch (error) {
+        // Retry one empty/transient response, never bad credentials or cancellation.
+        if (
+          abort?.aborted ||
+          !/no image|image (?:429|5\d\d)|fetch failed|timed out/i.test(String(error))
+        )
+          throw error;
+        log.warn(`retrying image ${id}: ${String(error)}`);
+        r = await generateImage(provider, model, prompt, aspect, abort);
+      }
+      abort?.throwIfAborted();
       await putImage({ id, prompt, model, mime: r.mime, bytes: r.bytes });
       const done = await AgentRepo.endRun(run.id, "ok");
       if (done) broadcast("s2c.agent.run", { run: done });
@@ -47,15 +65,53 @@ function ensureImage(
       return r;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      const done = await AgentRepo.endRun(run.id, "error", msg);
+      const done = await AgentRepo.endRun(run.id, abort?.aborted ? "aborted" : "error", msg);
       if (done) broadcast("s2c.agent.run", { run: done });
       log.warn(`image ${id} failed: ${msg}`);
       throw e;
-    } finally {
-      inflight.delete(id);
     }
-  })();
+  })().finally(() => {
+    forget();
+    abort?.removeEventListener("abort", forget);
+  });
   inflight.set(id, p);
+  abort?.addEventListener("abort", forget, { once: true });
+  void p.catch(() => {}); // Background consumers may never request the image route.
+}
+
+/** A skin publishes only after its image has been generated and persisted. */
+export async function requestSkinImage(
+  provider: string,
+  model: string,
+  prompt: string,
+  aspect: string,
+  signal: AbortSignal,
+): Promise<string> {
+  signal.throwIfAborted();
+  const id = imageId(provider, model, aspect, prompt);
+  if (hasImage(id)) return id;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      ensureImage(id, provider, model, aspect, prompt, "Skins", signal);
+      await new Promise<void>((resolve, reject) => {
+        const stop = () => reject(signal.reason);
+        signal.addEventListener("abort", stop, { once: true });
+        if (signal.aborted) stop();
+        inflight
+          .get(id)!
+          .then(() => resolve(), reject)
+          .finally(() => signal.removeEventListener("abort", stop));
+      });
+      break;
+    } catch (error) {
+      // A different skin may own this shared render. Its cancellation must not
+      // cancel our request: regenerate once after the aborted entry is removed.
+      if (signal.aborted || attempt > 0 || !(error instanceof Error) || error.name !== "AbortError")
+        throw error;
+    }
+  }
+  signal.throwIfAborted();
+  return id;
 }
 
 /** Serve a stored image, or await an in-flight generation for it (then serve). */

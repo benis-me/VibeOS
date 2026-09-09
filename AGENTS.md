@@ -39,10 +39,28 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   (`[CURRENT UI]` in `PromptAssembler`, capped by `VIBEOS_SNAPSHOT_BUDGET`, 0 = no cap).
   Cost is taken from the Claude CLI's reported figure, else estimated from tokens
   (`ai/pricing.ts`) so codebuddy / codex / openrouter still show cost.
-- **Skins.** `Settings.skin` (`devdock` | `xp` | `aqua`) sets `data-skin` on `<html>`;
-  skins are pure CSS over the design tokens + `.vibe-*` chrome hooks, so the OS chrome
-  AND the AI content re-skin live. The agent is **not** told the skin — keep generated
-  HTML skin-neutral (token-based) so any app re-skins on switch.
+- **Skins.** Built-ins (`devdock` / `xp` / `aqua`) are immutable. The native **Skins**
+  app creates blank custom skins (no built-in foundation), duplicates a selected
+  skin's active appearance, and generates versions through `ai/skins.ts` and
+  `SdkManager.run()`. Tasks belong to skins, not windows/sockets; boot marks unfinished
+  requests interrupted. Only validated successful output creates and auto-activates
+  an immutable version. Selecting an old version changes the next request's base.
+  `packages/shared/src/domain/skins.ts` is the own token/target/property contract;
+  never accept model-supplied selectors, arbitrary CSS or executable content. Optional
+  chrome geometry and named image assets extend v1 compatibly. Color tokens cannot
+  contain gradients in new output. Text generation includes a craft review; asset
+  requests reuse `imageCache.ts` and await persistence before publishing. Only existing
+  unchanged assets may reuse IDs. Preserve request ancestry and intent on refinements;
+  generic app HTML image instructions must not be appended to skin JSON prompts.
+  Titlebar/taskbar images use the dedicated inert material layer with low opacity;
+  `font-title` connects window and taskbar names. `.vibeskin` packages contain the
+  selected definition and raster image bytes. Imports validate all content before
+  writes, remap IDs from image bytes, and create an independent editable skin.
+  Definitions live at `disk/System/Skins/<id>/initial.json` and `Versions/<id>.json`;
+  SQLite indexes versions, active selection and conversation/progress. The frontend
+  applies scoped CSS live without regenerating app HTML. A copied built-in retains
+  its immutable packaged chrome, with independent token/rule overrides. **App UI**
+  agents are not told the skin: generated HTML stays token-based and skin-neutral.
 - **i18n (zh / en).** `Settings.locale` drives both the native UI (frontend dictionary in
   `lib/i18n.ts`, `useT()`) and generated content (`localeDirective()` appended to every
   system prompt in `SdkManager`). Undefined locale ⇒ frontend follows the browser and

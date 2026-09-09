@@ -2,9 +2,10 @@ import type { ServerWebSocket } from "bun";
 import type { ClientToServerPayload } from "@vibeos/shared/protocol";
 import { executeDisk, diskError, diskPath } from "../files/disk.ts";
 import { broadcast, sendTo, type WsData } from "./wsGateway.ts";
-import { lstatSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
-import { fileMediaType } from "@vibeos/shared/domain";
+import { fileMediaType, MAX_SKIN_PACKAGE_BYTES } from "@vibeos/shared/domain";
+import { handleSkinCommand } from "../ai/skins.ts";
 import { allowedOrigin } from "./requestOrigin.ts";
 import { mutateDisk, syncDesktopFiles } from "../db/repositories/VfsRepo.ts";
 import { readShortcut } from "../files/shortcuts.ts";
@@ -21,9 +22,17 @@ import {
 /** Shared file dispatch: native viewers for content, normal app launch for shortcuts. */
 export async function openDiskFile(path: string) {
   const absolute = diskPath(path);
-  if (!lstatSync(absolute).isFile()) throw new Error("notFile");
+  const info = lstatSync(absolute);
+  if (!info.isFile()) throw new Error("notFile");
+  const skinFile = path.toLowerCase().endsWith(".vibeskin");
+  if (skinFile) {
+    if (info.size > MAX_SKIN_PACKAGE_BYTES) throw new Error("skins.error.packageSize");
+    await handleSkinCommand({ action: "import", json: readFileSync(absolute, "utf8") });
+  }
   const shortcut = path.toLowerCase().endsWith(".vibelink") ? readShortcut(absolute) : undefined;
-  const appId = shortcut?.appId ?? (fileMediaType(path) ? "media-viewer" : "text-viewer");
+  const appId = skinFile
+    ? "skins"
+    : (shortcut?.appId ?? (fileMediaType(path) ? "media-viewer" : "text-viewer"));
   const app = getApp(appId);
   if (!app?.isInstalled) throw new Error("missingApp");
   const existing = app.manifest.singleInstance ? findOpenWindowByApp(appId) : null;
@@ -34,14 +43,14 @@ export async function openDiskFile(path: string) {
   }
   const window = await openWindow({
     appId,
-    title: shortcut ? app.name : basename(path),
+    title: shortcut || skinFile ? app.name : basename(path),
     kind: app.presetId ? "system" : "app",
     size: app.manifest.defaultSize,
-    filePath: shortcut ? undefined : path,
+    filePath: shortcut || skinFile ? undefined : path,
   });
   await ensureMemory(window.id, appId);
   broadcast("s2c.window.opened", { window });
-  if (shortcut) await renderInitialWindow(window.id, app);
+  if (shortcut || skinFile) await renderInitialWindow(window.id, app);
   return window;
 }
 

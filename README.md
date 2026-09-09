@@ -26,6 +26,27 @@ next — as if it were a real program responding.
   (the native minimal theme), **Windows XP "Luna"**, and **Mac OS X "Aqua"**. Skins
   are pure CSS over design tokens, so the OS chrome *and* the AI-generated content
   both re-skin instantly — independent of light/dark.
+- **AI Skin Studio** — the native **Skins** app manages custom skins with a dropdown
+  and a prompt conversation. Create a blank skin from VibeOS primitives, or duplicate
+  any skin's current appearance. Built-ins stay read-only. Generation continues when
+  its window/browser closes; each successful result saves and immediately applies a
+  new version. Pick an older version to restore it and continue designing from there.
+  Failed/cancelled requests preserve the active version; backend restarts mark in-flight
+  requests interrupted and retain the prompt for retry. No external theme framework:
+  AI uses our [token and chrome contract](packages/shared/src/domain/skins.ts), with a
+  design pass followed by a craft review. The selected version's original brief stays
+  in context. Skins can define chrome proportions, layered materials and generated
+  wallpaper/texture/frame images using the configured image model. Images must finish
+  before publication; failed image generation preserves the active version.
+  Skin files are stored under `~/.vibeos/disk/System/Skins/`; conversation, progress and
+  version indexes are in the runtime database. Generated images are reused from
+  `disk/Medias/Images/` across versions and copies. Deletion archives skin definitions
+  in Trash and retains shared images. A skin's desktop background takes precedence
+  while selected; switching away restores the user's wallpaper. The Import/Export
+  menu exports the selected appearance and embedded images as a `.vibeskin` file to
+  Desktop. Import via Skins or open the package in Files to create an independent,
+  editable skin; conversations and version history are not included in the package.
+
 - **OS context menus** — right-click anywhere. Menus differ by location (desktop,
   window title bar, app content, taskbar, taskbar item), submenus follow the
   "safety triangle" aim, and the styling follows the active skin.

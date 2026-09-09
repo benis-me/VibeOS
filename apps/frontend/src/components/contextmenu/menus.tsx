@@ -1,3 +1,4 @@
+import { useSkinStore } from "@/stores/skinStore";
 import {
   Search,
   AppWindow,
@@ -61,24 +62,13 @@ export function desktopMenu(o: {
       label: o.t("settings.cat.appearance"),
       icon: <Palette size={15} />,
       items: [
-        {
-          type: "item",
-          label: o.t("settings.skin.default"),
-          checked: o.skin === "devdock",
-          onSelect: () => setPref({ skin: "devdock" }),
-        },
-        {
-          type: "item",
-          label: "Windows XP",
-          checked: o.skin === "xp",
-          onSelect: () => setPref({ skin: "xp" }),
-        },
-        {
-          type: "item",
-          label: "Mac Aqua",
-          checked: o.skin === "aqua",
-          onSelect: () => setPref({ skin: "aqua" }),
-        },
+        ...useSkinStore.getState().skins.map((skin) => ({
+          type: "item" as const,
+          label: skin.name,
+          checked: o.skin === skin.id,
+          onSelect: () => setPref({ skin: skin.id }),
+        })),
+        { type: "item", label: o.t("skins.manage"), onSelect: () => openApp("skins") },
         { type: "separator" },
         {
           type: "item",

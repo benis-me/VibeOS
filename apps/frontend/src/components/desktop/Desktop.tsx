@@ -75,7 +75,7 @@ export function Desktop() {
 
   return (
     <div
-      className="relative h-full w-full overflow-hidden bg-desktop"
+      className="vibe-desktop relative h-full w-full overflow-hidden bg-desktop"
       onContextMenu={(e) =>
         openContextMenu(
           e,
@@ -93,7 +93,7 @@ export function Desktop() {
       {/* Base wallpaper gradient — also the fallback shown while a custom/AI
           wallpaper is still loading or generating. */}
       <div
-        className="pointer-events-none absolute inset-0"
+        className="vibe-wallpaper pointer-events-none absolute inset-0"
         style={{
           background:
             "radial-gradient(120% 120% at 80% 0%, color-mix(in oklab, var(--brand) 14%, transparent), transparent 60%)",
@@ -105,11 +105,11 @@ export function Desktop() {
       {wallpaperUrl && (
         <>
           <div
-            className="pointer-events-none absolute inset-0 bg-cover bg-center"
+            className="vibe-wallpaper pointer-events-none absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: `url("${wallpaperUrl}")` }}
           />
           {/* Subtle scrim keeps desktop icon labels legible over any image. */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/25" />
+          <div className="vibe-wallpaper pointer-events-none absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/25" />
         </>
       )}
 

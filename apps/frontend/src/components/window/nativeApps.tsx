@@ -1,3 +1,4 @@
+import { SkinsApp } from "@/components/skins/SkinsApp";
 import type { PresetAppId } from "@vibeos/shared";
 import { SettingsApp } from "@/components/settings/SettingsApp";
 import { ActivityMonitorApp } from "@/components/activity/ActivityMonitorApp";
@@ -16,6 +17,7 @@ export const NATIVE_APPS: Partial<Record<PresetAppId, (windowId: string) => Reac
   "file-manager": (windowId) => <FilesApp windowId={windowId} />,
   "text-viewer": (windowId) => <FileViewerApp windowId={windowId} />,
   "media-viewer": (windowId) => <FileViewerApp windowId={windowId} media />,
+  skins: () => <SkinsApp />,
   settings: () => <SettingsApp />,
   "activity-monitor": () => <ActivityMonitorApp />,
   "app-store": () => <AppStoreApp />,

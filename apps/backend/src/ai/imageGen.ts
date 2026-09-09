@@ -42,13 +42,15 @@ const falSize = (a: string) =>
       ? "portrait_16_9"
       : "square_hd";
 
-async function fromUrlOrData(url: string): Promise<GeneratedImage> {
+async function fromUrlOrData(url: string, abort?: AbortSignal): Promise<GeneratedImage> {
   if (url.startsWith("data:")) {
     const m = url.match(/^data:([^;]+);base64,(.*)$/);
     if (!m?.[1] || !m[2]) throw new Error("malformed data URL");
     return { bytes: Buffer.from(m[2], "base64"), mime: m[1] };
   }
-  const r = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  const r = await fetch(url, {
+    signal: AbortSignal.any([AbortSignal.timeout(30_000), ...(abort ? [abort] : [])]),
+  });
   if (!r.ok) throw new Error(`image fetch ${r.status}`);
   return {
     bytes: new Uint8Array(await r.arrayBuffer()),
@@ -67,13 +69,15 @@ export async function generateImage(
   model: string,
   prompt: string,
   aspect: string,
+  abort?: AbortSignal,
 ): Promise<GeneratedImage> {
+  abort?.throwIfAborted();
   // CodeBuddy is a local CLI: its ImageGen tool writes a file we then read.
-  if (provider === "codebuddy") return codebuddyImage(model, prompt, aspect);
+  if (provider === "codebuddy") return codebuddyImage(model, prompt, aspect, abort);
 
   const { apiKey, baseUrl } = providerConfig(provider as ProviderId);
   if (!apiKey) throw new Error(`No API key for ${provider}`);
-  const signal = AbortSignal.timeout(90_000);
+  const signal = AbortSignal.any([AbortSignal.timeout(90_000), ...(abort ? [abort] : [])]);
   const json = { "Content-Type": "application/json" };
 
   if (provider === "openai") {
@@ -104,12 +108,21 @@ export async function generateImage(
     if (!res.ok)
       throw new Error(`gemini image ${res.status}: ${short(await res.text().catch(() => ""))}`);
     const j = (await res.json()) as {
+      promptFeedback?: { blockReason?: string };
       candidates?: Array<{
+        finishReason?: string;
         content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string } }> };
       }>;
     };
     const part = j.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
-    if (!part?.inlineData?.data) throw new Error("gemini: no image data");
+    if (!part?.inlineData?.data) {
+      const reason = j.promptFeedback?.blockReason ?? j.candidates?.[0]?.finishReason;
+      throw new Error(
+        reason && /SAFETY|PROHIBITED|BLOCK|RECITATION/i.test(reason)
+          ? `gemini image blocked: ${reason}`
+          : `gemini: no image data (${reason ?? "empty response"})`,
+      );
+    }
     return {
       bytes: Buffer.from(part.inlineData.data, "base64"),
       mime: part.inlineData.mimeType ?? "image/png",
@@ -134,7 +147,7 @@ export async function generateImage(
     };
     const url = j.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     if (!url) throw new Error("openrouter: no image returned");
-    return fromUrlOrData(url);
+    return fromUrlOrData(url, signal);
   }
 
   if (provider === "fal") {
@@ -149,7 +162,7 @@ export async function generateImage(
     const j = (await res.json()) as { images?: Array<{ url?: string }> };
     const url = j.images?.[0]?.url;
     if (!url) throw new Error("fal: no image returned");
-    return fromUrlOrData(url);
+    return fromUrlOrData(url, signal);
   }
 
   throw new Error(`Image generation not supported for provider "${provider}"`);
@@ -165,6 +178,7 @@ async function codebuddyImage(
   model: string,
   prompt: string,
   aspect: string,
+  abort?: AbortSignal,
 ): Promise<GeneratedImage> {
   const dir = join(env.diskDir, "Cache", `vibeos-img-${randomUUID()}`);
   await mkdir(dir, { recursive: true, mode: 0o700 });
@@ -187,13 +201,13 @@ async function codebuddyImage(
       `Do nothing else and do not ask questions.`,
   );
   const proc = Bun.spawn(["codebuddy", ...args], { stdout: "ignore", stderr: "ignore" });
-  const timer = setTimeout(() => proc.kill(), 150_000);
+  const stop = () => proc.kill();
+  abort?.addEventListener("abort", stop, { once: true });
+  if (abort?.aborted) stop();
+  const timer = setTimeout(stop, 150_000);
   try {
     await proc.exited;
-  } finally {
-    clearTimeout(timer);
-  }
-  try {
+    abort?.throwIfAborted();
     const files = (await readdir(dir)).filter((f) => /\.(png|jpe?g|webp)$/i.test(f));
     const file = files[0];
     if (!file) throw new Error("codebuddy ImageGen produced no image");
@@ -205,6 +219,8 @@ async function codebuddyImage(
         : "image/jpeg";
     return { bytes, mime };
   } finally {
+    clearTimeout(timer);
+    abort?.removeEventListener("abort", stop);
     void rm(dir, { recursive: true, force: true }).catch(() => {});
   }
 }

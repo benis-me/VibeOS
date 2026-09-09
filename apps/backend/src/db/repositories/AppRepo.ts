@@ -111,6 +111,18 @@ const PRESETS: Array<{ id: PresetAppId; name: string; icon: string; manifest: Ap
     },
   },
   {
+    id: "skins",
+    name: "Skins",
+    icon: "palette",
+    manifest: {
+      description: "Create, generate and manage VibeOS skins and their versions.",
+      category: "system",
+      defaultSize: { w: 680, h: 600 },
+      minSize: { w: 520, h: 420 },
+      singleInstance: true,
+    },
+  },
+  {
     id: "settings",
     name: "Settings",
     icon: "settings",

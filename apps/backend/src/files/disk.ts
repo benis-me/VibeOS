@@ -236,22 +236,8 @@ export function executeDisk(command: DiskCommand): DiskResult {
         });
       return { path: command.destination };
     }
-    case "trash": {
-      const id = randomUUID();
-      const container = diskPath(`Trash/${id}`, true);
-      mkdirSync(container, { recursive: true, mode: 0o700 });
-      try {
-        writeFileSync(join(container, "info.json"), JSON.stringify({ path: command.path }), {
-          flag: "wx",
-          mode: 0o600,
-        });
-        renameSync(path, join(container, "item"));
-      } catch (error) {
-        rmSync(container, { recursive: true });
-        throw error;
-      }
-      return { path: id };
-    }
+    case "trash":
+      return trashContent(command.path);
   }
 }
 
@@ -286,4 +272,22 @@ export function watchDisk(changed: () => void): void {
   });
   watcher.on("error", (error) => console.warn("[files] watch failed", error.message));
   watcher.unref();
+}
+
+/** Internal repositories may archive their own protected system content. Never exposed as a file command. */
+export function trashContent(relativePath: string): DiskResult {
+  const id = randomUUID();
+  const container = diskPath(`Trash/${id}`, true);
+  mkdirSync(container, { recursive: true, mode: 0o700 });
+  try {
+    writeFileSync(join(container, "info.json"), JSON.stringify({ path: relativePath }), {
+      flag: "wx",
+      mode: 0o600,
+    });
+    renameSync(diskPath(relativePath, true), join(container, "item"));
+  } catch (error) {
+    rmSync(container, { recursive: true });
+    throw error;
+  }
+  return { path: id };
 }

@@ -1,3 +1,4 @@
+import { recoverSkins } from "../db/repositories/SkinRepo.ts";
 import { getDb } from "../db/database.ts";
 import { migrate } from "../db/migrate.ts";
 import { recordBoot } from "../db/repositories/KernelRepo.ts";
@@ -27,6 +28,7 @@ export async function boot() {
   await migrateSystemDisk(backup);
 
   const settings = await ensureSettings();
+  await recoverSkins();
   await seedPresets();
   await syncDesktopFiles();
 

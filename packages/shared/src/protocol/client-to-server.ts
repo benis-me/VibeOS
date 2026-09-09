@@ -1,3 +1,4 @@
+import type { SkinCommand } from "../domain/skins.ts";
 import type { ProfileChange, ProviderId, Settings } from "../domain/settings.ts";
 import type { VfsLocation } from "../domain/vfs.ts";
 import type { WindowSize } from "../domain/window.ts";
@@ -37,6 +38,7 @@ export interface DropTarget {
 }
 
 export type ClientToServer =
+  | { type: "c2s.skin.command"; payload: { requestId: string; command: SkinCommand } }
   | { type: "c2s.files.request"; payload: { requestId: string; command: FileRequestCommand } }
   | { type: "c2s.boot.hello"; payload: { clientId?: string } }
   | { type: "c2s.op"; payload: { windowId: string; op: AiOp } }

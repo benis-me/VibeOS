@@ -1,3 +1,4 @@
+import { useSkinStore } from "@/stores/skinStore";
 import { useMemo, useState } from "react";
 import { Reorder } from "motion/react";
 import { LayoutGrid, Bell } from "lucide-react";
@@ -32,7 +33,10 @@ export function Taskbar({
     [windowMap],
   );
   const apps = useAppStore((s) => s.apps);
-  const skin = useSettingsStore((s) => s.settings?.skin ?? "devdock");
+  const selectedSkin = useSettingsStore((s) => s.settings?.skin ?? "devdock");
+  const skin = useSkinStore(
+    (s) => s.skins.find((skin) => skin.id === selectedSkin)?.foundation ?? selectedSkin,
+  );
   const unread = useNotificationStore((s) => s.notifications.filter((n) => !n.read).length);
   // XP keeps its iconic "start"; the macOS-style Default/Aqua docks say "Apps".
   const startLabel = skin === "xp" ? t("taskbar.start") : t("taskbar.apps");

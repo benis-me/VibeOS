@@ -1,7 +1,8 @@
 export type Theme = "light" | "dark";
 
 /** Visual skin / design language. Orthogonal to {@link Theme} (light/dark). */
-export type Skin = "devdock" | "xp" | "aqua";
+import type { Skin } from "./skins.ts";
+export type { Skin } from "./skins.ts";
 
 export const DEFAULT_SKIN: Skin = "devdock";
 

@@ -1,3 +1,4 @@
+import { useSkinStore } from "@/stores/skinStore";
 import { useEffect, useRef, useState } from "react";
 import { Sun, Moon, Languages, Upload, Sparkles, Loader2 } from "lucide-react";
 import type { Locale, Skin } from "@vibeos/shared";
@@ -10,6 +11,7 @@ import { Pane, GroupLabel, Group, Row, Select, Segmented, Switch } from "./primi
 export function GeneralPane() {
   const t = useT();
   const locale = useLocale();
+  const skins = useSkinStore((s) => s.skins);
   const theme = useSettingsStore((s) => s.settings?.theme ?? "dark");
   const skin = useSettingsStore((s) => s.settings?.skin ?? "devdock");
   const proactive = useSettingsStore((s) => s.settings?.prefs.proactiveAgents !== false);
@@ -45,10 +47,18 @@ export function GeneralPane() {
         </Row>
         <Row label={t("settings.skin")}>
           <Select value={skin} onChange={(v) => setSkin(v as Skin)}>
-            <option value="devdock">{t("settings.skin.default")}</option>
-            <option value="xp">Windows XP</option>
-            <option value="aqua">Mac Aqua</option>
+            {skins.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
           </Select>
+          <button
+            className="vibe-btn ml-2 rounded-md border px-2 py-1 text-xs hover:bg-accent"
+            onClick={() => wsClient.send("c2s.window.open", { appId: "skins" })}
+          >
+            {t("skins.manage")}
+          </button>
         </Row>
         <WallpaperRow />
       </Group>
@@ -212,7 +222,11 @@ function WallpaperRow() {
               ) : (
                 <Sparkles className="size-3.5" />
               )}
-              {t(busy === "generate" ? "settings.wallpaper.generating" : "settings.wallpaper.generate")}
+              {t(
+                busy === "generate"
+                  ? "settings.wallpaper.generating"
+                  : "settings.wallpaper.generate",
+              )}
             </button>
           </div>
           {!imageOn && (

@@ -1,3 +1,5 @@
+import { handleSkinCommand } from "../ai/skins.ts";
+import { skinState } from "../db/repositories/SkinRepo.ts";
 import type { ServerWebSocket } from "bun";
 import { dirname } from "node:path";
 import pkg from "../../package.json";
@@ -83,7 +85,12 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): P
     sendTo(ws, "s2c.error", { code: "bad_message", detail: String(env.type) });
     return;
   }
-  log.debug(`◀ ${msg.type}`, msg.payload);
+  log.debug(
+    `◀ ${msg.type}`,
+    msg.type === "c2s.skin.command" && msg.payload.command.action === "import"
+      ? { action: "import", bytes: Buffer.byteLength(msg.payload.command.json) }
+      : msg.payload,
+  );
   const t0 = performance.now();
   try {
     await dispatch(ws, msg);
@@ -99,6 +106,18 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): P
 
 async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promise<void> {
   switch (msg.type) {
+    case "c2s.skin.command": {
+      try {
+        const skinId = await handleSkinCommand(msg.payload.command);
+        sendTo(ws, "s2c.skin.result", { requestId: msg.payload.requestId, skinId });
+      } catch (error) {
+        sendTo(ws, "s2c.skin.result", {
+          requestId: msg.payload.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    }
     case "c2s.files.request":
       return handleFilesRequest(ws, msg.payload);
     case "c2s.boot.hello":
@@ -413,6 +432,7 @@ function sendBootState(ws: ServerWebSocket<WsData>): void {
     version: pkg.version,
     bootCount: kernelState.bootCount,
     settings: loadSettings(),
+    skins: skinState(),
     windows,
     apps: listApps(),
     desktopNodes: listByLocation("desktop"),

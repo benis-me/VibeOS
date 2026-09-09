@@ -1,5 +1,7 @@
+import { applySkin } from "./skinStore";
+export { applySkin } from "./skinStore";
 import { create } from "zustand";
-import type { Settings, Theme, Locale, Skin } from "@vibeos/shared";
+import type { Settings, Theme, Locale } from "@vibeos/shared";
 import { DEFAULT_SKIN } from "@vibeos/shared";
 
 interface SettingsStoreState {
@@ -25,8 +27,4 @@ export function applyTheme(theme: Theme): void {
 
 export function applyLocale(locale: Locale): void {
   document.documentElement.lang = locale === "en" ? "en" : "zh-CN";
-}
-
-export function applySkin(skin: Skin): void {
-  document.documentElement.dataset.skin = skin;
 }

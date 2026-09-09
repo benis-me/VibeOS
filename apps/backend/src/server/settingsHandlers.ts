@@ -1,3 +1,5 @@
+import { activateSkin } from "../db/repositories/SkinRepo.ts";
+import { broadcastSkins } from "../ai/skins.ts";
 import type { ServerWebSocket } from "bun";
 import type { ClientToServerPayload } from "@vibeos/shared/protocol";
 import { broadcast, sendTo, type WsData } from "./wsGateway.ts";
@@ -27,7 +29,10 @@ export async function handleSettingsUpdate(
   p: ClientToServerPayload<"c2s.settings.update">,
 ): Promise<void> {
   const prevProvider = activeProviderId();
-  const settings = await updateSettings(p.partial);
+  const { skin, ...partial } = p.partial;
+  if (skin !== undefined) await activateSkin(skin);
+  const settings = await updateSettings(partial);
+  if (skin !== undefined) broadcastSkins();
   broadcast("s2c.settings.changed", { settings });
 
   if (p.partial.provider && settings.provider !== prevProvider) {

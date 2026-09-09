@@ -98,6 +98,7 @@ export async function run(opts: RunOptions): Promise<RunResult> {
   const settings = loadSettings();
   const locale = settings.locale ?? DEFAULT_LOCALE;
   const imageOn =
+    !opts.systemPromptOverride &&
     opts.role === "ui-generation" &&
     !!settings.prefs.imageModel?.provider &&
     !!settings.prefs.imageModel?.model;
@@ -191,6 +192,23 @@ export async function run(opts: RunOptions): Promise<RunResult> {
 
 /** Deterministic offline stub so the OS is usable without any provider. */
 function stubResponse(role: AgentRole, prompt: string): string {
+  if (prompt.startsWith("[VIBEOS_SKIN_REQUEST]"))
+    return JSON.stringify({
+      summary: "Offline sample skin / 离线示例皮肤",
+      definition: {
+        format: 1,
+        light: { brand: "#28665a", "brand-foreground": "#ffffff", desktop: "#dbe9e3" },
+        dark: { brand: "#84cbb3", "brand-foreground": "#11251e", desktop: "#10251e" },
+        rules: [
+          {
+            target: "titlebar",
+            state: "default",
+            mode: "both",
+            styles: { background: "var(--card)" },
+          },
+        ],
+      },
+    });
   if (role === "ui-generation") {
     const isFirst = prompt.includes("just launched");
     if (isFirst) {

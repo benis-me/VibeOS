@@ -1,3 +1,4 @@
+import type { SkinState, SkinRequest, Skin } from "../domain/skins.ts";
 import type { WindowSize, WindowState } from "../domain/window.ts";
 import type { AppDescriptor } from "../domain/app.ts";
 import type { VfsNode } from "../domain/vfs.ts";
@@ -31,6 +32,7 @@ export interface BootStatePayload {
   version: string;
   bootCount: number;
   settings: Settings;
+  skins: SkinState;
   windows: WindowState[];
   apps: AppDescriptor[];
   desktopNodes: VfsNode[];
@@ -65,6 +67,9 @@ export interface UiPatchPayload {
 }
 
 export type ServerToClient =
+  | { type: "s2c.skin.state"; payload: SkinState }
+  | { type: "s2c.skin.progress"; payload: { request: SkinRequest } }
+  | { type: "s2c.skin.result"; payload: { requestId: string; skinId?: Skin; error?: string } }
   | { type: "s2c.files.result"; payload: { requestId: string; result: DiskResult } }
   | { type: "s2c.files.changed"; payload: Record<string, never> }
   | { type: "s2c.boot.state"; payload: BootStatePayload }

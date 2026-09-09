@@ -4,6 +4,7 @@ export type PresetAppId =
   | "file-manager"
   | "text-viewer"
   | "media-viewer"
+  | "skins"
   | "settings"
   | "activity-monitor"
   | "app-store"
@@ -17,6 +18,7 @@ export const NATIVE_PRESET_APPS: PresetAppId[] = [
   "file-manager",
   "text-viewer",
   "media-viewer",
+  "skins",
   "settings",
   "activity-monitor",
   "app-store",
