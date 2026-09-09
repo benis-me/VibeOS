@@ -1,4 +1,4 @@
-import type { ProviderId, Settings } from "../domain/settings.ts";
+import type { ProfileChange, ProviderId, Settings } from "../domain/settings.ts";
 import type { VfsLocation } from "../domain/vfs.ts";
 
 /** A delegated event from inside an AI-generated window surface. */
@@ -61,7 +61,8 @@ export type ClientToServer =
       };
     }
   | { type: "c2s.vfs.open"; payload: { nodeId: string } }
-  | { type: "c2s.settings.update"; payload: { partial: Partial<Settings> } }
+  | { type: "c2s.settings.update"; payload: { partial: Partial<Omit<Settings, "profileEntries">> } }
+  | { type: "c2s.profile.update"; payload: ProfileChange }
   /** Set the desktop wallpaper from an uploaded image (a data: URL). */
   | { type: "c2s.wallpaper.upload"; payload: { dataUrl: string } }
   /** Generate a desktop wallpaper with the configured image model. */

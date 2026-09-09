@@ -168,7 +168,7 @@ async function generate(
     firstRender,
     renderMode,
     regionIds,
-    userProfile: loadSettings().userProfile,
+    profileEntries: loadSettings().profileEntries,
   });
 
   const reason = firstRender

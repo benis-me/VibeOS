@@ -144,13 +144,16 @@ export function Segmented<T extends string>({
 export function Switch({
   checked,
   onChange,
+  label,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
+  label?: string;
 }) {
   return (
     <button
       role="switch"
+      aria-label={label}
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={cn(

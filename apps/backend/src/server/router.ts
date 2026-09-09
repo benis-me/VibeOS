@@ -15,6 +15,7 @@ import * as Syscalls from "../syscall/SyscallInterpreter.ts";
 import { handleAppLaunch, handleAppSave, handleAppExport, handleAppImport } from "./appHandlers.ts";
 import {
   handleSettingsUpdate,
+  handleProfileUpdate,
   handleProviderScan,
   handleProviderFetchModels,
   handleWallpaperUpload,
@@ -184,6 +185,9 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
 
     case "c2s.settings.update":
       return handleSettingsUpdate(msg.payload);
+
+    case "c2s.profile.update":
+      return handleProfileUpdate(msg.payload);
 
     case "c2s.wallpaper.upload":
       return handleWallpaperUpload(ws, msg.payload);

@@ -336,6 +336,19 @@ export interface Preferences {
   [key: string]: unknown;
 }
 
+export interface ProfileEntry {
+  id: string;
+  content: string;
+  enabled: boolean;
+}
+
+/** Per-entry intents keep independent edits/toggles from overwriting the whole list. */
+export type ProfileChange =
+  | { action: "save"; id?: string; content: string }
+  | { action: "toggle"; id: string; enabled: boolean }
+  | { action: "remove"; id: string }
+  | { action: "disable-all" };
+
 export interface Settings {
   theme: Theme;
   /** Visual skin / design language (separate from light/dark). */
@@ -348,12 +361,8 @@ export interface Settings {
    * persists its choice on first boot.
    */
   locale?: Locale;
-  /**
-   * Free-text profile the user writes about themselves (name, preferences,
-   * recurring projects). Injected into every generation so hallucinated apps
-   * feel personalized and coherent across windows.
-   */
-  userProfile?: string;
+  /** User-written personalization. Only enabled entries are sent with UI generation. */
+  profileEntries: ProfileEntry[];
   modelOverrides: ModelPolicyOverrides;
   /** Per-API-provider config (key + base url + models), keyed by provider id. */
   apiProviders: Record<string, ApiProviderConfig>;

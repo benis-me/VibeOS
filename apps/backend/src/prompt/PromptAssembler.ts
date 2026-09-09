@@ -1,4 +1,4 @@
-import type { AppDescriptor } from "@vibeos/shared/domain";
+import type { AppDescriptor, ProfileEntry } from "@vibeos/shared/domain";
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import type { AppMemory, Interaction } from "@vibeos/shared/domain";
 import { presetHint } from "./presetTemplates.ts";
@@ -32,8 +32,8 @@ export interface AssembleInput {
   renderMode: RenderMode;
   /** The data-vibeos-region ids present in the current snapshot (for incremental). */
   regionIds?: string[];
-  /** OS-level user profile, injected so apps feel personalized. */
-  userProfile?: string;
+  /** Only enabled entries are included; an empty/disabled list adds no profile context. */
+  profileEntries?: readonly ProfileEntry[];
 }
 
 /**
@@ -66,7 +66,7 @@ export function assemblePrompt(input: AssembleInput): string {
     firstRender,
     renderMode,
     regionIds,
-    userProfile,
+    profileEntries,
   } = input;
   const parts: string[] = [];
 
@@ -74,9 +74,10 @@ export function assemblePrompt(input: AssembleInput): string {
   if (windowSize) gs.windowSize = `${Math.round(windowSize.w)}x${Math.round(windowSize.h)}px`;
   parts.push(`[GLOBAL STATE]\n${JSON.stringify(gs, null, 0)}`);
 
-  if (userProfile?.trim()) {
+  const enabledProfiles = (profileEntries ?? []).filter((e) => e.enabled && e.content.trim());
+  if (enabledProfiles.length) {
     parts.push(
-      `[USER PROFILE]\nWhat the user told us about themselves — tailor content to it (don't echo it verbatim):\n${truncate(userProfile.trim(), 800)}`,
+      `[USER PROFILE]\nPreferences the user enabled — apply where relevant (don't echo them verbatim):\n${enabledProfiles.map((e, i) => `${i + 1}. ${e.content.trim()}`).join("\n\n")}`,
     );
   }
 

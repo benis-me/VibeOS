@@ -1,5 +1,13 @@
-import type { Settings, ProviderId, Locale, Skin } from "@vibeos/shared/domain";
+import type {
+  Settings,
+  ProviderId,
+  Locale,
+  Skin,
+  ProfileEntry,
+  ProfileChange,
+} from "@vibeos/shared/domain";
 import { AI_PROVIDERS, DEFAULT_PROVIDER } from "@vibeos/shared/domain";
+import { ulid } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
 import { enqueue } from "./writeQueue.ts";
 
@@ -9,7 +17,7 @@ interface SettingsRow {
   provider: string | null;
   locale: string | null;
   skin: string | null;
-  user_profile: string | null;
+  profile_entries_json: string;
   model_overrides_json: string;
   api_providers_json: string | null;
   prefs_json: string;
@@ -33,6 +41,7 @@ function asSkin(v: string | null | undefined): Skin | undefined {
 const DEFAULTS: Settings = {
   theme: "dark",
   provider: DEFAULT_PROVIDER,
+  profileEntries: [],
   modelOverrides: {},
   apiProviders: {},
   prefs: { proactiveAgents: true },
@@ -51,12 +60,13 @@ export function loadSettings(): Settings {
     .query<SettingsRow, [string]>("SELECT * FROM settings WHERE id = ?")
     .get(SETTINGS_ID);
   if (!row) return { ...DEFAULTS };
+  const entries = safeJson<ProfileEntry[]>(row.profile_entries_json);
   cached = {
     theme: row.theme === "light" ? "light" : "dark",
     provider: asProvider(row.provider),
     locale: asLocale(row.locale),
     skin: asSkin(row.skin),
-    userProfile: row.user_profile ?? undefined,
+    profileEntries: Array.isArray(entries) ? entries : [],
     modelOverrides: safeJson(row.model_overrides_json),
     apiProviders: safeJson(row.api_providers_json ?? "{}"),
     prefs: safeJson(row.prefs_json),
@@ -91,10 +101,13 @@ export function ensureSettings(): Promise<Settings> {
   });
 }
 
-export function updateSettings(partial: Partial<Settings>): Promise<Settings> {
+export function updateSettings(
+  update: Partial<Settings> | ((current: Settings) => Partial<Settings>),
+): Promise<Settings> {
   return enqueue(() => {
     const db = getDb();
     const current = loadSettings();
+    const partial = typeof update === "function" ? update(current) : update;
     // Deep-merge per-role model config so updating one field (e.g. effort)
     // doesn't wipe the rest of that role's config.
     const mergedOverrides = { ...current.modelOverrides };
@@ -115,20 +128,20 @@ export function updateSettings(partial: Partial<Settings>): Promise<Settings> {
       provider: partial.provider ?? current.provider,
       locale: partial.locale ?? current.locale,
       skin: partial.skin ?? current.skin,
-      userProfile: partial.userProfile ?? current.userProfile,
+      profileEntries: partial.profileEntries ?? current.profileEntries,
       modelOverrides: mergedOverrides,
       apiProviders: mergedApi,
       prefs: { ...current.prefs, ...partial.prefs },
       updatedAt: Date.now(),
     };
     db.query(
-      `UPDATE settings SET theme = ?, provider = ?, locale = ?, skin = ?, user_profile = ?, model_overrides_json = ?, api_providers_json = ?, prefs_json = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE settings SET theme = ?, provider = ?, locale = ?, skin = ?, profile_entries_json = ?, model_overrides_json = ?, api_providers_json = ?, prefs_json = ?, updated_at = ? WHERE id = ?`,
     ).run(
       next.theme,
       next.provider,
       next.locale ?? null,
       next.skin ?? null,
-      next.userProfile ?? null,
+      JSON.stringify(next.profileEntries),
       JSON.stringify(next.modelOverrides),
       JSON.stringify(next.apiProviders),
       JSON.stringify(next.prefs),
@@ -137,6 +150,36 @@ export function updateSettings(partial: Partial<Settings>): Promise<Settings> {
     );
     cached = next;
     return next;
+  });
+}
+
+export function updateProfile(change: ProfileChange): Promise<Settings> {
+  return updateSettings((current) => {
+    const entries = current.profileEntries;
+    switch (change.action) {
+      case "save": {
+        const content = change.content.trim();
+        if (!content) throw new Error("Personalization content cannot be empty");
+        if (change.id && !entries.some((e) => e.id === change.id)) {
+          throw new Error("Personalization entry no longer exists");
+        }
+        return {
+          profileEntries: change.id
+            ? entries.map((e) => (e.id === change.id ? { ...e, content } : e))
+            : [...entries, { id: ulid(), content, enabled: true }],
+        };
+      }
+      case "toggle":
+        return {
+          profileEntries: entries.map((e) =>
+            e.id === change.id ? { ...e, enabled: change.enabled } : e,
+          ),
+        };
+      case "remove":
+        return { profileEntries: entries.filter((e) => e.id !== change.id) };
+      case "disable-all":
+        return { profileEntries: entries.map((e) => ({ ...e, enabled: false })) };
+    }
   });
 }
 

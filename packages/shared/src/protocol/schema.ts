@@ -67,7 +67,26 @@ export const clientToServerSchema = z.discriminatedUnion("type", [
   msg("c2s.vfs.empty", empty),
   // Settings is large and deep-merged server-side; validate only that it's an
   // object (each handler reads the fields it needs).
-  msg("c2s.settings.update", z.object({ partial: z.record(z.string(), z.unknown()) })),
+  msg(
+    "c2s.settings.update",
+    z.object({
+      // Profile changes use validated, per-entry intents below, never a stale list replacement.
+      partial: z.record(z.string(), z.unknown()).refine((p) => !("profileEntries" in p)),
+    }),
+  ),
+  msg(
+    "c2s.profile.update",
+    z.discriminatedUnion("action", [
+      z.object({
+        action: z.literal("save"),
+        id: z.string().min(1).optional(),
+        content: z.string().trim().min(1),
+      }),
+      z.object({ action: z.literal("toggle"), id: z.string().min(1), enabled: z.boolean() }),
+      z.object({ action: z.literal("remove"), id: z.string().min(1) }),
+      z.object({ action: z.literal("disable-all") }),
+    ]),
+  ),
   msg("c2s.wallpaper.upload", z.object({ dataUrl: z.string() })),
   msg("c2s.wallpaper.generate", z.object({ prompt: z.string() })),
   msg("c2s.provider.scan", empty),

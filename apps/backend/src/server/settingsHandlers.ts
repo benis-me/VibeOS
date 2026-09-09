@@ -11,10 +11,17 @@ import {
 } from "../ai/providers/index.ts";
 import { env } from "../config/env.ts";
 import { requestWallpaper, storeUpload } from "../ai/imageCache.ts";
-import { loadSettings, updateSettings } from "../db/repositories/SettingsRepo.ts";
+import { loadSettings, updateSettings, updateProfile } from "../db/repositories/SettingsRepo.ts";
 import { logger } from "../util/log.ts";
 
 const log = logger("router");
+
+export async function handleProfileUpdate(
+  p: ClientToServerPayload<"c2s.profile.update">,
+): Promise<void> {
+  const settings = await updateProfile(p);
+  broadcast("s2c.settings.changed", { settings });
+}
 
 export async function handleSettingsUpdate(
   p: ClientToServerPayload<"c2s.settings.update">,
