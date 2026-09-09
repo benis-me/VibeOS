@@ -1,9 +1,11 @@
 import type { NotificationKind } from "./notification.ts";
 import type { AppManifest } from "./app.ts";
 import type { VfsLocation } from "./vfs.ts";
+import type { WindowSize } from "./window.ts";
 
 /** Calls the AI may request, interpreted by the backend SyscallInterpreter. */
 export type Syscall =
+  | { type: "resize-window"; size: WindowSize }
   | {
       type: "notify";
       title: string;

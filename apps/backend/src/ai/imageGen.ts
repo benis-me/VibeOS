@@ -1,9 +1,10 @@
-import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 import type { ProviderId } from "@vibeos/shared/domain";
 import { providerConfig } from "./providers/config.ts";
 import { logger } from "../util/log.ts";
+import { env } from "../config/env.ts";
 
 const log = logger("imagegen");
 
@@ -165,8 +166,8 @@ async function codebuddyImage(
   prompt: string,
   aspect: string,
 ): Promise<GeneratedImage> {
-  const dir = `${tmpdir()}/vibeos-img-${randomUUID()}`;
-  await mkdir(dir, { recursive: true });
+  const dir = join(env.diskDir, "Cache", `vibeos-img-${randomUUID()}`);
+  await mkdir(dir, { recursive: true, mode: 0o700 });
   const size = openaiSize(aspect); // ImageGen accepts 1024x1024 / 1024x1536 / 1536x1024
   log.debug(`codebuddy ImageGen → ${dir} (${size})`);
   // The actual pixels come from --text-to-image-model; the agent that drives the

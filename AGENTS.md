@@ -21,8 +21,9 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
                   manager, AI-HTML surface, context menus
 ```
 
-- **SQLite is the single source of truth.** Frontend Zustand stores only mirror
-  it; user intents always round-trip through the WebSocket.
+- **SQLite is the source of truth for runtime state.** App packages, generated HTML, images and user files live in
+  `~/.vibeos/disk`; frontend stores mirror backend state. File mutations and other
+  user intents round-trip through the WebSocket; file downloads stream over HTTP.
 - Transport: one WebSocket. Protocol is versioned envelopes with `c2s.*` /
   `s2c.*` message unions in `packages/shared/src/protocol`.
 - **AI provider seam.** All model access goes through `ai/providers/` (`AiProvider`:
@@ -104,6 +105,24 @@ This environment injects a broken `NODE_OPTIONS` preload that crashes any
   `spawn-window`, `install`, `create-file`, `focus`, `close`.
 - **App instancing**: `AppManifest.singleInstance` → Settings is single-instance;
   Browser/Files/Terminal and virtual apps are multi-instance (new window each open).
+- **Native Files**: `files/disk.ts` confines real file operations to the system disk.
+  Files and desktop file opens dispatch through `filesHandlers.openDiskFile` to native
+  text/media viewers. `windows.file_path` persists their file; Files mutations update
+  that reference. Media previews use the shared passive MIME allowlist and Bun.file
+  byte ranges; never serve HTML/SVG as active preview content.
+  Native apps in `NATIVE_PRESET_APPS` never enter UI generation. Text writes require
+  the read version to prevent overwriting concurrent edits; deletions go to `Trash`.
+  Startup backs up legacy data before SQL changes, then `StorageRepo.migrateSystemDisk`
+  upgrades storage once by version (including partially exported installations).
+  Storage v2 materializes legacy desktop/recycled shortcuts as passive `.vibelink`
+  app-ID references, preserving node IDs and icon positions. `VfsRepo.syncDesktopFiles`
+  reconciles real Desktop files with runtime indexes; deleting a shortcut never
+  uninstalls its app. Shortcut opens validate the file and target app before dispatch.
+  Files navigation validates paths with `stat` before changing history; keyboard
+  navigation belongs only to the focused window.
+  AppRepo/AppMemoryRepo/ImagesRepo read and write disk content through runtime path
+  indexes; old payload columns are cleared after migration, with the original DB in
+  `runtime/backups`. Preserve snapshot commit guards when changing disk persistence.
 
 ## Hard product rules
 

@@ -1,4 +1,4 @@
-import type { Syscall } from "@vibeos/shared/domain";
+import type { Syscall, WindowSize } from "@vibeos/shared/domain";
 import { broadcast } from "../server/wsGateway.ts";
 import { bus } from "../events/bus.ts";
 import * as NotificationRepo from "../db/repositories/NotificationRepo.ts";
@@ -9,6 +9,7 @@ import {
   openWindow,
   focusWindow,
   closeWindow,
+  resizeGeneratedWindow,
 } from "../db/repositories/WindowRepo.ts";
 import { ensureMemory } from "../db/repositories/AppMemoryRepo.ts";
 import { renderInitialWindow } from "../kernel/windowInit.ts";
@@ -21,6 +22,8 @@ export interface SyscallContext {
   windowId?: string;
   appId?: string;
   source: "syscall" | "agent" | "system";
+  /** Present only on first generation; subsequent interactions keep the user's geometry. */
+  resizeFrom?: WindowSize;
 }
 
 export async function execute(calls: Syscall[], ctx: SyscallContext): Promise<void> {
@@ -36,6 +39,12 @@ export async function execute(calls: Syscall[], ctx: SyscallContext): Promise<vo
 
 async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
   switch (call.type) {
+    case "resize-window": {
+      if (!ctx.windowId || !ctx.resizeFrom) return;
+      const window = await resizeGeneratedWindow(ctx.windowId, call.size, ctx.resizeFrom);
+      if (window) broadcast("s2c.window.moved", { window });
+      return;
+    }
     case "notify": {
       const notification = await NotificationRepo.create({
         kind: call.kind ?? "info",

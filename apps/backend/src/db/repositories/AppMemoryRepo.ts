@@ -1,12 +1,17 @@
 import type { AppMemory, Interaction } from "@vibeos/shared/domain";
 import { ulid } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { diskPath } from "../../files/disk.ts";
+import { snapshotFile, writeContent } from "../../files/content.ts";
 import { enqueue } from "./writeQueue.ts";
 
 interface MemoryRow {
   window_id: string;
   app_id: string;
   html_snapshot: string;
+  snapshot_path: string | null;
   episode_summary: string;
   sdk_session_id: string | null;
   updated_at: number;
@@ -33,7 +38,11 @@ export function getMemory(windowId: string): AppMemory | null {
   return {
     windowId: row.window_id,
     appId: row.app_id,
-    htmlSnapshot: row.html_snapshot,
+    htmlSnapshot: row.snapshot_path
+      ? existsSync(diskPath(row.snapshot_path, true))
+        ? readFileSync(diskPath(row.snapshot_path, true), "utf8")
+        : ""
+      : row.html_snapshot,
     episodeSummary: row.episode_summary,
     sdkSessionId: row.sdk_session_id ?? undefined,
     updatedAt: row.updated_at,
@@ -63,11 +72,46 @@ export function saveSnapshot(
   return enqueue(() => {
     if (!canWrite()) return false;
     const db = getDb();
-    db.query("UPDATE app_memory SET html_snapshot = ?, updated_at = ? WHERE window_id = ?").run(
-      html,
-      Date.now(),
-      windowId,
-    );
+    const row = db
+      .query<
+        {
+          snapshot_path: string | null;
+          id: string;
+          app_id: string;
+          title: string;
+          w: number;
+          h: number;
+          content_path: string;
+        },
+        [string]
+      >(
+        "SELECT m.snapshot_path, w.id, w.app_id, w.title, w.w, w.h, a.content_path FROM app_memory m JOIN windows w ON w.id = m.window_id JOIN apps a ON a.id = m.app_id WHERE m.window_id = ?",
+      )
+      .get(windowId);
+    if (!row) return false;
+    const path = row.snapshot_path ?? snapshotFile(row, row.content_path);
+    writeContent(path, html);
+    if (row.app_id === "__transient__" && !row.snapshot_path) {
+      writeContent(
+        `${dirname(path)}/app.json`,
+        JSON.stringify(
+          {
+            id: row.id,
+            name: row.title,
+            kind: "virtual",
+            sourceWindowId: row.id,
+            isInstalled: false,
+            manifest: { defaultSize: { w: row.w, h: row.h } },
+            entry: "index.html",
+          },
+          null,
+          2,
+        ),
+      );
+    }
+    db.query(
+      "UPDATE app_memory SET snapshot_path = ?, html_snapshot = '', updated_at = ? WHERE window_id = ?",
+    ).run(path, Date.now(), windowId);
     return true;
   });
 }

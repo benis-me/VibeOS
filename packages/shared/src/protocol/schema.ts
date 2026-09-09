@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ClientToServer } from "./client-to-server.ts";
+import { FILE_UPLOAD_LIMIT } from "../domain/files.ts";
 
 /**
  * Runtime validation for inbound client→server messages. The WS boundary is the
@@ -30,12 +31,40 @@ const dropTarget = z.object({
 });
 
 const empty = z.object({});
+const filePath = z.string().max(4096);
+export const diskCommandSchema = z.union([
+  z.object({
+    action: z.enum(["list", "stat", "read", "mkdir", "trash", "restore", "delete", "open"]),
+    path: filePath,
+  }),
+  z.object({ action: z.enum(["move", "copy"]), path: filePath, destination: filePath }),
+  z.object({
+    action: z.literal("write"),
+    path: filePath,
+    content: z.string().max(Math.ceil(FILE_UPLOAD_LIMIT / 3) * 4),
+    encoding: z.literal("base64").optional(),
+    version: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+  }),
+]);
+
+/** Same supported dimensions as AI-spawned windows. */
+export const windowSizeSchema = z.object({
+  w: z.number().int().min(240).max(2000),
+  h: z.number().int().min(160).max(1400),
+});
 
 /** Build a `{ type: <literal>, payload }` message schema, preserving the literal. */
 const msg = <T extends string, P extends z.ZodTypeAny>(type: T, payload: P) =>
   z.object({ type: z.literal(type), payload });
 
 export const clientToServerSchema = z.discriminatedUnion("type", [
+  msg(
+    "c2s.files.request",
+    z.object({ requestId: z.string().min(1).max(100), command: diskCommandSchema }),
+  ),
   msg("c2s.boot.hello", z.object({ clientId: z.string().optional() })),
   msg("c2s.op", z.object({ windowId: z.string(), op: aiOp })),
   msg(
@@ -101,12 +130,14 @@ export const clientToServerSchema = z.discriminatedUnion("type", [
       description: z.string().optional(),
       icon: z.string().optional(),
       widget: z.boolean().optional(),
+      size: windowSizeSchema.optional(),
     }),
   ),
   msg(
     "c2s.app.save",
     z.object({ windowId: z.string(), name: z.string().optional(), icon: z.string().optional() }),
   ),
+  msg("c2s.app.shortcut", z.object({ appId: z.string().min(1) })),
   msg("c2s.app.export", z.object({ appId: z.string() })),
   msg("c2s.app.import", z.object({ json: z.string() })),
   msg(

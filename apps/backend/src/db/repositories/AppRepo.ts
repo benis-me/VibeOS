@@ -1,6 +1,9 @@
 import type { AppDescriptor, AppManifest, PresetAppId } from "@vibeos/shared/domain";
 import { ulid, stripEmoji } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
+import { existsSync } from "node:fs";
+import { diskPath } from "../../files/disk.ts";
+import { writeAppPackage, readAppPackage } from "../../files/content.ts";
 import { enqueue } from "./writeQueue.ts";
 
 interface AppRow {
@@ -10,12 +13,15 @@ interface AppRow {
   preset_id: string | null;
   icon: string;
   manifest_json: string;
+  content_path: string | null;
   is_installed: number;
   created_at: number;
   updated_at: number;
 }
 
 function toApp(row: AppRow): AppDescriptor {
+  if (row.content_path)
+    return { ...readAppPackage(row.content_path), id: row.id, isInstalled: row.is_installed === 1 };
   return {
     id: row.id,
     name: row.name,
@@ -34,13 +40,21 @@ export function listApps(): AppDescriptor[] {
   return db
     .query<AppRow, []>("SELECT * FROM apps WHERE is_installed = 1 ORDER BY created_at")
     .all()
+    .filter(isAvailable)
     .map(toApp);
 }
 
 export function getApp(id: string): AppDescriptor | null {
   const db = getDb();
   const row = db.query<AppRow, [string]>("SELECT * FROM apps WHERE id = ?").get(id);
-  return row ? toApp(row) : null;
+  return row && isAvailable(row) ? toApp(row) : null;
+}
+
+function isAvailable(row: AppRow): boolean {
+  return (
+    !row.content_path ||
+    (!row.content_path.startsWith("Trash/") && existsSync(diskPath(row.content_path, true)))
+  );
 }
 
 // icon = a lucide-react icon name (open-source icon set), rendered by <AppIcon>.
@@ -71,9 +85,29 @@ const PRESETS: Array<{ id: PresetAppId; name: string; icon: string; manifest: Ap
     name: "Files",
     icon: "folder",
     manifest: {
-      description: "Browse the virtual filesystem.",
+      description: "Manage real files on the VibeOS system disk.",
       category: "system",
       defaultSize: { w: 760, h: 520 },
+    },
+  },
+  {
+    id: "text-viewer",
+    name: "Text Viewer",
+    icon: "file-text",
+    manifest: {
+      description: "View text files on the VibeOS system disk.",
+      category: "system",
+      defaultSize: { w: 680, h: 520 },
+    },
+  },
+  {
+    id: "media-viewer",
+    name: "Media Viewer",
+    icon: "image",
+    manifest: {
+      description: "View images and play audio or video from the VibeOS system disk.",
+      category: "system",
+      defaultSize: { w: 800, h: 560 },
     },
   },
   {
@@ -151,14 +185,25 @@ export function seedPresets(): Promise<void> {
         db.query(
           "UPDATE apps SET name = ?, icon = ?, manifest_json = ?, updated_at = ? WHERE preset_id = ?",
         ).run(p.name, p.icon, JSON.stringify(p.manifest), now, p.id);
+        persistPackage(exists.id);
         continue;
       }
       db.query(
         `INSERT INTO apps (id, name, kind, preset_id, icon, manifest_json, is_installed, created_at, updated_at)
          VALUES (?, ?, 'preset', ?, ?, ?, 1, ?, ?)`,
       ).run(p.id, p.name, p.id, p.icon, JSON.stringify(p.manifest), now, now);
+      persistPackage(p.id);
     }
   });
+}
+
+/** Runtime keeps the installed-app index; the manifest and seed live on disk. */
+function persistPackage(id: string): void {
+  const db = getDb();
+  const row = db.query<AppRow, [string]>("SELECT * FROM apps WHERE id = ?").get(id)!;
+  const app = toApp({ ...row, content_path: null });
+  const path = writeAppPackage(app, row.content_path ?? undefined);
+  db.query("UPDATE apps SET content_path = ?, manifest_json = '{}' WHERE id = ?").run(path, id);
 }
 
 export function installApp(input: {
@@ -177,6 +222,7 @@ export function installApp(input: {
       `INSERT INTO apps (id, name, kind, preset_id, icon, manifest_json, is_installed, created_at, updated_at)
        VALUES (?, ?, 'virtual', NULL, ?, ?, 1, ?, ?)`,
     ).run(id, name, icon, JSON.stringify(input.manifest ?? {}), now, now);
+    persistPackage(id);
     return getApp(id)!;
   });
 }
@@ -199,6 +245,7 @@ export function ensureTransientApp(): Promise<string> {
       `INSERT INTO apps (id, name, kind, preset_id, icon, manifest_json, is_installed, created_at, updated_at)
        VALUES (?, 'Window', 'virtual', NULL, 'app-window', '{}', 0, ?, ?)`,
     ).run(TRANSIENT_ID, now, now);
+    persistPackage(TRANSIENT_ID);
     return TRANSIENT_ID;
   });
 }

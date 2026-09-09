@@ -71,6 +71,8 @@ const PRESET_ICONS: Record<PresetAppId, Icon> = {
   browser: Globe,
   "command-line": Terminal,
   "file-manager": FolderSimple,
+  "text-viewer": FileText,
+  "media-viewer": Image,
   settings: GearSix,
   "activity-monitor": Pulse,
   "app-store": Storefront,

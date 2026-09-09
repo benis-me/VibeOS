@@ -10,15 +10,26 @@ import { logger } from "../util/log.ts";
 
 const log = logger("router");
 
+export async function handleAppShortcut(
+  p: ClientToServerPayload<"c2s.app.shortcut">,
+): Promise<void> {
+  const app = getApp(p.appId);
+  if (!app?.isInstalled) return;
+  const node = await ensureShortcut(app.id, app.name, app.icon);
+  if (node) broadcast("s2c.vfs.changed", { node });
+  broadcast("s2c.files.changed", {});
+}
+
 /** Spawn a fresh window (or desktop widget) and generate its content live. */
 export async function handleAppLaunch(p: ClientToServerPayload<"c2s.app.launch">): Promise<void> {
   const appId = await ensureTransientApp();
   const widget = !!p.widget;
+  const size = p.size ?? (widget ? { w: 320, h: 260 } : { w: 820, h: 580 });
   const w = await openWindow({
     appId,
     title: p.name,
     kind: widget ? "widget" : "app",
-    rect: widget ? { x: 60, y: 60, w: 320, h: 260 } : { x: 140, y: 90, w: 820, h: 580 },
+    rect: { x: widget ? 60 : 140, y: widget ? 60 : 90, ...size },
   });
   await ensureMemory(w.id, appId);
   broadcast("s2c.window.opened", { window: w });
@@ -49,7 +60,7 @@ export async function handleAppSave(p: ClientToServerPayload<"c2s.app.save">): P
     icon: p.icon ?? src?.icon ?? "app-window",
     manifest: {
       description: src?.manifest.description,
-      defaultSize: src?.manifest.defaultSize,
+      defaultSize: { w: win.rect.w, h: win.rect.h },
       seedHtml: snapshot,
     },
   });

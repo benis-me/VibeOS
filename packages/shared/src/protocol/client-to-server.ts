@@ -1,5 +1,7 @@
 import type { ProfileChange, ProviderId, Settings } from "../domain/settings.ts";
 import type { VfsLocation } from "../domain/vfs.ts";
+import type { WindowSize } from "../domain/window.ts";
+import type { FileRequestCommand } from "../domain/files.ts";
 
 /** A delegated event from inside an AI-generated window surface. */
 export interface AiOp {
@@ -35,6 +37,7 @@ export interface DropTarget {
 }
 
 export type ClientToServer =
+  | { type: "c2s.files.request"; payload: { requestId: string; command: FileRequestCommand } }
   | { type: "c2s.boot.hello"; payload: { clientId?: string } }
   | { type: "c2s.op"; payload: { windowId: string; op: AiOp } }
   | {
@@ -79,10 +82,18 @@ export type ClientToServer =
   /** Launch a (possibly brand-new) app in a fresh window, generated live. */
   | {
       type: "c2s.app.launch";
-      payload: { name: string; description?: string; icon?: string; widget?: boolean };
+      payload: {
+        name: string;
+        description?: string;
+        icon?: string;
+        widget?: boolean;
+        size?: WindowSize;
+      };
     }
   /** Freeze a window's current UI as a reusable installed app (+ desktop shortcut). */
   | { type: "c2s.app.save"; payload: { windowId: string; name?: string; icon?: string } }
+  /** Create a desktop shortcut for an installed app. */
+  | { type: "c2s.app.shortcut"; payload: { appId: string } }
   /** Export an installed app to a shareable .vibeapp file on the desktop. */
   | { type: "c2s.app.export"; payload: { appId: string } }
   /** Import an app from a .vibeapp JSON string. */

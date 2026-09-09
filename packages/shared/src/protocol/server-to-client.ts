@@ -1,9 +1,10 @@
-import type { WindowState } from "../domain/window.ts";
+import type { WindowSize, WindowState } from "../domain/window.ts";
 import type { AppDescriptor } from "../domain/app.ts";
 import type { VfsNode } from "../domain/vfs.ts";
 import type { Notification } from "../domain/notification.ts";
 import type { Settings, ProviderId, ProviderModel } from "../domain/settings.ts";
 import type { AgentRole, AgentRun } from "../domain/agent.ts";
+import type { DiskResult } from "../domain/files.ts";
 
 export type BootPhase = "connecting" | "restoring" | "ready";
 
@@ -21,6 +22,8 @@ export interface AppSearchResult {
   icon: string;
   /** Whether this is best as a full app or a glanceable desktop widget. */
   kind: "app" | "widget";
+  /** Suggested outer window size, chosen for this application's content. */
+  defaultSize?: WindowSize;
 }
 
 export interface BootStatePayload {
@@ -62,6 +65,8 @@ export interface UiPatchPayload {
 }
 
 export type ServerToClient =
+  | { type: "s2c.files.result"; payload: { requestId: string; result: DiskResult } }
+  | { type: "s2c.files.changed"; payload: Record<string, never> }
   | { type: "s2c.boot.state"; payload: BootStatePayload }
   | { type: "s2c.boot.ready"; payload: Record<string, never> }
   | { type: "s2c.ui.patch"; payload: UiPatchPayload }

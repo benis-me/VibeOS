@@ -34,7 +34,12 @@ next — as if it were a real program responding.
   scroll-paginated run log.
 - **App Store & freezing** — install template apps, **freeze** a window's current
   state into a reusable app, and export / import apps as `.vibeapp` JSON.
-- **Persistent system state** — windows, app memory, virtual filesystem, settings,
+- **Native Files** — browse and edit the real system disk, import/download files,
+  rename/move/copy folders and files, and restore items from Trash. No model is involved.
+- **Native viewers** — double-click files to open separate Text Viewer or Media Viewer
+  windows. Text stays literal; images support fit/actual size, audio/video use browser
+  playback controls. Open file paths survive refreshes and restarts.
+- **Persistent system state** — windows, app memory, desktop references, settings,
   notifications, the user profile and agent runs live in SQLite and survive restarts.
 - **Multi-agent runtime** — several agents drive the system concurrently:
   - **UI-Generation Agent** (strong model) — renders/patches windows on user actions.
@@ -75,8 +80,8 @@ headless stream-json mode (`-p --output-format stream-json`) and `codex` via
 The CLI-based providers (CodeBuddy / Claude Code / Codex) each spawn a CLI subprocess,
 so the AI layer runs **backend-only**. VibeOS is therefore a Bun backend (HTTP +
 WebSocket) that drives the providers and the agent scheduler, plus a Vite/React frontend
-that connects over one WebSocket. SQLite is the single source of truth; the frontend
-Zustand stores mirror it.
+that connects over one WebSocket. SQLite owns runtime state; the system disk owns
+file contents. Frontend stores mirror backend state.
 
 All model access funnels through a single `AiProvider` seam (`apps/backend/src/ai/providers/`),
 so agents, the prompt assembler, and the frontend never know which backend is active. CLI
@@ -118,7 +123,8 @@ Copy `.env.example`. Notable variables:
 | Variable | Purpose |
 |---|---|
 | `PORT` | backend port (default 7720) |
-| `VIBEOS_DB_PATH` | SQLite file (default `./data/vibeos.db`) |
+| `VIBEOS_DATA_DIR` | Data root (default `~/.vibeos`): `runtime/` for internal state, `disk/` for the system disk |
+| `VIBEOS_DB_PATH` | Optional explicit SQLite path; overrides database location; storage-format upgrades still run |
 | `VIBEOS_AI_PROVIDER` | boot default backend: `claude` (default) `codex` `codebuddy` `openrouter`; unavailable CLIs are skipped |
 | `OPENROUTER_API_KEY` | API key for the `openrouter` provider (or `VIBEOS_AI_API_KEY`) |
 | `VIBEOS_AI_BASE_URL` | OpenAI-compatible endpoint for `openrouter` (default OpenRouter) |
@@ -143,9 +149,70 @@ bun test             # run the test suite
 
 ## Persistence
 
-State lives in SQLite (`VIBEOS_DB_PATH`). On boot the kernel migrates the schema,
-records the boot, restores open windows + their snapshots, and replays them to the
-client via `s2c.boot.state`. Delete the DB file to reset the machine.
+The data root defaults to `~/.vibeos`, independently of the working directory:
+
+```text
+~/.vibeos/
+  runtime/vibeos.db       # settings, window state, indexes, interactions and logs
+  runtime/backups/        # the original database and disk before migration
+  disk/
+    System/               # storage version and built-in app packages
+    Desktop/              # desktop files and .vibelink app shortcuts
+    Documents/            # user documents
+    Medias/Images/        # generated image files (existing image URLs still work)
+    Applications/         # installed apps and generated windows, including closed ones
+    Trash/                # reversible deletion with original paths
+    Cache/                # temporary generation files
+```
+
+App packages contain `app.json` and an optional `index.html`; per-window HTML is
+stored alongside the owning app. SQLite holds references to these files, and all
+subsequent app saves, snapshots and generated images read/write the disk.
+
+Generating a window archives its current HTML, but does not install a reusable app.
+**Save as app** creates a new installed app from that window's current HTML and size,
+plus a desktop shortcut. The original window stays independent; later interactions
+do not rewrite the saved starting page. `.vibeapp` is a JSON export/import format
+for the app manifest and saved starting HTML, not the on-disk package format or a
+full backup: linked files, image payloads and window history are not bundled.
+
+Desktop app icons are real `.vibelink` files referencing installed app IDs.
+App Store can create a shortcut; installation and saving also create one. Renaming,
+moving, deleting and restoring it in Files updates the desktop. Deleting a shortcut
+does not uninstall its app. `.vibelink` files only work where the target app is installed.
+
+Before changing an old installation, startup makes a consistent database backup
+(including committed WAL data) and copies any existing disk and legacy cache into
+`runtime/backups/<timestamp>/`. It then upgrades the schema, exports app definitions,
+all window snapshots, images and virtual files, verifies the output, clears the
+legacy payload columns, and records storage version 1. Storage version 2 migrates old
+desktop and recycled shortcut records into `.vibelink` files while retaining positions,
+target apps and deletion state, including installations already on version 1.
+This also upgrades installations
+partly exported by the earlier native Files implementation. A failed migration stops
+startup without marking completion; retries reuse identical output without overwriting
+conflicting files. The backup remains available after a successful upgrade.
+
+Files supports UTF-8 editing (up to 2 MB), browser imports (up to 16 MB), streamed
+downloads, rename/move/copy, and reversible deletion. Larger files can be placed
+directly in `disk/`; external changes refresh open Files windows automatically.
+The address bar supports back/forward history, parent navigation, breadcrumbs,
+editable paths, path suggestions, relative paths, copy and refresh. Use Ctrl/⌘L
+to edit the path, Alt+Left/Right/Up to navigate, and F5 to refresh the focused Files window.
+The backend binds to loopback by default. For an explicit remote/reverse-proxy setup,
+configure `VIBEOS_HOST` and `VIBEOS_WEB_ORIGIN` for the intended frontend origin.
+
+When the new database is absent, startup detects a legacy `apps/backend/data/vibeos.db`
+or `data/vibeos.db`, makes a consistent SQLite copy (including committed WAL data),
+and retains the original. It never overwrites an existing target and refuses to guess
+between multiple valid legacy databases. Set `VIBEOS_DB_PATH` explicitly to select
+an installation without relocating its database. The storage-format migration still
+runs for that database; an existing target is also checked for an old storage version.
+
+The kernel then migrates the schema, records the boot, restores open windows and
+snapshots, and replays them via `s2c.boot.state`. Search results carry preferred window
+sizes; first generation can refine them, and saving an app preserves its actual size.
+Smaller screens constrain the displayed window while retaining its preferred geometry.
 
 ## Acknowledgements
 

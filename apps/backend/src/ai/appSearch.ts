@@ -1,4 +1,5 @@
 import type { AppSearchResult } from "@vibeos/shared/protocol";
+import { windowSizeSchema } from "@vibeos/shared/protocol";
 import { stripEmoji } from "@vibeos/shared/util";
 import { run, recordSummary } from "./SdkManager.ts";
 import { logger } from "../util/log.ts";
@@ -73,11 +74,12 @@ const SEARCH_INSTRUCTION = `You are the app search engine of VibeOS, an AI opera
 Reply with ONLY a fenced JSON code block, nothing else:
 \`\`\`json
 { "results": [
-  { "name": "App Name", "description": "one short line", "icon": "calculator", "kind": "app" }
+  { "name": "App Name", "description": "one short line", "icon": "calculator", "kind": "app", "defaultSize": { "w": 420, "h": 560 } }
 ] }
 \`\`\`
 Rules:
 - name ≤ 30 chars; description ≤ 60 chars.
+- defaultSize: choose the preferred OUTER window size in CSS pixels for EACH result's actual layout. Vary dimensions and aspect ratios: a timer might use 320×240, a calculator 420×560, a document editor 800×680, a multi-panel dashboard 1120×740. These are examples, not fixed templates. Use integer w (240–2000) and h (160–1400). Do not give all results the same size.
 - kind: "widget" for a small, glanceable, single-purpose panel (clock, weather, stocks ticker, timer, mini player, to-do, system stat); "app" for a full interactive application (editor, browser, game, file tool, dashboard). Pick the more natural form for each result; include a sensible mix.
 - icon: choose the SINGLE closest name from THIS list ONLY, nothing else: ${ICON_VOCAB}. Never invent a name, never use an emoji.
 No prose outside the block.`;
@@ -99,19 +101,20 @@ export async function searchApps(
   });
   // Superseded by a newer query: drop silently (the client already ignores it).
   if (abort?.signal.aborted) return [];
-  const parsed = parse(result.text);
+  const parsed = parseAppSearchResults(result.text);
   await recordSummary(result.runId, `"${query}" → ${parsed.length} results`);
   log.info(`"${query}" → ${parsed.length} results in ${(performance.now() - t0).toFixed(0)}ms`);
   return parsed;
 }
 
-function parse(text: string): AppSearchResult[] {
+export function parseAppSearchResults(text: string): AppSearchResult[] {
   const block = JSON_RE.exec(text)?.[1] ?? text;
   try {
     const json = JSON.parse(block) as { results?: unknown };
     const arr = Array.isArray(json.results) ? json.results : [];
     return arr
-      .map((r) => {
+      .map((r): AppSearchResult | null => {
+        if (!r || typeof r !== "object") return null;
         const o = r as Record<string, unknown>;
         if (typeof o.name !== "string") return null;
         const name = stripEmoji(o.name).slice(0, 40);
@@ -124,6 +127,7 @@ function parse(text: string): AppSearchResult[] {
           // lucide icon name; default to a generic app icon
           icon: rawIcon || "app-window",
           kind: o.kind === "widget" ? "widget" : "app",
+          defaultSize: windowSizeSchema.safeParse(o.defaultSize).data,
         };
       })
       .filter((r): r is AppSearchResult => r !== null)

@@ -1,14 +1,19 @@
 export type WindowKind = "app" | "system" | "widget";
 export type WindowDisplayState = "normal" | "minimized" | "maximized";
 
-export interface Rect {
-  x: number;
-  y: number;
+export interface WindowSize {
   w: number;
   h: number;
 }
 
+export interface Rect extends WindowSize {
+  x: number;
+  y: number;
+}
+
 export interface WindowState {
+  /** Open file on the system disk; persisted across reconnects and restarts. */
+  filePath?: string;
   id: string;
   appId: string;
   title: string;

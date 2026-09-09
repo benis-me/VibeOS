@@ -2,6 +2,8 @@ export type PresetAppId =
   | "browser"
   | "command-line"
   | "file-manager"
+  | "text-viewer"
+  | "media-viewer"
   | "settings"
   | "activity-monitor"
   | "app-store"
@@ -12,6 +14,9 @@ export type AppKind = "preset" | "virtual";
 
 /** Preset apps rendered natively (real React), never AI-hallucinated. */
 export const NATIVE_PRESET_APPS: PresetAppId[] = [
+  "file-manager",
+  "text-viewer",
+  "media-viewer",
   "settings",
   "activity-monitor",
   "app-store",

@@ -3,6 +3,9 @@ import { migrate } from "../db/migrate.ts";
 import { recordBoot } from "../db/repositories/KernelRepo.ts";
 import { ensureSettings, updateSettings } from "../db/repositories/SettingsRepo.ts";
 import { seedPresets } from "../db/repositories/AppRepo.ts";
+import { syncDesktopFiles } from "../db/repositories/VfsRepo.ts";
+import { migrateSystemDisk } from "../db/repositories/StorageRepo.ts";
+import { backupBeforeStorageMigration } from "../db/legacyData.ts";
 import { kernelState } from "./kernelState.ts";
 import { openWelcomeOnFirstBoot } from "./windowInit.ts";
 import { startHttpServer } from "../server/httpServer.ts";
@@ -19,10 +22,13 @@ import { env } from "../config/env.ts";
 export async function boot() {
   console.log("[boot] VibeOS kernel starting…");
   const db = getDb();
+  const backup = backupBeforeStorageMigration(db, env);
   migrate(db);
+  await migrateSystemDisk(backup);
 
   const settings = await ensureSettings();
   await seedPresets();
+  await syncDesktopFiles();
 
   // Pick the AI backend: persisted Settings → env default → built-in default.
   // If that backend isn't available here (e.g. its CLI isn't installed), fall

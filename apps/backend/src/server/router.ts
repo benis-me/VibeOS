@@ -1,4 +1,5 @@
 import type { ServerWebSocket } from "bun";
+import { dirname } from "node:path";
 import pkg from "../../package.json";
 import type { ClientToServer, WsEnvelope } from "@vibeos/shared/protocol";
 import { parseClientMessage } from "@vibeos/shared/protocol";
@@ -12,7 +13,14 @@ import { env } from "../config/env.ts";
 import { searchApps } from "../ai/appSearch.ts";
 import { runCommand } from "../ai/commandPalette.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
-import { handleAppLaunch, handleAppSave, handleAppExport, handleAppImport } from "./appHandlers.ts";
+import {
+  handleAppLaunch,
+  handleAppSave,
+  handleAppExport,
+  handleAppImport,
+  handleAppShortcut,
+} from "./appHandlers.ts";
+import { handleFilesRequest, openDiskFile, broadcastFileWindows } from "./filesHandlers.ts";
 import {
   handleSettingsUpdate,
   handleProfileUpdate,
@@ -91,6 +99,8 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): P
 
 async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promise<void> {
   switch (msg.type) {
+    case "c2s.files.request":
+      return handleFilesRequest(ws, msg.payload);
     case "c2s.boot.hello":
       return sendBootState(ws);
 
@@ -155,6 +165,7 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
     case "c2s.vfs.move": {
       const node = await moveNode(msg.payload);
       if (node) broadcast("s2c.vfs.changed", { node });
+      broadcastFileWindows();
       return;
     }
 
@@ -173,12 +184,29 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
 
     case "c2s.vfs.open": {
       const node = getNode(msg.payload.nodeId);
+      if (node?.location === "recyclebin") return;
+      if (node?.type === "shortcut" && typeof node.meta.diskPath === "string") {
+        await openDiskFile(node.meta.diskPath);
+        return;
+      }
       if (node?.type === "shortcut" && node.targetAppId) {
         return handleOpen(node.targetAppId);
       }
-      // Files open in a viewer app — for now open the file-manager focused on it.
       if (node) {
-        return handleOpen("file-manager");
+        const path = typeof node.meta.diskPath === "string" ? node.meta.diskPath : undefined;
+        if (path && node.type === "file") {
+          await openDiskFile(path);
+          return;
+        }
+        return handleOpen(
+          "file-manager",
+          path
+            ? {
+                path: node.type === "folder" ? path : dirname(path),
+                file: node.type === "file" ? path : "",
+              }
+            : undefined,
+        );
       }
       return;
     }
@@ -295,6 +323,8 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
 
     case "c2s.app.export":
       return handleAppExport(msg.payload);
+    case "c2s.app.shortcut":
+      return handleAppShortcut(msg.payload);
 
     case "c2s.app.import":
       return handleAppImport(msg.payload);
@@ -341,7 +371,7 @@ async function ensureOpenWindow(appId: string): Promise<string | null> {
   return w.id;
 }
 
-async function handleOpen(appId: string): Promise<void> {
+async function handleOpen(appId: string, files?: { path: string; file: string }): Promise<void> {
   const app = getApp(appId);
   if (!app) {
     broadcast("s2c.error", { code: "no_app", detail: appId });
@@ -366,6 +396,11 @@ async function handleOpen(appId: string): Promise<void> {
   await ensureMemory(w.id, appId);
   broadcast("s2c.window.opened", { window: w });
   await renderInitialWindow(w.id, app);
+  if (files)
+    broadcast("s2c.chrome.set", {
+      windowId: w.id,
+      patch: { path: files.path === "." ? "" : files.path, file: files.file },
+    });
 }
 
 function sendBootState(ws: ServerWebSocket<WsData>): void {

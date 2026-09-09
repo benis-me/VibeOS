@@ -3,5 +3,6 @@
 //  - point the DB at a throwaway file so tests never touch the dev database
 //  - force the offline AI stub and disable background agents (no network/models)
 process.env.VIBEOS_DB_PATH ||= `/tmp/vibeos-test-${process.pid}.db`;
+process.env.VIBEOS_DATA_DIR ||= `/tmp/vibeos-test-${process.pid}`;
 process.env.VIBEOS_AI_STUB ||= "1";
 process.env.VIBEOS_AGENTS_DISABLED ||= "1";

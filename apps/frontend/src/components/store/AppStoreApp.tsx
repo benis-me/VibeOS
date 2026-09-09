@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Download } from "lucide-react";
+import { Download, CornerUpRight } from "lucide-react";
 import type { AppDescriptor } from "@vibeos/shared";
 import { AppIcon } from "@/components/AppIcon";
 import { useAppStore } from "@/stores/appStore";
@@ -169,6 +169,14 @@ function AppCard({
           className="vibe-btn rounded-md border px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <Download className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          title={t("store.createShortcut")}
+          onClick={() => wsClient.send("c2s.app.shortcut", { appId: app.id })}
+          className="vibe-btn rounded-md border px-2 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <CornerUpRight className="size-3.5" />
         </button>
       </div>
     </div>

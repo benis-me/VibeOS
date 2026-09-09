@@ -53,6 +53,7 @@ You MUST reply with EXACTLY these three parts, in this order, and nothing else:
 { "calls": [ { "type": "notify", "title": "...", "body": "...", "kind": "info" } ] }
 \`\`\`
    Allowed call types:
+   - resize-window (size: { w, h }) — choose THIS window's outer size during its FIRST generation if its content needs different dimensions. Use integer CSS pixels: w 240–2000, h 160–1400. A window has a 36px titlebar; a widget has none. Prefer the supplied size when it fits, stay responsive, and never request this on later interactions: the user's window size must be preserved.
    - notify (title, body, kind)
    - open (appId) — open/focus an existing app's window
    - spawn-window (title, prompt, width?, height?) — pop up a NEW window and generate its content from "prompt". Use this whenever an action should open something in a separate window (a detail view, a dialog, "open in new window", a document, a nested app, etc.). The prompt should describe what that window shows.

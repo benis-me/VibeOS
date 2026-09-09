@@ -56,9 +56,12 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
       y: dr.top + dr.height / 2 - (wr.top + wr.height / 2),
     });
   }, [minimized, reduced, win.id]);
-  // Maximized height is driven by the CSS taskbar-height var so it adapts when
-  // a skin changes the taskbar height (e.g. XP's shorter bar).
-  const rect = maximized ? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight } : win.rect;
+  // Fit the current screen without losing the preferred geometry on a larger screen.
+  // CSS keeps this responsive to both viewport and skin/taskbar changes.
+  const rect = win.rect;
+  const width = maximized ? "100vw" : `min(${rect.w}px, 100vw)`;
+  const availableHeight = "calc(100vh - var(--taskbar-h))";
+  const height = maximized ? availableHeight : `min(${rect.h}px, ${availableHeight})`;
 
   const focus = () => {
     if (!win.focused) wsClient.send("c2s.window.focus", { windowId: win.id });
@@ -95,10 +98,10 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
             : "rounded-xl bg-card",
       )}
       style={{
-        left: rect.x,
-        top: rect.y,
-        width: rect.w,
-        height: maximized ? "calc(100vh - var(--taskbar-h))" : rect.h,
+        left: maximized ? 0 : `clamp(0px, ${rect.x}px, calc(100vw - ${width}))`,
+        top: maximized ? 0 : `clamp(0px, ${rect.y}px, calc(${availableHeight} - ${height}))`,
+        width,
+        height,
         // Widgets sit on the desktop, behind normal windows.
         zIndex: widget ? 0 : win.z,
         borderRadius: maximized ? 0 : undefined,

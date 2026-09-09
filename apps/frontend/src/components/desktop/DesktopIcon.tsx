@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { FileText, FolderSimple } from "@phosphor-icons/react";
+import { CornerUpRight } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
 import type { VfsNode } from "@vibeos/shared";
 import { useAppStore } from "@/stores/appStore";
@@ -80,17 +81,27 @@ export function DesktopIcon({ node }: { node: VfsNode }) {
     <button
       onPointerDown={onPointerDown}
       onDoubleClick={open}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") open();
+      }}
+      title={node.type === "shortcut" ? `${node.name} · ${t("files.shortcut")}` : node.name}
       onContextMenu={(e) => openContextMenu(e, desktopItemMenu({ t, node }))}
       className="absolute flex w-20 touch-none flex-col items-center gap-1 rounded-lg p-2 text-center transition-colors hover:bg-foreground/5 focus-visible:bg-foreground/10"
       style={{ left: node.x ?? 24, top: node.y ?? 24 }}
     >
       <span
         className={cn(
-          "flex size-10 items-center justify-center text-3xl leading-none",
+          "relative flex size-10 items-center justify-center text-3xl leading-none",
           hasWallpaper && "desktop-glyph-on-wallpaper",
         )}
       >
         {icon}
+        {node.type === "shortcut" && (
+          <CornerUpRight
+            aria-hidden
+            className="absolute bottom-0 left-0 size-3.5 rounded-sm border bg-background p-px text-foreground"
+          />
+        )}
       </span>
       <span
         className={cn(

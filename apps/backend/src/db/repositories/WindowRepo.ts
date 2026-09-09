@@ -1,4 +1,4 @@
-import type { WindowState, WindowDisplayState } from "@vibeos/shared/domain";
+import type { WindowState, WindowDisplayState, WindowSize } from "@vibeos/shared/domain";
 import { ulid } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
 import { enqueue } from "./writeQueue.ts";
@@ -6,6 +6,7 @@ import { enqueue } from "./writeQueue.ts";
 interface WindowRow {
   id: string;
   app_id: string;
+  file_path: string | null;
   title: string;
   kind: string;
   x: number;
@@ -25,6 +26,7 @@ function toWindow(row: WindowRow): WindowState {
   return {
     id: row.id,
     appId: row.app_id,
+    filePath: row.file_path ?? undefined,
     title: row.title,
     kind: row.kind === "system" ? "system" : row.kind === "widget" ? "widget" : "app",
     rect: { x: row.x, y: row.y, w: row.w, h: row.h },
@@ -112,6 +114,7 @@ export function reorderWindows(ids: string[]): Promise<void> {
 
 export function openWindow(input: {
   appId: string;
+  filePath?: string;
   title: string;
   kind?: "app" | "system" | "widget";
   rect?: { x: number; y: number; w: number; h: number };
@@ -138,8 +141,8 @@ export function openWindow(input: {
       };
     db.query("UPDATE windows SET focused = 0 WHERE is_open = 1").run();
     db.query(
-      `INSERT INTO windows (id, app_id, title, kind, x, y, w, h, z, sort_order, state, is_open, focused, opened_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 1, 1, ?, ?)`,
+      `INSERT INTO windows (id, app_id, title, kind, x, y, w, h, z, sort_order, state, is_open, focused, opened_at, updated_at, file_path)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 1, 1, ?, ?, ?)`,
     ).run(
       id,
       input.appId,
@@ -153,8 +156,31 @@ export function openWindow(input: {
       order,
       now,
       now,
+      input.filePath ?? null,
     );
     return getWindow(id)!;
+  });
+}
+
+/** First-generation sizing must not overwrite a user's intervening resize. */
+export function resizeGeneratedWindow(
+  id: string,
+  size: WindowSize,
+  expected: WindowSize,
+): Promise<WindowState | null> {
+  return enqueue(() => {
+    const current = getWindow(id);
+    if (
+      !current?.isOpen ||
+      current.state !== "normal" ||
+      current.rect.w !== expected.w ||
+      current.rect.h !== expected.h
+    )
+      return null;
+    getDb()
+      .query("UPDATE windows SET w = ?, h = ?, updated_at = ? WHERE id = ?")
+      .run(size.w, size.h, Date.now(), id);
+    return getWindow(id);
   });
 }
 

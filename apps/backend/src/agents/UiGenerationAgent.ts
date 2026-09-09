@@ -1,4 +1,5 @@
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
+import { NATIVE_PRESET_APPS } from "@vibeos/shared/domain";
 import { bus } from "../events/bus.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { getApp } from "../db/repositories/AppRepo.ts";
@@ -129,6 +130,7 @@ async function generate(
   if (!win?.isOpen || !app) {
     return;
   }
+  if (app.presetId && NATIVE_PRESET_APPS.includes(app.presetId)) return;
 
   await ensureMemory(windowId, app.id);
   if (isStale(windowId, gen, abort)) return;
@@ -161,7 +163,7 @@ async function generate(
     memory,
     recent: recentInteractions(windowId),
     globalState: kernelState.snapshotForPrompt(),
-    windowSize: { w: win.rect.w, h: win.rect.h - 36 /* titlebar */ },
+    windowSize: { w: win.rect.w, h: win.rect.h - (win.kind === "widget" ? 0 : 36) },
     op: trigger.op,
     drag: trigger.drag,
     seedPrompt: trigger.seedPrompt,
@@ -275,7 +277,12 @@ async function generate(
     await recordSummary(result.runId, what);
     if (!canCommit()) return;
     if (parsed.syscalls.length > 0) {
-      await Syscalls.execute(parsed.syscalls, { windowId, appId: app.id, source: "syscall" });
+      await Syscalls.execute(parsed.syscalls, {
+        windowId,
+        appId: app.id,
+        source: "syscall",
+        resizeFrom: firstRender ? win.rect : undefined,
+      });
     }
     return;
   }

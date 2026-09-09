@@ -26,7 +26,12 @@ export function useWindowDrag(windowId: string) {
       const ms = useAppStore.getState().apps[w.appId]?.manifest?.minSize;
       const minW = ms?.w ?? MIN_W;
       const minH = ms?.h ?? MIN_H;
-      const start = { px: e.clientX, py: e.clientY, ...w.rect };
+      // The preferred rect can be larger than this screen; start from the visible geometry.
+      const el = e.currentTarget.closest<HTMLElement>('[role="dialog"]');
+      const rect = el
+        ? { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight }
+        : w.rect;
+      const start = { px: e.clientX, py: e.clientY, ...rect };
       (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
 
       const onMove = (ev: PointerEvent) => {

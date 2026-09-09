@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { windowSizeSchema } from "../protocol/schema.ts";
 
 /** Zod schemas validating the AI's structured output (the syscall block). */
 
@@ -7,6 +8,7 @@ export const notificationKindSchema = z.enum(["info", "success", "warning", "err
 export const vfsLocationSchema = z.enum(["desktop", "folder", "recyclebin"]);
 
 export const syscallSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("resize-window"), size: windowSizeSchema }),
   z.object({
     type: z.literal("notify"),
     title: z.string().min(1).max(120),
@@ -22,8 +24,8 @@ export const syscallSchema = z.discriminatedUnion("type", [
     title: z.string().min(1).max(80),
     prompt: z.string().min(1).max(2000),
     appId: z.string().min(1).optional(),
-    width: z.number().min(240).max(2000).optional(),
-    height: z.number().min(160).max(1400).optional(),
+    width: windowSizeSchema.shape.w.optional(),
+    height: windowSizeSchema.shape.h.optional(),
   }),
   z.object({
     type: z.literal("install"),

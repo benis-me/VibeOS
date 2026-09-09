@@ -1,4 +1,6 @@
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { AI_PROVIDERS, type ProviderId } from "@vibeos/shared/domain";
 
 function num(value: string | undefined, fallback: number): number {
@@ -10,9 +12,30 @@ function providerId(value: string | undefined): ProviderId | undefined {
   return AI_PROVIDERS.find((p) => p.id === value && p.textCapable)?.id;
 }
 
+function homePath(path: string): string {
+  return resolve(
+    path === "~" ? homedir() : path.startsWith("~/") ? join(homedir(), path.slice(2)) : path,
+  );
+}
+
+const dataDir = homePath(process.env.VIBEOS_DATA_DIR || "~/.vibeos");
+const dbOverride = process.env.VIBEOS_DB_PATH;
+const dbPath = dbOverride ? homePath(dbOverride) : join(dataDir, "runtime", "vibeos.db");
+
 export const env = {
   port: num(process.env.PORT, 7720),
-  dbPath: resolve(process.env.VIBEOS_DB_PATH ?? "./data/vibeos.db"),
+  dataDir,
+  runtimeDir: dirname(dbPath),
+  diskDir: join(dataDir, "disk"),
+  dbPath,
+  // An explicit database path opts out of database relocation, not storage-format upgrades.
+  legacyDbPaths: dbOverride
+    ? []
+    : [
+        fileURLToPath(new URL("../../data/vibeos.db", import.meta.url)),
+        fileURLToPath(new URL("../../../../data/vibeos.db", import.meta.url)),
+        resolve("data/vibeos.db"),
+      ],
   modelUiOverride: process.env.VIBEOS_MODEL_UI,
   modelFastOverride: process.env.VIBEOS_MODEL_FAST,
   /** Default AI backend at boot, before any Settings override. */

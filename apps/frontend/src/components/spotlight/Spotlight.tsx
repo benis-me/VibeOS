@@ -109,6 +109,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
       description: r.description,
       icon: r.icon,
       widget: asWidget,
+      size: r.defaultSize,
     });
     onClose();
   };
