@@ -1,5 +1,5 @@
 import type { Settings, ProviderId, Locale, Skin } from "@vibeos/shared/domain";
-import { DEFAULT_PROVIDER } from "@vibeos/shared/domain";
+import { AI_PROVIDERS, DEFAULT_PROVIDER } from "@vibeos/shared/domain";
 import { getDb } from "../database.ts";
 import { enqueue } from "./writeQueue.ts";
 
@@ -18,19 +18,8 @@ interface SettingsRow {
 
 const SETTINGS_ID = "settings";
 
-const PROVIDERS: readonly ProviderId[] = [
-  "codebuddy",
-  "claude",
-  "codex",
-  "openrouter",
-  "openai",
-  "anthropic",
-  "gemini",
-  "fal",
-];
-
 function asProvider(v: string | null | undefined): ProviderId {
-  return PROVIDERS.includes(v as ProviderId) ? (v as ProviderId) : DEFAULT_PROVIDER;
+  return AI_PROVIDERS.find((p) => p.id === v)?.id ?? DEFAULT_PROVIDER;
 }
 
 function asLocale(v: string | null | undefined): Locale | undefined {

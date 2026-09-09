@@ -7,6 +7,10 @@ const ENV_KEYS: Partial<Record<ProviderId, string[]>> = {
   openai: ["OPENAI_API_KEY"],
   anthropic: ["ANTHROPIC_API_KEY"],
   gemini: ["GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY", "GOOGLE_API_KEY"],
+  minimax: ["MINIMAX_API_KEY"],
+  zhipu: ["ZHIPU_API_KEY", "ZAI_API_KEY"],
+  kimi: ["MOONSHOT_API_KEY", "KIMI_API_KEY"],
+  cerebras: ["CEREBRAS_API_KEY"],
   openrouter: ["OPENROUTER_API_KEY", "VIBEOS_AI_API_KEY", "OPENAI_API_KEY"],
   fal: ["FAL_KEY", "FAL_API_KEY"],
 };

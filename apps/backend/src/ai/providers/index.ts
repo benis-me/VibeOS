@@ -25,6 +25,10 @@ const LOADERS: Partial<Record<ProviderId, () => Promise<AiProvider>>> = {
   openai: async () => (await import("./openai.ts")).openaiProvider,
   anthropic: async () => (await import("./anthropic.ts")).anthropicProvider,
   gemini: async () => (await import("./gemini.ts")).geminiProvider,
+  minimax: async () => (await import("./compatible.ts")).createCompatibleProvider("minimax"),
+  zhipu: async () => (await import("./compatible.ts")).createCompatibleProvider("zhipu"),
+  kimi: async () => (await import("./compatible.ts")).createCompatibleProvider("kimi"),
+  cerebras: async () => (await import("./compatible.ts")).createCompatibleProvider("cerebras"),
   // fal is image-only (no text run) — wired as an ImageProvider in Phase 4.
 };
 

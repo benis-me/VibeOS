@@ -31,6 +31,10 @@ export type ProviderId =
   | "openai"
   | "anthropic"
   | "gemini"
+  | "minimax"
+  | "zhipu"
+  | "kimi"
+  | "cerebras"
   | "fal";
 
 /** A provider's transport, surfaced in Settings so the UI can hint at setup. */
@@ -76,7 +80,7 @@ export interface ProviderCatalogEntry {
   textCapable?: boolean;
   /** Can serve the image-generation role. */
   imageCapable?: boolean;
-  /** Verified default model list (June 2026). Refreshable at runtime. */
+  /** Default model list; refreshable at runtime or extended with custom IDs. */
   seedModels?: ProviderModel[];
 }
 
@@ -205,6 +209,74 @@ export const AI_PROVIDERS: readonly ProviderCatalogEntry[] = [
         name: "Google: Gemini 2.5 Flash Image",
         capabilities: IMG,
       },
+    ],
+  },
+  {
+    id: "minimax",
+    label: "MiniMax",
+    kind: "api",
+    // https://platform.minimaxi.com/docs/api-reference/text-openai-api
+    defaultBaseUrl: "https://api.minimax.cn/v1",
+    fields: ["apiKey", "baseUrl"],
+    modelsEndpoint: true,
+    textCapable: true,
+    seedModels: [
+      { id: "MiniMax-M3", name: "MiniMax M3", capabilities: TEXT },
+      { id: "MiniMax-M2.7", name: "MiniMax M2.7", capabilities: ["text", "reasoning"] },
+      {
+        id: "MiniMax-M2.7-highspeed",
+        name: "MiniMax M2.7 Highspeed",
+        capabilities: ["text", "reasoning"],
+      },
+    ],
+  },
+  {
+    id: "zhipu",
+    label: "智谱 · Zhipu",
+    kind: "api",
+    // https://docs.bigmodel.cn/cn/guide/models/text/glm-5.3
+    defaultBaseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    fields: ["apiKey", "baseUrl"],
+    // No documented model-list API; use the catalog + user-added model IDs.
+    textCapable: true,
+    seedModels: [
+      { id: "glm-5.3", name: "GLM-5.3", capabilities: ["text", "reasoning"] },
+      { id: "glm-5.3-flash", name: "GLM-5.3 Flash", capabilities: TEXT },
+      { id: "glm-5.2", name: "GLM-5.2", capabilities: ["text", "reasoning"] },
+    ],
+  },
+  {
+    id: "kimi",
+    label: "Kimi",
+    kind: "api",
+    // https://platform.kimi.com/docs/models
+    defaultBaseUrl: "https://api.moonshot.cn/v1",
+    fields: ["apiKey", "baseUrl"],
+    modelsEndpoint: true,
+    textCapable: true,
+    seedModels: [
+      { id: "kimi-k3", name: "Kimi K3", capabilities: TEXT },
+      { id: "kimi-k2.7-code", name: "Kimi K2.7 Code", capabilities: ["text", "reasoning"] },
+      {
+        id: "kimi-k2.7-code-highspeed",
+        name: "Kimi K2.7 Code Highspeed",
+        capabilities: ["text", "reasoning"],
+      },
+      { id: "kimi-k2.6", name: "Kimi K2.6", capabilities: TEXT },
+    ],
+  },
+  {
+    id: "cerebras",
+    label: "Cerebras",
+    kind: "api",
+    // https://inference-docs.cerebras.ai/models/overview
+    defaultBaseUrl: "https://api.cerebras.ai/v1",
+    fields: ["apiKey", "baseUrl"],
+    modelsEndpoint: true,
+    textCapable: true,
+    seedModels: [
+      { id: "gpt-oss-120b", name: "GPT OSS 120B", capabilities: ["text", "reasoning"] },
+      { id: "qwen-3.8-27b", name: "Qwen 3.8 27B", capabilities: TEXT },
     ],
   },
   {

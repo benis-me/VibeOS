@@ -1,4 +1,4 @@
-import type { ModelCapability } from "@vibeos/shared/domain";
+import { AI_PROVIDERS, type ModelCapability } from "@vibeos/shared/domain";
 import { availableProviderIds, getProvider } from "./providers/index.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { logger } from "../util/log.ts";
@@ -7,6 +7,9 @@ const log = logger("models");
 
 /** Best-effort capability tags for a discovered model id. */
 export function inferCapabilities(id: string): ModelCapability[] {
+  // A refreshed list must retain verified capabilities instead of labelling every LLM as vision.
+  const known = AI_PROVIDERS.flatMap((p) => p.seedModels ?? []).find((m) => m.id === id);
+  if (known?.capabilities) return known.capabilities;
   const s = id.toLowerCase();
   if (/image|imagen|flux|dall|nano-banana|ideogram|recraft|seedream|qwen-image/.test(s)) {
     return ["image"];

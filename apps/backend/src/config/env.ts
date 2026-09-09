@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import type { ProviderId } from "@vibeos/shared/domain";
+import { AI_PROVIDERS, type ProviderId } from "@vibeos/shared/domain";
 
 function num(value: string | undefined, fallback: number): number {
   const n = value ? Number(value) : NaN;
@@ -7,9 +7,7 @@ function num(value: string | undefined, fallback: number): number {
 }
 
 function providerId(value: string | undefined): ProviderId | undefined {
-  return value === "codebuddy" || value === "claude" || value === "codex" || value === "openrouter"
-    ? value
-    : undefined;
+  return AI_PROVIDERS.find((p) => p.id === value && p.textCapable)?.id;
 }
 
 export const env = {
