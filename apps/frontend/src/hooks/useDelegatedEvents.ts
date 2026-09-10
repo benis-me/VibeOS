@@ -135,7 +135,7 @@ export function useDelegatedEvents(
         action: action ?? form.dataset.vibeosAction ?? "submit",
         // surface the main value explicitly so the AI can't miss it
         value: primary,
-        dataset: collectDataset(form),
+        dataset: { ...collectDataset(form), ...collectDataset(origin) },
         formData: fd,
       });
     };
@@ -158,9 +158,19 @@ export function useDelegatedEvents(
       if (editable) return;
 
       // Otherwise, the nearest element carrying an explicit action wins.
-      const actionEl = tgt.closest<HTMLElement>("[data-vibeos-action]");
+      const actionEl = tgt.closest<HTMLElement>(
+        "[data-vibeos-action],[data-vibeos-command]:not(form)",
+      );
       const el = actionEl ?? findInteractive(e.target, root);
       if (!el) return;
+      if (el.matches(":disabled,[aria-disabled='true']")) return;
+      if (
+        tgt.matches("input[type=checkbox],input[type=radio],select") &&
+        tgt.closest("form[data-vibeos-command]") &&
+        !tgt.dataset.vibeosCommand &&
+        !tgt.dataset.vibeosAction
+      )
+        return;
       e.preventDefault();
 
       // A real submit button inside a form → submit so typed values are sent.
@@ -202,6 +212,7 @@ export function useDelegatedEvents(
       if (tgt.closest("input,textarea,select,option,[contenteditable]")) return;
       const el = findInteractive(e.target, root);
       if (!el) return;
+      if (el.dataset.vibeosCommand || el.closest("form[data-vibeos-command]")) return;
       e.preventDefault();
       const ds = collectDataset(el);
       emit(el, {
@@ -223,6 +234,12 @@ export function useDelegatedEvents(
     const onChange = (e: Event) => {
       const target = e.target as HTMLInputElement;
       const tag = target.tagName;
+      if (
+        target.closest("form[data-vibeos-command]") &&
+        !target.dataset.vibeosCommand &&
+        !target.dataset.vibeosAction
+      )
+        return;
 
       // Only "toggle-style" controls commit on change. Every free-text input
       // (text, search, number, email, tel, url, password, textarea, …) commits

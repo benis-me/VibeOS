@@ -8,3 +8,4 @@ export * from "./settings.ts";
 export * from "./agent.ts";
 export * from "./syscall.ts";
 export * from "./skins.ts";
+export * from "./communication.ts";

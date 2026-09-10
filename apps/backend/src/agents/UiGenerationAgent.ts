@@ -1,6 +1,8 @@
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
-import { NATIVE_PRESET_APPS } from "@vibeos/shared/domain";
-import { bus } from "../events/bus.ts";
+import { NATIVE_PRESET_APPS, type AppDelivery } from "@vibeos/shared/domain";
+import { bus, messageContext } from "../events/bus.ts";
+import { deliveryAlive, failDelivery, pendingReplies } from "../events/communication.ts";
+import { parseSubscriptions } from "../db/repositories/CommunicationRepo.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { getApp } from "../db/repositories/AppRepo.ts";
 import { getWindow } from "../db/repositories/WindowRepo.ts";
@@ -25,6 +27,7 @@ import { logger } from "../util/log.ts";
 const log = logger("ui-gen");
 
 interface Trigger {
+  message?: AppDelivery;
   firstRender?: boolean;
   op?: AiOp;
   drag?: DragPayload;
@@ -46,28 +49,53 @@ interface Trigger {
  * history (which would grow unbounded and could drift from the merged DOM).
  */
 interface InFlight {
+  trigger: Trigger;
   abort: AbortController;
   /** generation counter — only the newest run for a window may commit. */
   gen: number;
 }
 const inflight = new Map<string, InFlight>();
 const genCounter = new Map<string, number>();
+const deliveries = new Map<string, AppDelivery[]>();
+function drainDeliveries(windowId: string) {
+  if (inflight.has(windowId)) return;
+  const queue = deliveries.get(windowId);
+  let message = queue?.shift();
+  while (message && !deliveryAlive(message)) message = queue?.shift();
+  if (!queue?.length) deliveries.delete(windowId);
+  if (message)
+    dispatch(windowId, { message, firstRender: !getMemory(windowId)?.htmlSnapshot.trim() });
+}
 
 function dispatch(windowId: string, trigger: Trigger): void {
   // Preempt any in-flight run for this same window.
   const prev = inflight.get(windowId);
   if (prev) {
     prev.abort.abort();
+    if (prev.trigger.message) failDelivery(prev.trigger.message, "communication.interrupted");
     log.debug(`preempt [${windowId.slice(-6)}] — newer action superseded older`);
   }
 
   const gen = (genCounter.get(windowId) ?? 0) + 1;
   genCounter.set(windowId, gen);
   const abort = new AbortController();
-  inflight.set(windowId, { abort, gen });
+  inflight.set(windowId, { abort, gen, trigger });
+  const expiry = trigger.message
+    ? setTimeout(
+        () => {
+          abort.abort();
+          failDelivery(trigger.message!, "communication.timeout");
+        },
+        Math.max(0, trigger.message.expiresAt - Date.now()),
+      )
+    : undefined;
+  expiry?.unref?.();
 
   void generate(windowId, trigger, gen, abort)
     .catch((e) => {
+      if (abort.signal.aborted) return;
+      if (trigger.message && !abort.signal.aborted)
+        failDelivery(trigger.message, "communication.failed");
       if (genCounter.get(windowId) !== gen) return;
       log.error(`generate threw [${windowId.slice(-6)}]`, e instanceof Error ? e.message : e);
       if (!getMemory(windowId)?.htmlSnapshot) {
@@ -81,8 +109,13 @@ function dispatch(windowId: string, trigger: Trigger): void {
       });
     })
     .finally(() => {
+      clearTimeout(expiry);
       // Only clear if we're still the current run (a newer one may have replaced us).
-      if (inflight.get(windowId)?.gen === gen) inflight.delete(windowId);
+      if (inflight.get(windowId)?.gen === gen) {
+        inflight.delete(windowId);
+        if (getWindow(windowId)?.isOpen) broadcast("s2c.ui.busy", { windowId, busy: false });
+        drainDeliveries(windowId);
+      }
     });
 }
 
@@ -93,6 +126,7 @@ function dispatch(windowId: string, trigger: Trigger): void {
  * result count as stale and commit nothing.
  */
 function abortWindow(windowId: string): void {
+  deliveries.delete(windowId);
   const cur = inflight.get(windowId);
   if (cur) {
     cur.abort.abort();
@@ -103,6 +137,42 @@ function abortWindow(windowId: string): void {
 }
 
 export function registerUiGenerationAgent(): void {
+  bus.on("app.delivery", ({ delivery }) => {
+    if (!deliveryAlive(delivery)) return;
+    const queue = deliveries.get(delivery.windowId) ?? [];
+    if (
+      delivery.kind === "event" &&
+      "system" in delivery.source &&
+      ["files.changed", "settings.changed", "apps.changed"].includes(delivery.topic)
+    ) {
+      const previous = queue.findIndex(
+        (d) => d.kind === "event" && d.topic === delivery.topic && d.channel === delivery.channel,
+      );
+      if (previous !== -1) queue.splice(previous, 1);
+    }
+    if (queue.length >= 32) {
+      failDelivery(delivery, "communication.limit");
+      if (delivery.kind === "message") throw new Error("communication.limit");
+      return;
+    }
+    queue.push(delivery);
+    deliveries.set(delivery.windowId, queue);
+    drainDeliveries(delivery.windowId);
+  });
+  bus.on("app.delivery.cancel", ({ windowId, id, subscriptionId, abort }) => {
+    const matches = (d: AppDelivery) =>
+      (id && (d.id === id || d.trace.requests?.includes(id))) ||
+      (subscriptionId && d.subscriptionId === subscriptionId);
+    const queue = deliveries.get(windowId);
+    if (queue)
+      deliveries.set(
+        windowId,
+        queue.filter((d) => !matches(d)),
+      );
+    const current = inflight.get(windowId);
+    if (abort && current?.trigger.message && matches(current.trigger.message))
+      current.abort.abort();
+  });
   bus.on("window.firstRender", ({ windowId }) => dispatch(windowId, { firstRender: true }));
   bus.on("window.spawnRender", ({ windowId, seedPrompt }) =>
     dispatch(windowId, { firstRender: true, seedPrompt }),
@@ -139,11 +209,11 @@ async function generate(
 
   broadcast("s2c.ui.busy", { windowId, busy: true });
 
-  if (trigger.op || trigger.drag) {
+  if (trigger.op || trigger.drag || trigger.message) {
     await addInteraction({
       windowId,
-      opKind: trigger.op?.kind ?? "dragdrop",
-      opPayload: trigger.op ?? trigger.drag,
+      opKind: trigger.message ? "message" : (trigger.op?.kind ?? "dragdrop"),
+      opPayload: trigger.message ?? trigger.op ?? trigger.drag,
     });
   }
 
@@ -171,6 +241,8 @@ async function generate(
     renderMode,
     regionIds,
     profileEntries: loadSettings().profileEntries,
+    message: trigger.message,
+    pendingReplies: pendingReplies(windowId, trigger.message?.trace),
   });
 
   const reason = firstRender
@@ -185,7 +257,8 @@ async function generate(
   );
   const t0 = performance.now();
 
-  const canCommit = () => !isStale(windowId, gen, abort);
+  const canCommit = () =>
+    !isStale(windowId, gen, abort) && (!trigger.message || deliveryAlive(trigger.message));
   let repairReason = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     if (!canCommit()) return;
@@ -216,7 +289,6 @@ async function generate(
     });
 
     if (!canCommit()) {
-      if (genCounter.get(windowId) === gen) throw new Error(result.error ?? "Generation aborted");
       return;
     }
     if (!result.ok) throw new Error(result.error ?? "Generation failed");
@@ -234,6 +306,7 @@ async function generate(
       } else if (!parsed.syscalls.length) {
         throw new Error("The model returned no UI or system action");
       }
+      if (html !== undefined) await parseSubscriptions(html);
     } catch (error) {
       repairReason = error instanceof Error ? error.message : String(error);
       await recordSummary(result.runId, `Rejected UI: ${repairReason}`);
@@ -277,12 +350,16 @@ async function generate(
     await recordSummary(result.runId, what);
     if (!canCommit()) return;
     if (parsed.syscalls.length > 0) {
-      await Syscalls.execute(parsed.syscalls, {
-        windowId,
-        appId: app.id,
-        source: "syscall",
-        resizeFrom: firstRender ? win.rect : undefined,
-      });
+      const execute = () =>
+        Syscalls.execute(parsed.syscalls, {
+          windowId,
+          appId: app.id,
+          source: "syscall",
+          resizeFrom: firstRender ? win.rect : undefined,
+          canCommit,
+        });
+      if (trigger.message) await messageContext.run(trigger.message.trace, execute);
+      else await execute();
     }
     return;
   }

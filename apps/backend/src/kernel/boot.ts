@@ -1,4 +1,5 @@
 import { recoverSkins } from "../db/repositories/SkinRepo.ts";
+import { registerCommunication } from "../events/communication.ts";
 import { getDb } from "../db/database.ts";
 import { migrate } from "../db/migrate.ts";
 import { recordBoot } from "../db/repositories/KernelRepo.ts";
@@ -31,6 +32,7 @@ export async function boot() {
   await recoverSkins();
   await seedPresets();
   await syncDesktopFiles();
+  await registerCommunication();
 
   // Pick the AI backend: persisted Settings → env default → built-in default.
   // If that backend isn't available here (e.g. its CLI isn't installed), fall

@@ -67,11 +67,13 @@ export interface UiPatchPayload {
 }
 
 export type ServerToClient =
+  | { type: "s2c.communication.delivery"; payload: { delivery: AppDelivery } }
+  | { type: "s2c.communication.result"; payload: { requestId: string; windowId: string; error?: string } }
   | { type: "s2c.skin.state"; payload: SkinState }
   | { type: "s2c.skin.progress"; payload: { request: SkinRequest } }
   | { type: "s2c.skin.result"; payload: { requestId: string; skinId?: Skin; error?: string } }
   | { type: "s2c.files.result"; payload: { requestId: string; result: DiskResult } }
-  | { type: "s2c.files.changed"; payload: Record<string, never> }
+  | { type: "s2c.files.changed"; payload: { paths?: string[] } }
   | { type: "s2c.boot.state"; payload: BootStatePayload }
   | { type: "s2c.boot.ready"; payload: Record<string, never> }
   | { type: "s2c.ui.patch"; payload: UiPatchPayload }
@@ -128,3 +130,4 @@ export type ServerToClientPayload<T extends ServerToClientType> = Extract<
   ServerToClient,
   { type: T }
 >["payload"];
+import type { AppDelivery } from "../domain/communication.ts";

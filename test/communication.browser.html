@@ -1,0 +1,180 @@
+<!doctype html>
+<!-- Run: NODE_OPTIONS= bunx vite --config apps/frontend/vite.config.ts --port 7733
+     Open http://localhost:7733/test/communication.browser.html. No model or database is used. -->
+<meta charset="utf-8" />
+<title>VibeOS communication DOM regression</title>
+<div id="surface" style="height: 280px"></div>
+<pre id="result">Running…</pre>
+<script type="module">
+  import React from "react";
+  import { createRoot } from "react-dom/client";
+  import { flushSync } from "react-dom";
+  import { AiHtmlSurface } from "/apps/frontend/src/components/window/AiHtmlSurface.tsx";
+  import { useWindowStore } from "/apps/frontend/src/stores/windowStore.ts";
+  import { useConnectionStore } from "/apps/frontend/src/stores/connectionStore.ts";
+  import { wsClient } from "/apps/frontend/src/lib/ws.ts";
+  import { sendCommunication } from "/apps/frontend/src/lib/communication.ts";
+
+  const listeners = new Map(),
+    statuses = new Set(),
+    sent = [];
+  let checks = 0;
+  const assert = (ok, message) => {
+    if (!ok) throw Error(message);
+    checks++;
+  };
+  const emit = (type, data) => {
+    for (const fn of [...(listeners.get(type) ?? [])]) fn(data);
+  };
+  wsClient.on = (type, fn) => {
+    const entries = listeners.get(type) ?? new Set();
+    entries.add(fn);
+    listeners.set(type, entries);
+    return () => entries.delete(fn);
+  };
+  wsClient.onStatus = (fn) => {
+    statuses.add(fn);
+    return () => statuses.delete(fn);
+  };
+  wsClient.send = (type, payload) => {
+    sent.push({ type, ...payload });
+    if (type === "c2s.communication.command" && payload.command.action !== "request")
+      queueMicrotask(() =>
+        emit("s2c.communication.result", {
+          requestId: payload.requestId,
+          windowId: payload.windowId,
+        }),
+      );
+  };
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const delivery = (data, overrides = {}) => ({
+    id: "event",
+    kind: "event",
+    windowId: "receiver",
+    source: { appId: "publisher", windowId: "sender" },
+    mode: "data",
+    topic: "record.changed",
+    channel: "file.content",
+    data,
+    expiresAt: Date.now() + 10000,
+    trace: { id: "trace", hops: 0, windows: [] },
+    ...overrides,
+  });
+  try {
+    useConnectionStore.getState().setConnected(true);
+    const store = useWindowStore.getState();
+    store.setAll([], {
+      receiver: `<main data-vibeos-region="page"><input name="draft" aria-label="Draft">
+    <pre data-vibeos-bind="file.content.text"></pre><p data-vibeos-bind="file.content.$error"></p>
+    <form data-vibeos-command='{"action":"publish","topic":"record.changed"}'>
+      <input name="text" value="actual input"><button type="submit">Publish</button>
+      <button type="submit" data-vibeos-command='{"action":"send","target":{"windowId":"other"},"topic":"direct","mode":"data","channel":"note"}'>Send directly</button>
+    </form></main>`,
+    });
+    const root = createRoot(document.getElementById("surface"));
+    flushSync(() => root.render(React.createElement(AiHtmlSurface, { windowId: "receiver" })));
+    await tick();
+    const surface = document.querySelector(".ai-surface"),
+      page = surface.firstElementChild;
+    const draft = surface.querySelector('[name="draft"]'),
+      text = surface.querySelector("pre");
+    draft.value = "unsaved draft";
+    draft.focus();
+    draft.setSelectionRange(1, 4);
+    emit("s2c.communication.delivery", {
+      delivery: delivery({ text: '<img src=x onerror="alert(1)">' }),
+    });
+    assert(
+      text.textContent === '<img src=x onerror="alert(1)">' && text.children.length === 0,
+      "Binding executed HTML",
+    );
+    assert(
+      surface.firstElementChild === page &&
+        surface.querySelector('[name="draft"]') === draft &&
+        draft.value === "unsaved draft" &&
+        document.activeElement === draft &&
+        draft.selectionStart === 1,
+      "Data update replaced input or focus",
+    );
+    emit("s2c.communication.delivery", {
+      delivery: delivery({ text: "wrong window" }, { windowId: "other" }),
+    });
+    assert(text.textContent.startsWith("<img"), "Message reached the wrong window");
+    emit("s2c.communication.delivery", {
+      delivery: delivery({ text: "model message" }, { mode: "ai" }),
+    });
+    assert(text.textContent.startsWith("<img"), "AI message was also applied as data");
+
+    surface.querySelector("form button").click();
+    await tick();
+    const published = sent.filter((s) => s.command?.action === "publish");
+    assert(
+      published.length === 1 && published[0].command.data.text === "actual input",
+      "Form did not publish actual input exactly once",
+    );
+    surface.querySelectorAll("form button")[1].click();
+    await tick();
+    assert(
+      sent.at(-1).command.action === "send" && sent.at(-1).command.data.text === "actual input",
+      "Submit button command did not override its form",
+    );
+    assert(!sent.some((s) => s.type === "c2s.op"), "A deterministic command invoked AI");
+    store.applyPatch({
+      windowId: "receiver",
+      mode: "regions",
+      regions: [
+        {
+          region: "page",
+          html: '<main data-vibeos-region="page"><pre data-vibeos-bind="file.content.text"></pre></main>',
+        },
+      ],
+      done: true,
+    });
+    assert(
+      surface.querySelector("pre").textContent.startsWith("<img"),
+      "Latest bound data was lost during a validated render",
+    );
+    emit("s2c.boot.ready", {});
+    await tick();
+    assert(
+      sent.at(-1).command.action === "refresh",
+      "Reconnect did not refresh persisted subscriptions",
+    );
+
+    const pending = sendCommunication("receiver", {
+      action: "request",
+      target: { system: "files" },
+      topic: "read",
+      data: { path: "Documents/a.txt" },
+    });
+    const request = sent.at(-1);
+    emit("s2c.communication.delivery", {
+      delivery: delivery(
+        { content: "real" },
+        { kind: "response", correlationId: request.requestId },
+      ),
+    });
+    assert((await pending).content === "real", "Correlated request did not resolve");
+    const disconnected = sendCommunication("receiver", {
+      action: "request",
+      target: { system: "files" },
+      topic: "read",
+      data: { path: "Documents/a.txt" },
+    }).catch((e) => e.message);
+    for (const fn of [...statuses]) fn(false);
+    assert(
+      (await disconnected) === "communication.disconnected",
+      "Disconnect left a request hanging",
+    );
+    await tick();
+    flushSync(() => root.unmount());
+    assert(
+      [...listeners.values()].every((set) => set.size === 0) && statuses.size === 0,
+      "Unmount leaked message listeners",
+    );
+    document.getElementById("result").textContent = `PASS: ${checks} checks`;
+  } catch (error) {
+    document.getElementById("result").textContent = `FAIL: ${error.stack}`;
+    console.error(error);
+  }
+</script>

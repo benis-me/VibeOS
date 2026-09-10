@@ -6,6 +6,7 @@ import { dirname } from "node:path";
 import { diskPath } from "../../files/disk.ts";
 import { snapshotFile, writeContent } from "../../files/content.ts";
 import { enqueue } from "./writeQueue.ts";
+import { parseSubscriptions, storeDeclaredSubscriptions } from "./CommunicationRepo.ts";
 
 interface MemoryRow {
   window_id: string;
@@ -64,11 +65,12 @@ export function ensureMemory(windowId: string, appId: string): Promise<void> {
   });
 }
 
-export function saveSnapshot(
+export async function saveSnapshot(
   windowId: string,
   html: string,
   canWrite = () => true,
 ): Promise<boolean> {
+  const subscriptions = await parseSubscriptions(html);
   return enqueue(() => {
     if (!canWrite()) return false;
     const db = getDb();
@@ -112,6 +114,7 @@ export function saveSnapshot(
     db.query(
       "UPDATE app_memory SET snapshot_path = ?, html_snapshot = '', updated_at = ? WHERE window_id = ?",
     ).run(path, Date.now(), windowId);
+    storeDeclaredSubscriptions(windowId, subscriptions);
     return true;
   });
 }

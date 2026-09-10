@@ -121,6 +121,13 @@ This environment injects a broken `NODE_OPTIONS` preload that crashes any
   and submenus use a safety-triangle hover. Don't trigger native browser menus.
 - **Syscalls** (`syscall/SyscallInterpreter.ts`): `notify`, `open`,
   `spawn-window`, `install`, `create-file`, `focus`, `close`.
+  `communication` routes validated send/request/reply and event subscriptions through
+  `events/communication.ts`; see `docs/communication.md`. App identity and causal
+  traces come from the runtime. Keep FIFO message handling separate from interactive
+  latest-wins generation, and propagate cancellation through read/write continuations.
+  Data deliveries bind literal text without model calls; never insert message data
+  as HTML or run generated scripts. Declared subscriptions persist with validated
+  snapshots; closing windows removes subscriptions and cancels related requests.
 - **App instancing**: `AppManifest.singleInstance` → Settings is single-instance;
   Browser/Files/Terminal and virtual apps are multi-instance (new window each open).
 - **Native Files**: `files/disk.ts` confines real file operations to the system disk.

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { communicationCommandSchema } from "../domain/communication.ts";
 import { windowSizeSchema } from "../protocol/schema.ts";
 
 /** Zod schemas validating the AI's structured output (the syscall block). */
@@ -8,6 +9,7 @@ export const notificationKindSchema = z.enum(["info", "success", "warning", "err
 export const vfsLocationSchema = z.enum(["desktop", "folder", "recyclebin"]);
 
 export const syscallSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("communication"), command: communicationCommandSchema }),
   z.object({ type: z.literal("resize-window"), size: windowSizeSchema }),
   z.object({
     type: z.literal("notify"),

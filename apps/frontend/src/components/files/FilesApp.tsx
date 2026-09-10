@@ -16,6 +16,7 @@ import {
   Save,
   Trash2,
   Upload,
+  Send,
   X,
 } from "lucide-react";
 import {
@@ -28,6 +29,9 @@ import {
   type DiskEntry,
 } from "@vibeos/shared";
 import { requestFiles, fileDownloadUrl } from "@/lib/files";
+import { sendCommunication } from "@/lib/communication";
+import { openContextMenu } from "@/components/contextmenu/ContextMenu";
+import { useWindowStore } from "@/stores/windowStore";
 import { wsClient } from "@/lib/ws";
 import { useChromeStore } from "@/stores/chromeStore";
 import { FilesAddressBar } from "./FilesAddressBar";
@@ -73,6 +77,8 @@ export function FilesApp({
   const path = storedPath === ".Trash" ? "Trash" : storedPath;
   const requestedFile = useChromeStore((s) => s.states[windowId]?.file ?? "");
   const apps = useAppStore((state) => state.apps);
+  const windows = useWindowStore((state) => state.windows);
+  const [handoff, setHandoff] = useState<"pending" | "done" | null>(null);
   const [history, setHistory] = useState({ paths: [path], index: 0 });
   const [navigating, setNavigating] = useState(false);
   const navigationSequence = useRef(0);
@@ -94,9 +100,11 @@ export function FilesApp({
     e.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
   );
   const errorText = (code: string) =>
-    t(`files.error.${code}`) === `files.error.${code}`
-      ? t("files.error.failed")
-      : t(`files.error.${code}`);
+    code.startsWith("communication.") || code.startsWith("files.error.")
+      ? t(code)
+      : t(`files.error.${code}`) === `files.error.${code}`
+        ? t("files.error.failed")
+        : t(`files.error.${code}`);
   const focusInput = useCallback((node: HTMLInputElement | null) => node?.focus(), []);
 
   useEffect(() => {
@@ -127,13 +135,35 @@ export function FilesApp({
   }, [path, refresh]);
   useEffect(() => {
     const reload = () => setRefresh((n) => n + 1);
-    const off = wsClient.on("s2c.files.changed", reload);
-    const reconnect = wsClient.on("s2c.boot.ready", reload);
+    const subscribe = () =>
+      void sendCommunication(windowId, {
+        action: "subscribe",
+        subscription: {
+          id: "files-list",
+          topic: "files.changed",
+          source: { system: true },
+          path,
+          mode: "data",
+        },
+      }).catch(() => {});
+    const off = wsClient.on("s2c.communication.delivery", ({ delivery }) => {
+      if (
+        delivery.windowId === windowId &&
+        delivery.kind === "event" &&
+        delivery.channel === "files-list"
+      )
+        reload();
+    });
+    subscribe();
+    const reconnect = wsClient.on("s2c.boot.ready", () => {
+      reload();
+      subscribe();
+    });
     return () => {
       off();
       reconnect();
     };
-  }, []);
+  }, [windowId, path]);
 
   const canLeave = () => !dirty || window.confirm(t("files.discard"));
   const navigate = async (address: string, historyIndex?: number): Promise<boolean> => {
@@ -282,9 +312,50 @@ export function FilesApp({
     if (e.kind === "directory") navigate(e.path);
     else void mutate({ action: "open", path: e.path });
   };
+  const sendFile = async (
+    target: { appId: string; open: true; newWindow?: boolean } | { windowId: string },
+  ) => {
+    if (!current) return;
+    setHandoff("pending");
+    setError(null);
+    try {
+      await sendCommunication(windowId, {
+        action: "request",
+        target,
+        topic: "file.open",
+        data: { path: current.path },
+        responseMode: "data",
+        channel: "open-with",
+      });
+      setHandoff("done");
+      setRefresh((n) => n + 1);
+    } catch (e) {
+      setHandoff(null);
+      setError((e as Error).message);
+    }
+  };
 
   return (
     <div className="vibe-files flex h-full min-w-0 flex-col bg-background text-foreground">
+      {handoff && (
+        <div
+          role="status"
+          className="flex shrink-0 items-center gap-2 border-b bg-card px-3 py-2 text-xs"
+        >
+          <span className="flex-1">
+            {t(handoff === "pending" ? "communication.processing" : "communication.completed")}
+          </span>
+          {handoff === "done" && (
+            <button
+              className={button}
+              onClick={() => setHandoff(null)}
+              aria-label={t("communication.dismiss")}
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+      )}
       <FilesAddressBar
         path={path}
         busy={busy || navigating}
@@ -448,6 +519,59 @@ export function FilesApp({
                   </>
                 ) : (
                   <>
+                    <button
+                      className={button}
+                      aria-haspopup="menu"
+                      disabled={
+                        !current || current.kind !== "file" || busy || handoff === "pending"
+                      }
+                      onClick={(e) =>
+                        openContextMenu(e, [
+                          ...Object.values(apps)
+                            .filter(
+                              (a) =>
+                                a.isInstalled &&
+                                (!a.presetId ||
+                                  ["text-viewer", "media-viewer"].includes(a.presetId)),
+                            )
+                            .map((app) => ({
+                              type: "item" as const,
+                              label: app.name,
+                              icon: (
+                                <AppIcon
+                                  name={app.icon}
+                                  presetId={app.presetId}
+                                  label={app.name}
+                                  className="size-4"
+                                />
+                              ),
+                              onSelect: () =>
+                                void sendFile({
+                                  appId: app.id,
+                                  open: true,
+                                  newWindow: !app.manifest.singleInstance,
+                                }),
+                            })),
+                          { type: "separator" as const },
+                          {
+                            type: "submenu" as const,
+                            label: t("communication.sendWindow"),
+                            items: Object.values(windows)
+                              .filter(
+                                (w) => w.isOpen && w.id !== windowId && !apps[w.appId]?.presetId,
+                              )
+                              .map((w) => ({
+                                type: "item" as const,
+                                label: w.title,
+                                onSelect: () => void sendFile({ windowId: w.id }),
+                              })),
+                          },
+                        ])
+                      }
+                    >
+                      <Send className="size-3.5" />
+                      {t("communication.openWith")}
+                    </button>
                     <button
                       className={button}
                       disabled={busy}

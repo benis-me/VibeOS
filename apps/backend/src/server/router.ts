@@ -8,6 +8,7 @@ import { parseClientMessage } from "@vibeos/shared/protocol";
 import { discoverAllProviders } from "../ai/modelDiscovery.ts";
 import { sendTo, broadcast, type WsData } from "./wsGateway.ts";
 import { bus } from "../events/bus.ts";
+import { communicate, communicationError } from "../events/communication.ts";
 import { kernelState } from "../kernel/kernelState.ts";
 import { ModelPolicy } from "../ai/ModelPolicy.ts";
 import { availableProviderIds } from "../ai/providers/index.ts";
@@ -89,7 +90,9 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): P
     `◀ ${msg.type}`,
     msg.type === "c2s.skin.command" && msg.payload.command.action === "import"
       ? { action: "import", bytes: Buffer.byteLength(msg.payload.command.json) }
-      : msg.payload,
+      : msg.type === "c2s.communication.command"
+        ? { windowId: msg.payload.windowId, action: msg.payload.command.action }
+        : msg.payload,
   );
   const t0 = performance.now();
   try {
@@ -106,6 +109,20 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): P
 
 async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promise<void> {
   switch (msg.type) {
+    case "c2s.communication.command": {
+      const { windowId, requestId, command } = msg.payload;
+      try {
+        await communicate(windowId, command, requestId);
+        sendTo(ws, "s2c.communication.result", { requestId, windowId });
+      } catch (error) {
+        sendTo(ws, "s2c.communication.result", {
+          requestId,
+          windowId,
+          error: communicationError(error),
+        });
+      }
+      return;
+    }
     case "c2s.skin.command": {
       try {
         const skinId = await handleSkinCommand(msg.payload.command);

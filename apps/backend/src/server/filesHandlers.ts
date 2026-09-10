@@ -4,7 +4,7 @@ import { executeDisk, diskError, diskPath } from "../files/disk.ts";
 import { broadcast, sendTo, type WsData } from "./wsGateway.ts";
 import { lstatSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
-import { fileMediaType, MAX_SKIN_PACKAGE_BYTES } from "@vibeos/shared/domain";
+import { fileMediaType, MAX_SKIN_PACKAGE_BYTES, type DiskResult } from "@vibeos/shared/domain";
 import { handleSkinCommand } from "../ai/skins.ts";
 import { allowedOrigin } from "./requestOrigin.ts";
 import { mutateDisk, syncDesktopFiles } from "../db/repositories/VfsRepo.ts";
@@ -67,33 +67,43 @@ export function broadcastFileWindows() {
   }
 }
 
+/** Same real-file operations for Files, native viewers and app messages. */
+export async function executeFileCommand(
+  command: ClientToServerPayload<"c2s.files.request">["command"],
+  beforeWrite = () => {},
+): Promise<DiskResult & { windowId?: string }> {
+  beforeWrite();
+  if (command.action === "open") {
+    const window = await openDiskFile(command.path);
+    return { path: command.path, windowId: window.id };
+  }
+  const readOnly =
+    command.action === "list" || command.action === "read" || command.action === "stat";
+  const { result, nodes, removed } = readOnly
+    ? { result: executeDisk(command), nodes: [], removed: [] }
+    : await mutateDisk(command, beforeWrite);
+  for (const node of nodes) broadcast("s2c.vfs.changed", { node });
+  if (removed.length) broadcast("s2c.vfs.removed", { ids: removed });
+  if (!readOnly) {
+    broadcastFileWindows();
+    broadcast("s2c.files.changed", {
+      paths: [
+        command.path,
+        ...("destination" in command ? [command.destination] : []),
+        ...(result.path ? [result.path] : []),
+      ],
+    });
+  }
+  return { path: command.path, ...result };
+}
+
 export async function handleFilesRequest(
   ws: ServerWebSocket<WsData>,
   payload: ClientToServerPayload<"c2s.files.request">,
 ): Promise<void> {
   try {
-    if (payload.command.action === "open") {
-      await openDiskFile(payload.command.path);
-      sendTo(ws, "s2c.files.result", {
-        requestId: payload.requestId,
-        result: { path: payload.command.path },
-      });
-      return;
-    }
-    const readOnly =
-      payload.command.action === "list" ||
-      payload.command.action === "read" ||
-      payload.command.action === "stat";
-    const { result, nodes, removed } = readOnly
-      ? { result: executeDisk(payload.command), nodes: [], removed: [] }
-      : await mutateDisk(payload.command);
+    const result = await executeFileCommand(payload.command);
     sendTo(ws, "s2c.files.result", { requestId: payload.requestId, result });
-    for (const node of nodes) broadcast("s2c.vfs.changed", { node });
-    if (removed.length) broadcast("s2c.vfs.removed", { ids: removed });
-    if (!readOnly) {
-      broadcastFileWindows();
-      broadcast("s2c.files.changed", {});
-    }
   } catch (error) {
     sendTo(ws, "s2c.files.result", {
       requestId: payload.requestId,

@@ -32,9 +32,10 @@ RESPONSIVE — the window can be ANY size and the user can resize it both ways, 
 - The current window size is provided in GLOBAL STATE — design for it, but stay fluid for resizes in BOTH dimensions.`;
 
 const OUTPUT_CONTRACT = `
-You MUST reply with EXACTLY these three parts, in this order, and nothing else:
+Reply using these parts in this order, and nothing outside them:
 
 1. An HTML fragment wrapped in <vibeos-html mode="full">…</vibeos-html> for a complete window body, or <vibeos-html mode="regions">…</vibeos-html> for region replacements. Always declare the mode explicitly.
+   - When only requesting data, replying to a message or performing another system action, OMIT this entire HTML part if the UI does not need changing. Never emit an empty regions wrapper. The existing UI stays intact.
    - It is the BODY of an application window. Do NOT include <html>, <head>, <body>, <script>, or <style> tags.
    - Style ONLY with inline style="" attributes, using the VibeOS design system variables above. Do NOT invent your own color palette — reuse the OS tokens so every app looks consistent.
    - You MAY use <form>, <input>, <button>, <select>, <textarea>, <ul>/<li>, <table>, etc.
@@ -46,7 +47,7 @@ You MUST reply with EXACTLY these three parts, in this order, and nothing else:
    - REGION IDS: use unique, stable ids for separate parts (toolbar, content, detail, etc.). A single whole-window region is insufficient for small updates. A region replacement must retain its id. To insert/delete a region, replace its existing parent. Never patch both a parent and its child in one response.
    - STATEFUL INPUTS: when you re-render after an input/submit, you MUST set the value="" of inputs to reflect the new state. E.g. a browser address bar must show the URL the user just navigated to (value="https://..."), a search box keeps the submitted query, a logged-in form clears. Never blank out or revert a value the user just entered unless the action's purpose is to clear it. Prefer patching just the content region (data-vibeos-region) and leaving the input region untouched when only the page body changed.
    - DRAG & DROP (optional): make an item draggable to other apps by adding draggable="true" data-vibeos-drag plus data-drag-kind="text|image|file" data-drag-ref="<value/url/id>" data-drag-label="<name>". When the user drops something onto this window, you receive it as the OPERATION (a "dropped" item with its kind/ref/label) — react to it.
-   - Make it feel like a real, lived-in application with believable, specific (hallucinated) content.
+   - Make it feel like a real, lived-in application. When handling APP MESSAGE or real disk data, show only actual content and confirmed results. Never invent a read, save, reply, or successful action.
 
 2. A fenced code block tagged vibeos-syscall containing JSON, OR omit it if there are no system effects:
 \`\`\`vibeos-syscall
@@ -61,6 +62,7 @@ You MUST reply with EXACTLY these three parts, in this order, and nothing else:
    - create-file (name, mime, content, location)
    - focus (windowId), close (windowId)
    - chrome (set) — update THIS window's native shell when it has one (e.g. a browser address bar): { "type": "chrome", "set": { "url": "https://…", "title": "…" } }
+   - communication (command) — request/send/reply, subscribe/unsubscribe, or publish using the APP COMMUNICATION contract. Use real system endpoints for file/data operations. Prefer declarative data-vibeos-command controls and data-vibeos-bind text for interactions that need no model.
 
 3. A one-sentence episode summary wrapped in <vibeos-summary>…</vibeos-summary> describing what just happened.
 

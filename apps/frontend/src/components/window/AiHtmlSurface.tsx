@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
+import { communicationCommandSchema, type AppDelivery } from "@vibeos/shared";
+import { bindCommunication, sendCommunication } from "@/lib/communication";
+import { useT } from "@/lib/i18n";
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import { sanitizeAiHtml } from "@/lib/sanitize";
 import { replaceRegions } from "@/lib/patch";
@@ -33,6 +37,37 @@ function inputKey(el: HTMLInputElement | HTMLTextAreaElement): string {
  */
 export function AiHtmlSurface({ windowId }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const t = useT();
+  const [communicationError, setCommunicationError] = useState("");
+  const [requests, setRequests] = useState(0);
+  const data = useRef(new Map<string, AppDelivery>());
+  const translate = useRef(t);
+  translate.current = t;
+  const showError = useCallback((e: unknown) => {
+    const key =
+      e instanceof Error && /^(communication|files.error|skins.error)\.[a-zA-Z]+$/.test(e.message)
+        ? e.message
+        : "communication.invalid";
+    setCommunicationError(key);
+  }, []);
+  useEffect(() => {
+    const off = wsClient.on("s2c.communication.delivery", ({ delivery }) => {
+      if (delivery.windowId !== windowId || delivery.mode !== "data") return;
+      if (delivery.channel) {
+        data.current.delete(delivery.channel);
+        data.current.set(delivery.channel, delivery);
+        if (data.current.size > 32) data.current.delete(data.current.keys().next().value!);
+      }
+      if (ref.current) bindCommunication(ref.current, delivery, translate.current);
+    });
+    const reconnect = wsClient.on("s2c.boot.ready", () => {
+      void sendCommunication(windowId, { action: "refresh" }).catch(() => {});
+    });
+    return () => {
+      off();
+      reconnect();
+    };
+  }, [windowId, showError]);
   const busy = useWindowStore((s) => s.busy[windowId]);
 
   // Remember the user's in-progress input across re-renders so a full-replace
@@ -41,6 +76,28 @@ export function AiHtmlSurface({ windowId }: Props) {
 
   const onOp = useCallback(
     (op: AiOp) => {
+      const directive = op.dataset?.vibeosCommand;
+      if (directive) {
+        try {
+          const raw = JSON.parse(directive);
+          if (op.formData && Object.keys(op.formData).length)
+            raw.data = {
+              ...(raw.data && typeof raw.data === "object" && !Array.isArray(raw.data)
+                ? raw.data
+                : {}),
+              ...op.formData,
+            };
+          const command = communicationCommandSchema.parse(raw);
+          setCommunicationError("");
+          setRequests((n) => n + 1);
+          void sendCommunication(windowId, command)
+            .catch(showError)
+            .finally(() => setRequests((n) => n - 1));
+        } catch (e) {
+          showError(e);
+        }
+        return;
+      }
       // Snapshot the active input before we (likely) re-render.
       const active = document.activeElement as HTMLElement | null;
       if (active && ref.current?.contains(active) && /^(INPUT|TEXTAREA)$/.test(active.tagName)) {
@@ -57,7 +114,7 @@ export function AiHtmlSurface({ windowId }: Props) {
       useWindowStore.getState().setBusy(windowId, true);
       wsClient.send("c2s.op", { windowId, op });
     },
-    [windowId],
+    [windowId, showError],
   );
 
   useDelegatedEvents(ref, onOp);
@@ -93,6 +150,10 @@ export function AiHtmlSurface({ windowId }: Props) {
         el.innerHTML = out;
       }
       el.scrollTop = scroll;
+      for (const delivery of data.current.values())
+        bindCommunication(el, delivery, translate.current);
+      if (!state.patches[windowId]?.streaming)
+        void sendCommunication(windowId, { action: "refresh" }).catch(() => {});
       const p = preserved.current;
       preserved.current = null;
       if (!p || active?.isConnected) return;
@@ -122,7 +183,7 @@ export function AiHtmlSurface({ windowId }: Props) {
         render(state, true);
       }
     });
-  }, [windowId]);
+  }, [windowId, showError]);
 
   // Retry generated images that fail to load (e.g. the held request was cut
   // short, or a transient error) instead of leaving a broken image. The image
@@ -193,7 +254,23 @@ export function AiHtmlSurface({ windowId }: Props) {
     <div className="relative h-full w-full overflow-hidden" onDragOver={onDragOver} onDrop={onDrop}>
       {/* OS-style loading bar pinned to the top while the AI is working.
           No text — the bar alone communicates activity, like a native shell. */}
-      {busy && <ProgressBar />}
+      {(busy || requests > 0) && <ProgressBar />}
+      {communicationError && (
+        <div
+          role="alert"
+          className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 border-b bg-background px-3 py-2 text-xs text-destructive"
+        >
+          <span className="min-w-0 flex-1">{t(communicationError)}</span>
+          <button
+            type="button"
+            onClick={() => setCommunicationError("")}
+            aria-label={t("communication.dismiss")}
+            className="vibe-btn rounded border px-2 py-1"
+          >
+            <X className="size-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* The delegation root is mounted UNCONDITIONALLY (not gated on `html`) so
           useDelegatedEvents can bind its listeners at mount. If it only appeared

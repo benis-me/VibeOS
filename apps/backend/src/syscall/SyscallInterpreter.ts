@@ -1,6 +1,7 @@
 import type { Syscall, WindowSize } from "@vibeos/shared/domain";
 import { broadcast } from "../server/wsGateway.ts";
 import { bus } from "../events/bus.ts";
+import { communicate } from "../events/communication.ts";
 import * as NotificationRepo from "../db/repositories/NotificationRepo.ts";
 import * as AppRepo from "../db/repositories/AppRepo.ts";
 import * as VfsRepo from "../db/repositories/VfsRepo.ts";
@@ -24,21 +25,29 @@ export interface SyscallContext {
   source: "syscall" | "agent" | "system";
   /** Present only on first generation; subsequent interactions keep the user's geometry. */
   resizeFrom?: WindowSize;
+  canCommit?: () => boolean;
 }
 
 export async function execute(calls: Syscall[], ctx: SyscallContext): Promise<void> {
   for (const call of calls) {
+    if (ctx.canCommit && !ctx.canCommit()) return;
     try {
-      log.info(`exec ${call.type}`, call);
+      log.info(`exec ${call.type}`, call.type === "communication" ? { action: call.command.action } : call);
       await one(call, ctx);
     } catch (e) {
       log.error(`failed ${call.type}`, e instanceof Error ? e.message : e);
+      if (call.type === "communication") throw e;
     }
   }
 }
 
 async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
   switch (call.type) {
+    case "communication": {
+      if (!ctx.windowId) throw new Error("communication.closed");
+      await communicate(ctx.windowId, call.command);
+      return;
+    }
     case "resize-window": {
       if (!ctx.windowId || !ctx.resizeFrom) return;
       const window = await resizeGeneratedWindow(ctx.windowId, call.size, ctx.resizeFrom);

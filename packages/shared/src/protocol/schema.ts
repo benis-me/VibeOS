@@ -1,4 +1,5 @@
 import { skinCommandSchema } from "../domain/skins.ts";
+import { communicationCommandSchema } from "../domain/communication.ts";
 import { z } from "zod";
 import type { ClientToServer } from "./client-to-server.ts";
 import { FILE_UPLOAD_LIMIT } from "../domain/files.ts";
@@ -62,6 +63,14 @@ const msg = <T extends string, P extends z.ZodTypeAny>(type: T, payload: P) =>
   z.object({ type: z.literal(type), payload });
 
 export const clientToServerSchema = z.discriminatedUnion("type", [
+  msg(
+    "c2s.communication.command",
+    z.object({
+      windowId: z.string().min(1).max(100),
+      requestId: z.string().min(1).max(100),
+      command: communicationCommandSchema,
+    }),
+  ),
   msg(
     "c2s.skin.command",
     z.object({ requestId: z.string().min(1).max(100), command: skinCommandSchema }),

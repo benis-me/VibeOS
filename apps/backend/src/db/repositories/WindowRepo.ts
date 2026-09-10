@@ -54,6 +54,14 @@ export function getWindow(id: string): WindowState | null {
   return row ? toWindow(row) : null;
 }
 
+export function setWindowFile(id: string, path: string, title: string) {
+  return enqueue(() => {
+    getDb().query("UPDATE windows SET file_path = ?, title = ?, updated_at = ? WHERE id = ? AND is_open = 1")
+      .run(path, title, Date.now(), id);
+    return getWindow(id);
+  });
+}
+
 export function findOpenWindowByApp(appId: string): WindowState | null {
   const db = getDb();
   const row = db

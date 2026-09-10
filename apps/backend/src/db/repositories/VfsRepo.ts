@@ -402,8 +402,9 @@ function applyDiskMutation(
 }
 
 /** Keep desktop references in sync when Files renames, moves or trashes real content. */
-export function mutateDisk(command: DiskCommand) {
+export function mutateDisk(command: DiskCommand, beforeWrite = () => {}) {
   return enqueue(() => {
+    beforeWrite();
     const result = applyDiskMutation(command);
     const desktop = reconcileDesktop();
     return {
