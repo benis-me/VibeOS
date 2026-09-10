@@ -27,6 +27,11 @@ export const NATIVE_PRESET_APPS: PresetAppId[] = [
 ];
 
 export interface AppManifest {
+  instructions?: string;
+  fileTypes?: string[];
+  operations?: { topic: string; description: string }[];
+  dataSchemaVersion?: number;
+  assets?: Record<string, string>;
   /** Short description used to seed the AI prompt for a virtual app. */
   description?: string;
   /** Optional category for grouping in the start menu. */

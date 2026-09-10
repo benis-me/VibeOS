@@ -1,3 +1,4 @@
+import { syncApplicationInstallation } from "./ApplicationRepo.ts";
 import type { VfsNode, VfsNodeType, VfsLocation } from "@vibeos/shared/domain";
 import { ulid } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
@@ -330,6 +331,7 @@ function applyDiskMutation(
           : result.path!;
     for (const [table, column] of [
       ["apps", "content_path"],
+      ["app_versions", "path"],
       ["app_memory", "snapshot_path"],
       ["images", "content_path"],
       ["windows", "file_path"],
@@ -398,6 +400,41 @@ function applyDiskMutation(
     );
     nodes.push(getNode(node.id)!);
   }
+  const appIds = syncApplicationInstallation(command, result);
+  if (appIds.length && (command.action === "trash" || command.action === "restore")) {
+    for (const row of getDb()
+      .query<VfsRow, []>("SELECT * FROM vfs_nodes WHERE type='shortcut'")
+      .all()) {
+      const node = toNode(row);
+      if (!node.targetAppId || !appIds.includes(node.targetAppId)) continue;
+      const path = node.meta.diskPath;
+      if (typeof path !== "string") continue;
+      if (command.action === "trash" && !node.meta.diskTrashId && existsSync(diskPath(path))) {
+        const moved = applyDiskMutation({ action: "trash", path });
+        const updated = getNode(node.id)!;
+        updated.meta.appBundleTrashId = result.path;
+        getDb()
+          .query("UPDATE vfs_nodes SET meta_json=? WHERE id=?")
+          .run(JSON.stringify(updated.meta), node.id);
+        nodes.push(updated);
+        removed.push(...moved.removed);
+      } else if (
+        command.action === "restore" &&
+        node.meta.appBundleTrashId === command.path &&
+        typeof node.meta.diskTrashId === "string" &&
+        !existsSync(diskPath(path))
+      ) {
+        const restored = applyDiskMutation({ action: "restore", path: node.meta.diskTrashId });
+        const updated = getNode(node.id)!;
+        delete updated.meta.appBundleTrashId;
+        getDb()
+          .query("UPDATE vfs_nodes SET meta_json=? WHERE id=?")
+          .run(JSON.stringify(updated.meta), node.id);
+        nodes.push(updated);
+        removed.push(...restored.removed);
+      }
+    }
+  }
   return { result, nodes, removed };
 }
 
@@ -441,7 +478,8 @@ function reconcileDesktop(): { nodes: VfsNode[]; removed: string[] } {
   for (const entry of entries) {
     if (entry.kind === "symlink") continue;
     const existing = indexed.get(entry.path);
-    const type = entry.kind === "directory" ? "folder" : entry.kind;
+    const type =
+      entry.kind === "directory" ? "folder" : entry.kind === "application" ? "file" : entry.kind;
     const name = type === "shortcut" ? entry.name.replace(/\.vibelink$/i, "") : entry.name;
     if (
       existing &&

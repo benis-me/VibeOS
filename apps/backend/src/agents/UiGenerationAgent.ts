@@ -1,3 +1,6 @@
+import { ulid } from "@vibeos/shared/util";
+import { getAppData, readApplicationVersion } from "../db/repositories/ApplicationRepo.ts";
+import { learnFromUser } from "../ai/systemMemory.ts";
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import { NATIVE_PRESET_APPS, type AppDelivery } from "@vibeos/shared/domain";
 import { bus, messageContext } from "../events/bus.ts";
@@ -13,6 +16,7 @@ import {
   saveSnapshot,
   saveSummary,
   addInteraction,
+  interactionInput,
 } from "../db/repositories/AppMemoryRepo.ts";
 import { kernelState } from "../kernel/kernelState.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
@@ -196,12 +200,17 @@ async function generate(
   abort: AbortController,
 ): Promise<void> {
   const win = getWindow(windowId);
-  const app = win ? getApp(win.appId) : null;
+  let app = win ? getApp(win.appId) : null;
   if (!win?.isOpen || !app) {
     return;
   }
   if (app.presetId && NATIVE_PRESET_APPS.includes(app.presetId)) return;
 
+  const definition = readApplicationVersion(app.id, win.appVersionId);
+  if (definition) app = { ...app, manifest: { ...app.manifest, ...definition } };
+  const sharedData = getAppData(app.id);
+  if (definition && sharedData.schemaVersion !== definition.dataSchemaVersion)
+    throw new Error("applications.error.schema");
   await ensureMemory(windowId, app.id);
   if (isStale(windowId, gen, abort)) return;
   const memory = getMemory(windowId);
@@ -209,8 +218,9 @@ async function generate(
 
   broadcast("s2c.ui.busy", { windowId, busy: true });
 
+  let interactionId: string | undefined;
   if (trigger.op || trigger.drag || trigger.message) {
-    await addInteraction({
+    interactionId = await addInteraction({
       windowId,
       opKind: trigger.message ? "message" : (trigger.op?.kind ?? "dragdrop"),
       opPayload: trigger.message ?? trigger.op ?? trigger.drag,
@@ -230,6 +240,7 @@ async function generate(
 
   const prompt = assemblePrompt({
     app,
+    appData: sharedData,
     memory,
     recent: recentInteractions(windowId),
     globalState: kernelState.snapshotForPrompt(),
@@ -242,6 +253,11 @@ async function generate(
     regionIds,
     profileEntries: loadSettings().profileEntries,
     message: trigger.message,
+    workflowInput:
+      trigger.message?.kind === "response" &&
+      trigger.message.trace.interaction?.windowId === windowId
+        ? interactionInput(windowId, trigger.message.trace.interaction.id)
+        : undefined,
     pendingReplies: pendingReplies(windowId, trigger.message?.trace),
   });
 
@@ -359,7 +375,26 @@ async function generate(
           canCommit,
         });
       if (trigger.message) await messageContext.run(trigger.message.trace, execute);
+      else if (trigger.op && interactionId)
+        await messageContext.run(
+          {
+            id: ulid(),
+            hops: 0,
+            windows: [windowId],
+            interaction: { windowId, id: interactionId },
+          },
+          execute,
+        );
       else await execute();
+    }
+    if (trigger.op) {
+      const op = trigger.op;
+      const values = Object.entries(op.formData ?? {})
+        .filter(([key]) => !/password|secret|token|key|credential/i.test(key))
+        .map(([, value]) => value);
+      if (op.value && !/password|secret|token|credential/i.test(op.action ?? ""))
+        values.push(op.value);
+      if (values.length) learnFromUser(values.join("\n"), app.name);
     }
     return;
   }

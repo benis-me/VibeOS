@@ -1,3 +1,5 @@
+import { changeSystemMemory } from "../db/repositories/SystemMemoryRepo.ts";
+import { cancelMemoryExtraction } from "../ai/systemMemory.ts";
 import { activateSkin } from "../db/repositories/SkinRepo.ts";
 import { broadcastSkins } from "../ai/skins.ts";
 import type { ServerWebSocket } from "bun";
@@ -31,6 +33,13 @@ export async function handleSettingsUpdate(
   const prevProvider = activeProviderId();
   const { skin, ...partial } = p.partial;
   if (skin !== undefined) await activateSkin(skin);
+  if (partial.prefs?.memoryEnabled !== undefined) {
+    cancelMemoryExtraction();
+    broadcast(
+      "s2c.memory.state",
+      await changeSystemMemory({ action: "toggle", enabled: partial.prefs.memoryEnabled === true }),
+    );
+  }
   const settings = await updateSettings(partial);
   if (skin !== undefined) broadcastSkins();
   broadcast("s2c.settings.changed", { settings });

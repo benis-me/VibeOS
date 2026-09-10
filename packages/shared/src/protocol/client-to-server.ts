@@ -1,3 +1,5 @@
+import type { ApplicationCommand } from "../domain/applications.ts";
+import type { MemoryCommand } from "../domain/systemMemory.ts";
 import type { SkinCommand } from "../domain/skins.ts";
 import type { CommunicationCommand } from "../domain/communication.ts";
 import type { ProfileChange, ProviderId, Settings } from "../domain/settings.ts";
@@ -39,7 +41,12 @@ export interface DropTarget {
 }
 
 export type ClientToServer =
-  | { type: "c2s.communication.command"; payload: { windowId: string; requestId: string; command: CommunicationCommand } }
+  | { type: "c2s.application.command"; payload: { requestId: string; command: ApplicationCommand } }
+  | { type: "c2s.memory.command"; payload: { requestId: string; command: MemoryCommand } }
+  | {
+      type: "c2s.communication.command";
+      payload: { windowId: string; requestId: string; command: CommunicationCommand };
+    }
   | { type: "c2s.skin.command"; payload: { requestId: string; command: SkinCommand } }
   | { type: "c2s.files.request"; payload: { requestId: string; command: FileRequestCommand } }
   | { type: "c2s.boot.hello"; payload: { clientId?: string } }

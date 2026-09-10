@@ -12,7 +12,7 @@ export const SYSTEM_FOLDERS = [
 export interface DiskEntry {
   path: string;
   name: string;
-  kind: "file" | "directory" | "symlink" | "shortcut";
+  kind: "file" | "directory" | "symlink" | "shortcut" | "application";
   targetAppId?: string;
   icon?: string;
   size: number;
@@ -69,7 +69,10 @@ export function fileMediaType(path: string): string | undefined {
   return extension && Object.hasOwn(types, extension) ? types[extension] : undefined;
 }
 
-export type FileRequestCommand = DiskCommand | { action: "open"; path: string };
+export type FileRequestCommand =
+  | DiskCommand
+  | { action: "open"; path: string }
+  | { action: "reveal"; path: string };
 
 export type DiskCommand =
   | { action: "list" | "stat" | "read" | "mkdir" | "trash" | "restore" | "delete"; path: string }
@@ -84,6 +87,7 @@ export type DiskCommand =
     };
 
 export interface DiskResult {
+  windowId?: string;
   path?: string;
   entries?: DiskEntry[];
   entry?: DiskEntry;

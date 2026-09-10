@@ -6,6 +6,7 @@ import { enqueue } from "./writeQueue.ts";
 interface WindowRow {
   id: string;
   app_id: string;
+  app_version_id: string | null;
   file_path: string | null;
   title: string;
   kind: string;
@@ -26,6 +27,7 @@ function toWindow(row: WindowRow): WindowState {
   return {
     id: row.id,
     appId: row.app_id,
+    appVersionId: row.app_version_id ?? undefined,
     filePath: row.file_path ?? undefined,
     title: row.title,
     kind: row.kind === "system" ? "system" : row.kind === "widget" ? "widget" : "app",
@@ -56,7 +58,10 @@ export function getWindow(id: string): WindowState | null {
 
 export function setWindowFile(id: string, path: string, title: string) {
   return enqueue(() => {
-    getDb().query("UPDATE windows SET file_path = ?, title = ?, updated_at = ? WHERE id = ? AND is_open = 1")
+    getDb()
+      .query(
+        "UPDATE windows SET file_path = ?, title = ?, updated_at = ? WHERE id = ? AND is_open = 1",
+      )
       .run(path, title, Date.now(), id);
     return getWindow(id);
   });
@@ -166,6 +171,9 @@ export function openWindow(input: {
       now,
       input.filePath ?? null,
     );
+    db.query(
+      "UPDATE windows SET app_version_id=(SELECT active_version_id FROM apps WHERE id=?) WHERE id=?",
+    ).run(input.appId, id);
     return getWindow(id)!;
   });
 }

@@ -1,3 +1,4 @@
+import { migrateApplications } from "../db/repositories/ApplicationRepo.ts";
 import { recoverSkins } from "../db/repositories/SkinRepo.ts";
 import { registerCommunication } from "../events/communication.ts";
 import { getDb } from "../db/database.ts";
@@ -24,9 +25,10 @@ import { env } from "../config/env.ts";
 export async function boot() {
   console.log("[boot] VibeOS kernel starting…");
   const db = getDb();
-  const backup = backupBeforeStorageMigration(db, env);
+  const backup = backupBeforeStorageMigration(db, env, 3);
   migrate(db);
   await migrateSystemDisk(backup);
+  await migrateApplications();
 
   const settings = await ensureSettings();
   await recoverSkins();

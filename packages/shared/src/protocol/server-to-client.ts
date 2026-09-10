@@ -1,3 +1,5 @@
+import type { ApplicationState, AppDataSnapshot } from "../domain/applications.ts";
+import type { SystemMemoryState } from "../domain/systemMemory.ts";
 import type { SkinState, SkinRequest, Skin } from "../domain/skins.ts";
 import type { WindowSize, WindowState } from "../domain/window.ts";
 import type { AppDescriptor } from "../domain/app.ts";
@@ -67,8 +69,20 @@ export interface UiPatchPayload {
 }
 
 export type ServerToClient =
+  | { type: "s2c.application.state"; payload: ApplicationState }
+  | {
+      type: "s2c.application.result";
+      payload: { requestId: string; appId?: string; path?: string; error?: string };
+    }
+  | { type: "s2c.appData.changed"; payload: AppDataSnapshot }
+  | { type: "s2c.memory.state"; payload: SystemMemoryState }
+  | { type: "s2c.memory.result"; payload: { requestId: string; error?: string } }
+  | { type: "s2c.apps.changed"; payload: { apps: AppDescriptor[] } }
   | { type: "s2c.communication.delivery"; payload: { delivery: AppDelivery } }
-  | { type: "s2c.communication.result"; payload: { requestId: string; windowId: string; error?: string } }
+  | {
+      type: "s2c.communication.result";
+      payload: { requestId: string; windowId: string; error?: string };
+    }
   | { type: "s2c.skin.state"; payload: SkinState }
   | { type: "s2c.skin.progress"; payload: { request: SkinRequest } }
   | { type: "s2c.skin.result"; payload: { requestId: string; skinId?: Skin; error?: string } }

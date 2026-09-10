@@ -6,7 +6,12 @@ const id = z.string().min(1).max(100);
 const name = z.string().regex(/^[a-zA-Z][a-zA-Z0-9._-]{0,79}$/);
 const path = z.string().max(4096);
 export type MessageData =
-  null | boolean | number | string | MessageData[] | { [key: string]: MessageData };
+  | null
+  | boolean
+  | number
+  | string
+  | MessageData[]
+  | { [key: string]: MessageData };
 // Bound the depth and byte size of user/model-supplied JSON.
 export const messageDataSchema = z
   .unknown()
@@ -39,7 +44,7 @@ export const messageDataSchema = z
 export const messageTargetSchema = z.union([
   z.object({ windowId: id }).strict(),
   z.object({ appId: id, open: z.boolean().optional(), newWindow: z.boolean().optional() }).strict(),
-  z.object({ system: z.enum(["files", "apps", "settings"]) }).strict(),
+  z.object({ system: z.enum(["files", "apps", "settings", "app-data"]) }).strict(),
 ]);
 export const subscriptionSchema = z
   .object({
@@ -94,6 +99,8 @@ export type AppSubscription = z.infer<typeof subscriptionSchema>;
 export type MessageTarget = z.infer<typeof messageTargetSchema>;
 export type MessageSource = { system: true } | { appId: string; windowId: string };
 export interface MessageTrace {
+  /** Runtime reference to the user operation that started this continuation. */
+  interaction?: { windowId: string; id: string };
   id: string;
   hops: number;
   windows: string[];

@@ -1,3 +1,6 @@
+import { supportsFile } from "@vibeos/shared";
+import { requestApplication } from "@/lib/nativeCommands";
+import { useApplicationStore } from "@/stores/applicationStore";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -100,7 +103,9 @@ export function FilesApp({
     e.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
   );
   const errorText = (code: string) =>
-    code.startsWith("communication.") || code.startsWith("files.error.")
+    code.startsWith("communication.") ||
+    code.startsWith("applications.") ||
+    code.startsWith("files.error.")
       ? t(code)
       : t(`files.error.${code}`) === `files.error.${code}`
         ? t("files.error.failed")
@@ -175,7 +180,7 @@ export function FilesApp({
       const next = resolveDiskAddress(address, path);
       const result = await requestFiles({ action: "stat", path: next });
       if (id !== navigationSequence.current) return false;
-      if (result.entry?.kind !== "directory") {
+      if (!["directory", "application"].includes(result.entry?.kind ?? "")) {
         await requestFiles({ action: "open", path: next });
         return true;
       }
@@ -494,7 +499,7 @@ export function FilesApp({
             </>
           ) : (
             <>
-              <div className="flex shrink-0 flex-wrap gap-1.5 border-b px-3 py-2">
+              <div className="flex h-12 shrink-0 items-center gap-1.5 overflow-x-auto border-b px-3">
                 {trash ? (
                   <>
                     <button
@@ -531,8 +536,13 @@ export function FilesApp({
                             .filter(
                               (a) =>
                                 a.isInstalled &&
-                                (!a.presetId ||
-                                  ["text-viewer", "media-viewer"].includes(a.presetId)),
+                                (a.presetId
+                                  ? ["text-viewer", "media-viewer"].includes(a.presetId)
+                                  : supportsFile(
+                                      a.manifest.fileTypes,
+                                      current?.path ?? "",
+                                      fileMediaType(current?.path ?? ""),
+                                    )),
                             )
                             .map((app) => ({
                               type: "item" as const,
@@ -757,6 +767,64 @@ export function FilesApp({
                       aria-selected={selected === e.path}
                       onClick={() => setSelected(e.path)}
                       onDoubleClick={() => openEntry(e)}
+                      onContextMenu={
+                        e.kind === "application" && !trash
+                          ? (event) => {
+                              setSelected(e.path);
+                              const appId = e.targetAppId;
+                              const registered = appId && apps[appId];
+                              const action = (command: Parameters<typeof requestApplication>[0]) =>
+                                void requestApplication(command).catch((error) =>
+                                  setError(error.message),
+                                );
+                              openContextMenu(event, [
+                                {
+                                  type: "item",
+                                  label: t("applications.open"),
+                                  onSelect: () => openEntry(e),
+                                },
+                                {
+                                  type: "item",
+                                  label: t("applications.contents"),
+                                  onSelect: () => void navigate(e.path),
+                                },
+                                ...(registered
+                                  ? [
+                                      {
+                                        type: "item" as const,
+                                        label: t("applications.edit"),
+                                        onSelect: () => {
+                                          useApplicationStore.getState().select(appId);
+                                          wsClient.send("c2s.window.open", { appId: "app-store" });
+                                        },
+                                      },
+                                      {
+                                        type: "item" as const,
+                                        label: t("applications.duplicate"),
+                                        onSelect: () =>
+                                          action({
+                                            action: "duplicate",
+                                            appId,
+                                            name: `${registered.name} ${t("skins.copySuffix")}`,
+                                          }),
+                                      },
+                                      {
+                                        type: "item" as const,
+                                        label: t("store.export"),
+                                        onSelect: () => action({ action: "export", appId }),
+                                      },
+                                      {
+                                        type: "item" as const,
+                                        label: t("applications.uninstall"),
+                                        onSelect: () =>
+                                          void mutate({ action: "trash", path: e.path }),
+                                      },
+                                    ]
+                                  : []),
+                              ]);
+                            }
+                          : undefined
+                      }
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
                           event.preventDefault();
@@ -766,7 +834,7 @@ export function FilesApp({
                       className={`grid w-full grid-cols-[minmax(0,1fr)_68px] items-center gap-3 rounded-md px-2.5 py-2 text-left text-[13px] ${selected === e.path ? "bg-accent" : "hover:bg-accent/40"}`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
-                        {e.kind === "shortcut" ? (
+                        {e.kind === "shortcut" || e.kind === "application" ? (
                           <span className="relative shrink-0">
                             <AppIcon
                               name={apps[e.targetAppId ?? ""]?.icon ?? e.icon}
@@ -774,7 +842,9 @@ export function FilesApp({
                               label={e.name}
                               className="size-5"
                             />
-                            <CornerUpRight className="absolute -bottom-0.5 -left-1 size-2.5 rounded-sm bg-background" />
+                            {e.kind === "shortcut" && (
+                              <CornerUpRight className="absolute -bottom-0.5 -left-1 size-2.5 rounded-sm bg-background" />
+                            )}
                           </span>
                         ) : e.kind === "directory" ? (
                           <Folder className="size-4 shrink-0 text-muted-foreground" />
@@ -793,11 +863,13 @@ export function FilesApp({
                       <span className="text-right text-[10px] text-muted-foreground">
                         {e.kind === "directory"
                           ? t("files.folder")
-                          : e.kind === "shortcut"
-                            ? t("files.shortcut")
-                            : e.kind === "symlink"
-                              ? t("files.link")
-                              : sizeLabel(e.size)}
+                          : e.kind === "application"
+                            ? t("applications.bundle")
+                            : e.kind === "shortcut"
+                              ? t("files.shortcut")
+                              : e.kind === "symlink"
+                                ? t("files.link")
+                                : sizeLabel(e.size)}
                       </span>
                     </button>
                   ))

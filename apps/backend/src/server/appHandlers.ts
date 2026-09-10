@@ -1,11 +1,13 @@
-import type { AppManifest } from "@vibeos/shared/domain";
+import { saveWindowAsApplication } from "../db/repositories/ApplicationRepo.ts";
+import { handleApplicationCommand } from "../ai/applications.ts";
+import { getWindow as currentWindow } from "../db/repositories/WindowRepo.ts";
 import type { ClientToServerPayload } from "@vibeos/shared/protocol";
 import { broadcast } from "./wsGateway.ts";
 import { bus } from "../events/bus.ts";
-import { ensureTransientApp, getApp, installApp } from "../db/repositories/AppRepo.ts";
-import { openWindow, getWindow } from "../db/repositories/WindowRepo.ts";
-import { ensureMemory, getSnapshot } from "../db/repositories/AppMemoryRepo.ts";
-import { ensureShortcut, createNode } from "../db/repositories/VfsRepo.ts";
+import { getApp, installApp } from "../db/repositories/AppRepo.ts";
+import { openWindow } from "../db/repositories/WindowRepo.ts";
+import { ensureMemory } from "../db/repositories/AppMemoryRepo.ts";
+import { ensureShortcut } from "../db/repositories/VfsRepo.ts";
 import { logger } from "../util/log.ts";
 
 const log = logger("router");
@@ -22,7 +24,18 @@ export async function handleAppShortcut(
 
 /** Spawn a fresh window (or desktop widget) and generate its content live. */
 export async function handleAppLaunch(p: ClientToServerPayload<"c2s.app.launch">): Promise<void> {
-  const appId = await ensureTransientApp();
+  const draft = await installApp({
+    name: p.name,
+    icon: p.icon,
+    isInstalled: false,
+    manifest: {
+      description: p.description ?? p.name,
+      instructions: p.description ?? p.name,
+      defaultSize: p.size,
+    },
+  });
+  const appId = draft.id;
+  broadcast("s2c.syscall.appInstalled", { app: draft });
   const widget = !!p.widget;
   const size = p.size ?? (widget ? { w: 320, h: 260 } : { w: 820, h: 580 });
   const w = await openWindow({
@@ -46,64 +59,19 @@ export async function handleAppLaunch(p: ClientToServerPayload<"c2s.app.launch">
 
 /** Freeze a window's current UI as a reusable installed app (+ desktop shortcut). */
 export async function handleAppSave(p: ClientToServerPayload<"c2s.app.save">): Promise<void> {
-  const win = getWindow(p.windowId);
-  if (!win) return;
-  const snapshot = getSnapshot(p.windowId);
-  if (!snapshot.trim()) {
-    broadcast("s2c.error", { code: "ai_failed", detail: "nothing to save yet", windowId: win.id });
-    return;
-  }
-  const src = getApp(win.appId);
-  const name = (p.name ?? win.title ?? src?.name ?? "App").trim() || "App";
-  const app = await installApp({
-    name,
-    icon: p.icon ?? src?.icon ?? "app-window",
-    manifest: {
-      description: src?.manifest.description,
-      defaultSize: { w: win.rect.w, h: win.rect.h },
-      seedHtml: snapshot,
-    },
-  });
+  const app = await saveWindowAsApplication(p.windowId, p.name, p.icon);
   const shortcut = await ensureShortcut(app.id, app.name, app.icon);
   broadcast("s2c.syscall.appInstalled", { app, shortcut: shortcut ?? undefined });
-  log.info(`saved window [${win.id.slice(-6)}] as app "${name}"`);
+  broadcast("s2c.window.stateChanged", { window: currentWindow(p.windowId)! });
+  await handleApplicationCommand({ action: "state" });
 }
 
 /** Export an installed app to a shareable .vibeapp file on the desktop. */
 export async function handleAppExport(p: ClientToServerPayload<"c2s.app.export">): Promise<void> {
-  const app = getApp(p.appId);
-  if (!app) return;
-  const data = JSON.stringify(
-    { vibeapp: 1, name: app.name, icon: app.icon, manifest: app.manifest },
-    null,
-    2,
-  );
-  const node = await createNode({
-    name: `${app.name}.vibeapp`,
-    type: "file",
-    mime: "application/vibeapp+json",
-    content: data,
-    location: "desktop",
-  });
-  broadcast("s2c.syscall.fileCreated", { node });
-  log.info(`exported app "${app.name}" → ${node.name}`);
+  await handleApplicationCommand({ action: "export", appId: p.appId });
 }
 
 /** Import an app from a .vibeapp JSON string. */
 export async function handleAppImport(p: ClientToServerPayload<"c2s.app.import">): Promise<void> {
-  type VibeApp = { name?: string; icon?: string; manifest?: AppManifest };
-  let data: VibeApp | null = null;
-  try {
-    data = JSON.parse(p.json) as VibeApp;
-  } catch {
-    /* ignore */
-  }
-  if (!data || typeof data.name !== "string" || !data.name.trim()) {
-    broadcast("s2c.error", { code: "bad_json" });
-    return;
-  }
-  const app = await installApp({ name: data.name, icon: data.icon, manifest: data.manifest ?? {} });
-  const shortcut = await ensureShortcut(app.id, app.name, app.icon);
-  broadcast("s2c.syscall.appInstalled", { app, shortcut: shortcut ?? undefined });
-  log.info(`imported app "${app.name}"`);
+  await handleApplicationCommand({ action: "import", json: p.json });
 }

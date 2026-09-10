@@ -32,7 +32,10 @@ export async function execute(calls: Syscall[], ctx: SyscallContext): Promise<vo
   for (const call of calls) {
     if (ctx.canCommit && !ctx.canCommit()) return;
     try {
-      log.info(`exec ${call.type}`, call.type === "communication" ? { action: call.command.action } : call);
+      log.info(
+        `exec ${call.type}`,
+        call.type === "communication" ? { action: call.command.action } : call,
+      );
       await one(call, ctx);
     } catch (e) {
       log.error(`failed ${call.type}`, e instanceof Error ? e.message : e);
@@ -94,7 +97,13 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
       // Anchor it to: explicit appId → source app → a generic transient app.
       let appId = call.appId ?? ctx.appId;
       if (!appId || !AppRepo.getApp(appId)) {
-        appId = await AppRepo.ensureTransientApp();
+        const app = await AppRepo.installApp({
+          name: call.title,
+          isInstalled: false,
+          manifest: { description: call.prompt, instructions: call.prompt },
+        });
+        appId = app.id;
+        broadcast("s2c.syscall.appInstalled", { app });
       }
       const w = await openWindow({
         appId,

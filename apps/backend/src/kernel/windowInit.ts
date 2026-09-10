@@ -1,3 +1,4 @@
+import { getAppData } from "../db/repositories/ApplicationRepo.ts";
 import type { AppDescriptor } from "@vibeos/shared/domain";
 import { NATIVE_PRESET_APPS } from "@vibeos/shared/domain";
 import { broadcast } from "../server/wsGateway.ts";
@@ -22,6 +23,8 @@ export async function renderInitialWindow(windowId: string, app: AppDescriptor):
   if (seed.trim()) {
     await saveSnapshot(windowId, seed);
     broadcast("s2c.ui.patch", { windowId, mode: "full", html: seed, done: true });
+    if (app.kind === "virtual" && JSON.stringify(getAppData(app.id).data) !== "{}")
+      bus.emit("window.firstRender", { windowId });
     return;
   }
 

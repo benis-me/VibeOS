@@ -1,3 +1,5 @@
+import { useApplicationStore } from "@/stores/applicationStore";
+import { useMemoryStore } from "@/stores/memoryStore";
 import { useSkinStore } from "@/stores/skinStore";
 import { useEffect } from "react";
 import { wsClient } from "@/lib/ws";
@@ -30,6 +32,11 @@ export function useBoot(): void {
         if (connected) {
           conn.setBootPhase("restoring");
           wsClient.send("c2s.boot.hello", {});
+          wsClient.send("c2s.application.command", {
+            requestId: ulid(),
+            command: { action: "state" },
+          });
+          wsClient.send("c2s.memory.command", { requestId: ulid(), command: { action: "state" } });
         } else {
           conn.setBootPhase("connecting");
         }
@@ -65,6 +72,12 @@ export function useBoot(): void {
     offs.push(
       wsClient.on("s2c.skin.state", (p) => useSkinStore.getState().set(p)),
       wsClient.on("s2c.skin.progress", (p) => useSkinStore.getState().progress(p.request)),
+    );
+
+    offs.push(
+      wsClient.on("s2c.application.state", (p) => useApplicationStore.getState().set(p)),
+      wsClient.on("s2c.memory.state", (p) => useMemoryStore.getState().set(p)),
+      wsClient.on("s2c.apps.changed", (p) => useAppStore.getState().setAll(p.apps)),
     );
 
     offs.push(wsClient.on("s2c.boot.ready", () => conn.setBootPhase("ready")));

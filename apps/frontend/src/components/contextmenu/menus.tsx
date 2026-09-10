@@ -1,3 +1,5 @@
+import { useAppStore } from "@/stores/appStore";
+import { useApplicationStore } from "@/stores/applicationStore";
 import { useSkinStore } from "@/stores/skinStore";
 import {
   Search,
@@ -119,6 +121,19 @@ export function windowMenu(o: { t: T; win: WindowState; native: boolean }): Menu
       ? []
       : ([
           { type: "separator" },
+          ...(useAppStore.getState().apps[o.win.appId]?.isInstalled &&
+          !useAppStore.getState().apps[o.win.appId]?.presetId
+            ? [
+                {
+                  type: "item" as const,
+                  label: o.t("applications.edit"),
+                  onSelect: () => {
+                    useApplicationStore.getState().select(o.win.appId, o.win.id);
+                    wsClient.send("c2s.window.open", { appId: "app-store" });
+                  },
+                },
+              ]
+            : []),
           {
             type: "item",
             label: o.t("win.saveAsApp"),

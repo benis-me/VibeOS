@@ -1,3 +1,4 @@
+import { systemMemoryContext } from "../db/repositories/SystemMemoryRepo.ts";
 import type { AgentRole, AgentTrigger } from "@vibeos/shared/domain";
 import { DEFAULT_LOCALE } from "@vibeos/shared/domain";
 import { ModelPolicy } from "./ModelPolicy.ts";
@@ -30,6 +31,7 @@ export function stopRun(runId: string): boolean {
 }
 
 export interface RunOptions {
+  useSystemMemory?: boolean;
   role: AgentRole;
   trigger: AgentTrigger;
   prompt: string;
@@ -105,7 +107,8 @@ export async function run(opts: RunOptions): Promise<RunResult> {
   const systemPrompt =
     (opts.systemPromptOverride ?? systemPromptFor(opts.role)) +
     localeDirective(locale) +
-    (imageOn ? imageDirective() : "");
+    (imageOn ? imageDirective() : "") +
+    (opts.useSystemMemory === false ? "" : systemMemoryContext());
   // Track the run so the Activity Monitor can stop it. Reuse the caller's abort
   // controller when given (window close already aborts via it), else make one.
   const controller = opts.abort ?? new AbortController();
@@ -192,6 +195,29 @@ export async function run(opts: RunOptions): Promise<RunResult> {
 
 /** Deterministic offline stub so the OS is usable without any provider. */
 function stubResponse(role: AgentRole, prompt: string): string {
+  if (prompt.startsWith("[VIBEOS_MEMORY_EXTRACTION]"))
+    return JSON.stringify({ save: [], remove: [] });
+  if (prompt.startsWith("[VIBEOS_APP_REQUEST]"))
+    return JSON.stringify({
+      summary: "Offline application / 离线示例应用",
+      definition: {
+        description: "Offline sample",
+        instructions:
+          "Continue interpreting actions with AI. Persist durable records with app-data.",
+        seedHtml:
+          '<main data-vibeos-region="root" style="height:100%;display:flex;flex-direction:column;padding:16px;gap:12px"><h2>VibeOS</h2><div data-vibeos-region="content" style="flex:1">Offline sample / 离线示例</div><button data-vibeos-action="continue">Continue / 继续</button></main>',
+        defaultSize: { w: 680, h: 480 },
+        fileTypes: [".md", ".txt"],
+        operations: [
+          {
+            topic: "file.open",
+            description: "Summarize a real text file, save a new result and reply with its path.",
+          },
+        ],
+        dataSchemaVersion: 1,
+        assets: {},
+      },
+    });
   if (prompt.startsWith("[VIBEOS_SKIN_REQUEST]"))
     return JSON.stringify({
       summary: "Offline sample skin / 离线示例皮肤",

@@ -1,9 +1,10 @@
+import { initializeApplication, readApplicationVersion } from "./ApplicationRepo.ts";
 import type { AppDescriptor, AppManifest, PresetAppId } from "@vibeos/shared/domain";
 import { ulid, stripEmoji } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
 import { existsSync } from "node:fs";
 import { diskPath } from "../../files/disk.ts";
-import { writeAppPackage, readAppPackage } from "../../files/content.ts";
+import { contentName, writeAppPackage, readAppPackage } from "../../files/content.ts";
 import { enqueue } from "./writeQueue.ts";
 
 interface AppRow {
@@ -20,8 +21,16 @@ interface AppRow {
 }
 
 function toApp(row: AppRow): AppDescriptor {
-  if (row.content_path)
-    return { ...readAppPackage(row.content_path), id: row.id, isInstalled: row.is_installed === 1 };
+  if (row.content_path) {
+    const app = {
+      ...readAppPackage(row.content_path),
+      id: row.id,
+      isInstalled: row.is_installed === 1,
+    };
+    const definition = readApplicationVersion(row.id);
+    if (definition) app.manifest = { ...app.manifest, ...definition };
+    return app;
+  }
   return {
     id: row.id,
     name: row.name,
@@ -35,10 +44,12 @@ function toApp(row: AppRow): AppDescriptor {
   };
 }
 
-export function listApps(): AppDescriptor[] {
+export function listApps(includeOpenDrafts = false): AppDescriptor[] {
   const db = getDb();
   return db
-    .query<AppRow, []>("SELECT * FROM apps WHERE is_installed = 1 ORDER BY created_at")
+    .query<AppRow, []>(
+      `SELECT * FROM apps WHERE is_installed = 1 ${includeOpenDrafts ? "OR id IN (SELECT app_id FROM windows WHERE is_open=1)" : ""} ORDER BY created_at`,
+    )
     .all()
     .filter(isAvailable)
     .map(toApp);
@@ -147,10 +158,10 @@ const PRESETS: Array<{ id: PresetAppId; name: string; icon: string; manifest: Ap
   },
   {
     id: "app-store",
-    name: "App Store",
+    name: "Applications",
     icon: "layout-grid",
     manifest: {
-      description: "Browse, install, export and share apps.",
+      description: "Manage, modify and continue local AI applications.",
       category: "system",
       defaultSize: { w: 820, h: 580 },
       singleInstance: true,
@@ -214,14 +225,20 @@ function persistPackage(id: string): void {
   const db = getDb();
   const row = db.query<AppRow, [string]>("SELECT * FROM apps WHERE id = ?").get(id)!;
   const app = toApp({ ...row, content_path: null });
-  const path = writeAppPackage(app, row.content_path ?? undefined);
+  const root =
+    app.kind === "virtual" && app.id !== "__transient__"
+      ? `${app.isInstalled ? "Applications" : "Cache/Applications"}/${contentName(app.name, app.id)}.vibeapp/manifest.json`
+      : undefined;
+  const path = writeAppPackage(app, row.content_path ?? root);
   db.query("UPDATE apps SET content_path = ?, manifest_json = '{}' WHERE id = ?").run(path, id);
+  initializeApplication(app);
 }
 
 export function installApp(input: {
   name: string;
   icon?: string;
   manifest?: AppManifest;
+  isInstalled?: boolean;
 }): Promise<AppDescriptor> {
   return enqueue(() => {
     const db = getDb();
@@ -232,8 +249,16 @@ export function installApp(input: {
     const icon = (input.icon ? stripEmoji(input.icon).trim() : "") || "app-window";
     db.query(
       `INSERT INTO apps (id, name, kind, preset_id, icon, manifest_json, is_installed, created_at, updated_at)
-       VALUES (?, ?, 'virtual', NULL, ?, ?, 1, ?, ?)`,
-    ).run(id, name, icon, JSON.stringify(input.manifest ?? {}), now, now);
+       VALUES (?, ?, 'virtual', NULL, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      name,
+      icon,
+      JSON.stringify(input.manifest ?? {}),
+      Number(input.isInstalled !== false),
+      now,
+      now,
+    );
     persistPackage(id);
     return getApp(id)!;
   });

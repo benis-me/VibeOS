@@ -88,8 +88,9 @@ export function readAppPackage(path: string): AppDescriptor {
     throw new Error(`Invalid app package: ${path}`);
   }
   if (app.entry !== undefined) {
-    if (app.entry !== "index.html") throw new Error(`Invalid app entry: ${path}`);
-    app.manifest.seedHtml = readFileSync(diskPath(`${dirname(path)}/index.html`, true), "utf8");
+    if (app.entry !== "index.html" && !/^Versions\/[a-zA-Z0-9_-]+\/index\.html$/.test(app.entry))
+      throw new Error(`Invalid app entry: ${path}`);
+    app.manifest.seedHtml = readFileSync(diskPath(`${dirname(path)}/${app.entry}`, true), "utf8");
   }
   return app;
 }

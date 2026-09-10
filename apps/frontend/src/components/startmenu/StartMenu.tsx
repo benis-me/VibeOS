@@ -21,7 +21,7 @@ interface Props {
 export function StartMenu({ open, onClose, onAppSearch }: Props) {
   const appMap = useAppStore((s) => s.apps);
   const apps = useMemo(
-    () => Object.values(appMap).filter((a) => a.id !== "__transient__"),
+    () => Object.values(appMap).filter((a) => a.isInstalled && a.id !== "__transient__"),
     [appMap],
   );
   const system = useMemo(() => apps.filter((a) => a.kind === "preset"), [apps]);

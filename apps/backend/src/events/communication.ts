@@ -1,3 +1,4 @@
+import { getAppData, setAppData } from "../db/repositories/ApplicationRepo.ts";
 import { z } from "zod";
 import {
   communicationCommandSchema,
@@ -59,7 +60,7 @@ const object = (data: MessageData) =>
 export const communicationError = (error: unknown) => {
   if (error instanceof z.ZodError) return "communication.invalid";
   const text = error instanceof Error ? error.message : String(error);
-  return /^(communication|files\.error|skins\.error)\.[a-zA-Z]+$/.test(text)
+  return /^(communication|files\.error|skins\.error|applications\.error)\.[a-zA-Z]+$/.test(text)
     ? text
     : "files.error." + diskError(error);
 };
@@ -196,8 +197,21 @@ async function systemCall(
   topic: string,
   data: MessageData,
   beforeWrite = () => {},
+  appId?: string,
 ): Promise<MessageData> {
   const args = object(data);
+  if (system === "app-data") {
+    if (!appId) throw new Error("communication.invalid");
+    const snapshot =
+      topic === "get"
+        ? getAppData(appId)
+        : topic === "set"
+          ? await setAppData(appId, data, beforeWrite)
+          : null;
+    if (!snapshot) throw new Error("communication.unsupported");
+    if (topic === "set") broadcast("s2c.appData.changed", snapshot);
+    return JSON.parse(JSON.stringify(snapshot));
+  }
   if (system === "files") {
     const parsed = diskCommandSchema.safeParse({ ...args, action: topic });
     if (!parsed.success) throw new Error("communication.invalid");
@@ -211,6 +225,8 @@ async function systemCall(
         id: a.id,
         name: a.name,
         installed: a.isInstalled,
+        fileTypes: a.manifest.fileTypes ?? [],
+        operations: a.manifest.operations ?? [],
         native: !!a.presetId && NATIVE_PRESET_APPS.includes(a.presetId),
       }));
     if (topic === "windows")
@@ -304,6 +320,7 @@ export async function communicate(
   if (trace?.requests?.some((id) => !pending.has(id))) throw new Error("communication.interrupted");
   const command = communicationCommandSchema.parse(input);
   if (command.action === "refresh") {
+    refreshAppData(windowId);
     await Promise.all(
       listSubscriptions()
         .filter((s) => s.windowId === windowId && s.subscription.refresh)
@@ -388,7 +405,13 @@ export async function communicate(
       };
       const result = await messageContext.run(request.trace, () =>
         "system" in command.target
-          ? systemCall(command.target.system, command.topic, request.data, beforeWrite)
+          ? systemCall(
+              command.target.system,
+              command.topic,
+              request.data,
+              beforeWrite,
+              source.appId,
+            )
           : nativeCall(targetWindow, command.topic, request.data),
       );
       const resultSize = new TextEncoder().encode(JSON.stringify(result)).length;
@@ -430,7 +453,9 @@ function publish(topic: string, data: MessageData, source: MessageSource, trace?
     if (
       "system" in sub.source
         ? !("system" in source)
-        : !("appId" in source) || sub.source.appId !== source.appId
+        : !("appId" in source) ||
+          (sub.source.appId === "self" ? getWindow(windowId)?.appId : sub.source.appId) !==
+            source.appId
     )
       continue;
     // Do not feed a workflow's own mutations back into that workflow.
@@ -497,9 +522,39 @@ async function eventDelivery(
         : (trace ?? { id: ulid(), hops: 0, windows: [] }),
   });
 }
+function refreshAppData(windowId: string) {
+  const window = getWindow(windowId);
+  if (!window?.isOpen) return;
+  const data = JSON.parse(JSON.stringify(getAppData(window.appId)));
+  deliver({
+    id: ulid(),
+    windowId,
+    source: { system: true },
+    kind: "event",
+    topic: "app.data.changed",
+    data,
+    mode: "data",
+    channel: "appData",
+    expiresAt: Date.now() + MESSAGE_TIMEOUT,
+    trace: { id: ulid(), hops: 0, windows: [] },
+  });
+}
 function observe(message: ServerToClient, trace?: MessageTrace) {
   const source: MessageSource = { system: true };
   switch (message.type) {
+    case "s2c.appData.changed":
+      for (const window of listOpenWindows())
+        if (window.appId === message.payload.appId) refreshAppData(window.id);
+      publish(
+        "app.data.changed",
+        JSON.parse(JSON.stringify(message.payload)),
+        { appId: message.payload.appId, windowId: "system" },
+        trace,
+      );
+      break;
+    case "s2c.apps.changed":
+      publish("apps.changed", {}, source, trace);
+      break;
     case "s2c.files.changed":
       publish("files.changed", { paths: message.payload.paths ?? [] }, source, trace);
       break;

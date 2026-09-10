@@ -1,3 +1,5 @@
+import { applicationCommandSchema } from "../domain/applications.ts";
+import { memoryCommandSchema } from "../domain/systemMemory.ts";
 import { skinCommandSchema } from "../domain/skins.ts";
 import { communicationCommandSchema } from "../domain/communication.ts";
 import { z } from "zod";
@@ -36,7 +38,17 @@ const empty = z.object({});
 const filePath = z.string().max(4096);
 export const diskCommandSchema = z.union([
   z.object({
-    action: z.enum(["list", "stat", "read", "mkdir", "trash", "restore", "delete", "open"]),
+    action: z.enum([
+      "list",
+      "stat",
+      "read",
+      "mkdir",
+      "trash",
+      "restore",
+      "delete",
+      "open",
+      "reveal",
+    ]),
     path: filePath,
   }),
   z.object({ action: z.enum(["move", "copy"]), path: filePath, destination: filePath }),
@@ -63,6 +75,14 @@ const msg = <T extends string, P extends z.ZodTypeAny>(type: T, payload: P) =>
   z.object({ type: z.literal(type), payload });
 
 export const clientToServerSchema = z.discriminatedUnion("type", [
+  msg(
+    "c2s.application.command",
+    z.object({ requestId: z.string().min(1).max(100), command: applicationCommandSchema }),
+  ),
+  msg(
+    "c2s.memory.command",
+    z.object({ requestId: z.string().min(1).max(100), command: memoryCommandSchema }),
+  ),
   msg(
     "c2s.communication.command",
     z.object({

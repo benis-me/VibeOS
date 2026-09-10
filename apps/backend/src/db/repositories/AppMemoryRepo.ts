@@ -2,9 +2,8 @@ import type { AppMemory, Interaction } from "@vibeos/shared/domain";
 import { ulid } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
 import { diskPath } from "../../files/disk.ts";
-import { snapshotFile, writeContent } from "../../files/content.ts";
+import { writeContent } from "../../files/content.ts";
 import { enqueue } from "./writeQueue.ts";
 import { parseSubscriptions, storeDeclaredSubscriptions } from "./CommunicationRepo.ts";
 
@@ -91,26 +90,8 @@ export async function saveSnapshot(
       )
       .get(windowId);
     if (!row) return false;
-    const path = row.snapshot_path ?? snapshotFile(row, row.content_path);
+    const path = row.snapshot_path ?? `System/Sessions/${encodeURIComponent(windowId)}/index.html`;
     writeContent(path, html);
-    if (row.app_id === "__transient__" && !row.snapshot_path) {
-      writeContent(
-        `${dirname(path)}/app.json`,
-        JSON.stringify(
-          {
-            id: row.id,
-            name: row.title,
-            kind: "virtual",
-            sourceWindowId: row.id,
-            isInstalled: false,
-            manifest: { defaultSize: { w: row.w, h: row.h } },
-            entry: "index.html",
-          },
-          null,
-          2,
-        ),
-      );
-    }
     db.query(
       "UPDATE app_memory SET snapshot_path = ?, html_snapshot = '', updated_at = ? WHERE window_id = ?",
     ).run(path, Date.now(), windowId);
@@ -169,10 +150,11 @@ export function addInteraction(input: {
   opKind: string;
   opPayload: unknown;
   resultSummary?: string;
-}): Promise<void> {
+}): Promise<string> {
   return enqueue(() => {
     const db = getDb();
     const now = Date.now();
+    const id = ulid(now);
     const seqRow = db
       .query<{ maxseq: number | null }, [string]>(
         "SELECT MAX(seq) as maxseq FROM interactions WHERE window_id = ?",
@@ -183,7 +165,7 @@ export function addInteraction(input: {
       `INSERT INTO interactions (id, window_id, seq, op_kind, op_payload_json, result_summary, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      ulid(now),
+      id,
       input.windowId,
       seq,
       input.opKind,
@@ -191,7 +173,17 @@ export function addInteraction(input: {
       input.resultSummary ?? null,
       now,
     );
+    return id;
   });
+}
+
+export function interactionInput(windowId: string, id: string): unknown {
+  const row = getDb()
+    .query<{ op_payload_json: string }, [string, string]>(
+      "SELECT op_payload_json FROM interactions WHERE id=? AND window_id=?",
+    )
+    .get(id, windowId);
+  return row ? safeJson(row.op_payload_json) : undefined;
 }
 
 function safeJson(s: string): unknown {

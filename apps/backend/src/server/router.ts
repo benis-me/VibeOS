@@ -1,3 +1,6 @@
+import { handleApplicationCommand } from "../ai/applications.ts";
+import { changeSystemMemory } from "../db/repositories/SystemMemoryRepo.ts";
+import { cancelMemoryExtraction, learnFromUser } from "../ai/systemMemory.ts";
 import { handleSkinCommand } from "../ai/skins.ts";
 import { skinState } from "../db/repositories/SkinRepo.ts";
 import type { ServerWebSocket } from "bun";
@@ -23,7 +26,12 @@ import {
   handleAppImport,
   handleAppShortcut,
 } from "./appHandlers.ts";
-import { handleFilesRequest, openDiskFile, broadcastFileWindows } from "./filesHandlers.ts";
+import {
+  handleFilesRequest,
+  openDiskFile,
+  broadcastFileWindows,
+  broadcastDiskChanges,
+} from "./filesHandlers.ts";
 import {
   handleSettingsUpdate,
   handleProfileUpdate,
@@ -90,9 +98,11 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): P
     `◀ ${msg.type}`,
     msg.type === "c2s.skin.command" && msg.payload.command.action === "import"
       ? { action: "import", bytes: Buffer.byteLength(msg.payload.command.json) }
-      : msg.type === "c2s.communication.command"
-        ? { windowId: msg.payload.windowId, action: msg.payload.command.action }
-        : msg.payload,
+      : ["c2s.memory.command", "c2s.application.command"].includes(msg.type)
+        ? { type: msg.type }
+        : msg.type === "c2s.communication.command"
+          ? { windowId: msg.payload.windowId, action: msg.payload.command.action }
+          : msg.payload,
   );
   const t0 = performance.now();
   try {
@@ -109,6 +119,32 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): P
 
 async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promise<void> {
   switch (msg.type) {
+    case "c2s.application.command": {
+      try {
+        const result = await handleApplicationCommand(msg.payload.command);
+        sendTo(ws, "s2c.application.result", { requestId: msg.payload.requestId, ...result });
+      } catch (error) {
+        sendTo(ws, "s2c.application.result", {
+          requestId: msg.payload.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    }
+    case "c2s.memory.command": {
+      try {
+        if (msg.payload.command.action !== "state") cancelMemoryExtraction();
+        broadcast("s2c.memory.state", await changeSystemMemory(msg.payload.command));
+        broadcast("s2c.settings.changed", { settings: loadSettings() });
+        sendTo(ws, "s2c.memory.result", { requestId: msg.payload.requestId });
+      } catch (error) {
+        sendTo(ws, "s2c.memory.result", {
+          requestId: msg.payload.requestId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return;
+    }
     case "c2s.communication.command": {
       const { windowId, requestId, command } = msg.payload;
       try {
@@ -199,15 +235,18 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
     }
 
     case "c2s.vfs.move": {
+      const previousLocation = getNode(msg.payload.nodeId)?.location;
       const node = await moveNode(msg.payload);
       if (node) broadcast("s2c.vfs.changed", { node });
-      broadcastFileWindows();
+      if (previousLocation !== node?.location) await broadcastDiskChanges();
+      else broadcastFileWindows();
       return;
     }
 
     case "c2s.vfs.delete": {
       if (await deleteNode(msg.payload.nodeId)) {
         broadcast("s2c.vfs.removed", { ids: [msg.payload.nodeId] });
+        await broadcastDiskChanges();
       }
       return;
     }
@@ -215,6 +254,7 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
     case "c2s.vfs.empty": {
       const ids = await emptyRecycleBin();
       if (ids.length) broadcast("s2c.vfs.removed", { ids });
+      await broadcastDiskChanges();
       return;
     }
 
@@ -318,6 +358,7 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
     }
 
     case "c2s.app.search": {
+      learnFromUser(msg.payload.query, "Search");
       // Cancel this connection's previous in-flight search so fast typing doesn't
       // leave redundant AI generations running (the client debounces too, but a
       // new query that lands mid-generation should preempt the old one).
@@ -331,6 +372,7 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
     }
 
     case "c2s.command.run": {
+      learnFromUser(msg.payload.text, "Command");
       // AI command palette: interpret the instruction into syscalls and run them.
       commandAborts.get(ws)?.abort();
       const ctrl = new AbortController();
@@ -451,7 +493,7 @@ function sendBootState(ws: ServerWebSocket<WsData>): void {
     settings: loadSettings(),
     skins: skinState(),
     windows,
-    apps: listApps(),
+    apps: listApps(true),
     desktopNodes: listByLocation("desktop"),
     recycleBinNodes: listByLocation("recyclebin"),
     notifications: listRecent(),

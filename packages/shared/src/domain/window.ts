@@ -16,6 +16,7 @@ export interface WindowState {
   filePath?: string;
   id: string;
   appId: string;
+  appVersionId?: string;
   title: string;
   kind: WindowKind;
   rect: Rect;

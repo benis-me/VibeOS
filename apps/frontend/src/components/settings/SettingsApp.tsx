@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { SlidersHorizontal, Server, Boxes, Info, User } from "lucide-react";
+import { SlidersHorizontal, Server, Boxes, Info, User, Brain } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/lib/i18n";
 import { EASE_OUT } from "@/lib/motion";
@@ -9,9 +9,10 @@ import { GeneralPane } from "./GeneralPane";
 import { ProvidersPane } from "./ProvidersPane";
 import { DefaultModelsPane } from "./DefaultModelsPane";
 import { ProfilePane } from "./ProfilePane";
+import { MemoryPane } from "./MemoryPane";
 import { AboutPane } from "./AboutPane";
 
-type CategoryId = "providers" | "models" | "general" | "profile" | "about";
+type CategoryId = "providers" | "models" | "general" | "profile" | "memory" | "about";
 
 /**
  * Settings is the one app rendered natively (not AI-hallucinated): it controls
@@ -34,6 +35,7 @@ export function SettingsApp() {
       label: t("settings.cat.general"),
     },
     { id: "profile", icon: <User className="size-3.5" />, label: t("settings.cat.profile") },
+    { id: "memory", icon: <Brain className="size-3.5" />, label: t("memory.title") },
     { id: "about", icon: <Info className="size-3.5" />, label: t("settings.cat.about") },
   ];
 
@@ -81,6 +83,7 @@ export function SettingsApp() {
               {category === "models" && <DefaultModelsPane />}
               {category === "general" && <GeneralPane />}
               {category === "profile" && <ProfilePane />}
+              {category === "memory" && <MemoryPane />}
               {category === "about" && <AboutPane />}
             </motion.div>
           </AnimatePresence>

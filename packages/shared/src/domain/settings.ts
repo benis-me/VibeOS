@@ -327,6 +327,7 @@ export interface ImageModelRef {
 }
 
 export interface Preferences {
+  memoryEnabled?: boolean;
   /** Disable proactive system-event agent. */
   proactiveAgents?: boolean;
   /** Desktop wallpaper: an `/api/img/:id` path (uploaded or generated), or

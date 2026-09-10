@@ -61,6 +61,18 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   applies scoped CSS live without regenerating app HTML. A copied built-in retains
   its immutable packaged chrome, with independent token/rule overrides. **App UI**
   agents are not told the skin: generated HTML stays token-based and skin-neutral.
+- **Local applications and memory.** Applications is the native local app/version editor;
+  see `docs/applications-and-memory.md`. Virtual apps have independent identities,
+  immutable definitions in `Applications/*.vibeapp/Versions`, window-pinned versions,
+  and revision-checked shared data in `System/AppData`. UI interactions remain AI generated.
+  Definition tasks survive closing the editor; failed output never activates a version.
+  Storage v3 preserves old snapshots in System/Sessions and archives legacy bundles.
+  File moves/trash/restore reconcile application indexes in the existing file writer queue.
+  System memory is opt-in, user-editable and separate from app data; direct user inputs
+  are the only automatic extraction source. Manual edits/off invalidate in-flight extraction.
+  Memory context enters through SdkManager; never feed model output or file contents into
+  the extractor. Communication traces retain the initiating interaction ID so subsequent
+  read/write turns can use full original form values instead of truncated summaries.
 - **i18n (zh / en).** `Settings.locale` drives both the native UI (frontend dictionary in
   `lib/i18n.ts`, `useT()`) and generated content (`localeDirective()` appended to every
   system prompt in `SdkManager`). Undefined locale ⇒ frontend follows the browser and

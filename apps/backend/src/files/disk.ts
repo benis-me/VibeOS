@@ -81,6 +81,26 @@ function entry(path: string, internal = false, originalPath = path): DiskEntry {
   const abs = internal ? join(diskRoot(), path) : diskPath(path);
   const stat = lstatSync(abs);
   let shortcut: ReturnType<typeof readShortcut> | undefined;
+  let application: { id: string; icon?: string } | undefined;
+  if (stat.isDirectory() && originalPath.toLowerCase().endsWith(".vibeapp")) {
+    try {
+      const manifest = diskPath(`${path}/manifest.json`, true);
+      if (lstatSync(manifest).size < 128 * 1024) {
+        const value = JSON.parse(readFileSync(manifest, "utf8"));
+        if (
+          value.format === 2 &&
+          typeof value.id === "string" &&
+          /^[a-zA-Z0-9_-]{1,100}$/.test(value.id)
+        )
+          application = {
+            id: value.id,
+            icon: typeof value.icon === "string" ? value.icon : undefined,
+          };
+      }
+    } catch {
+      /* A damaged bundle remains inspectable as a folder. */
+    }
+  }
   if (stat.isFile() && originalPath.toLowerCase().endsWith(".vibelink")) {
     try {
       shortcut = readShortcut(abs);
@@ -94,12 +114,14 @@ function entry(path: string, internal = false, originalPath = path): DiskEntry {
     kind: stat.isSymbolicLink()
       ? "symlink"
       : stat.isDirectory()
-        ? "directory"
+        ? application
+          ? "application"
+          : "directory"
         : shortcut
           ? "shortcut"
           : "file",
-    targetAppId: shortcut?.appId,
-    icon: shortcut?.icon,
+    targetAppId: application?.id ?? shortcut?.appId,
+    icon: application?.icon ?? shortcut?.icon,
     size: stat.size,
     modifiedAt: stat.mtimeMs,
   };
@@ -153,6 +175,8 @@ function trashInfo(id: string): { path: string; container: string } {
 function assertMutable(path: string): void {
   if ((SYSTEM_FOLDERS as readonly string[]).includes(path) || path.startsWith("System/"))
     fail("systemFolder");
+  // Published bundles are immutable; edit them through the application version command.
+  if (/\.vibeapp\//i.test(path)) fail("systemFolder");
 }
 
 /** Synchronous filesystem mutations serialize naturally within the Bun event loop. */

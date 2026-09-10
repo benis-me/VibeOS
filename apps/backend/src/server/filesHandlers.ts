@@ -1,3 +1,11 @@
+import { applicationPath } from "../db/repositories/ApplicationRepo.ts";
+import {
+  importApplication,
+  importApplicationDirectory,
+} from "../db/repositories/ApplicationPackageRepo.ts";
+import { broadcastApplications } from "../ai/applications.ts";
+import { bus } from "../events/bus.ts";
+import { closeWindow } from "../db/repositories/WindowRepo.ts";
 import type { ServerWebSocket } from "bun";
 import type { ClientToServerPayload } from "@vibeos/shared/protocol";
 import { executeDisk, diskError, diskPath } from "../files/disk.ts";
@@ -7,7 +15,7 @@ import { basename } from "node:path";
 import { fileMediaType, MAX_SKIN_PACKAGE_BYTES, type DiskResult } from "@vibeos/shared/domain";
 import { handleSkinCommand } from "../ai/skins.ts";
 import { allowedOrigin } from "./requestOrigin.ts";
-import { mutateDisk, syncDesktopFiles } from "../db/repositories/VfsRepo.ts";
+import { listByLocation, mutateDisk, syncDesktopFiles } from "../db/repositories/VfsRepo.ts";
 import { readShortcut } from "../files/shortcuts.ts";
 import { renderInitialWindow } from "../kernel/windowInit.ts";
 import { getApp } from "../db/repositories/AppRepo.ts";
@@ -23,16 +31,34 @@ import {
 export async function openDiskFile(path: string) {
   const absolute = diskPath(path);
   const info = lstatSync(absolute);
-  if (!info.isFile()) throw new Error("notFile");
+  let bundleApp: string | undefined;
+  if (path.toLowerCase().endsWith(".vibeapp")) {
+    if (info.isDirectory()) {
+      const entry = executeDisk({ action: "stat", path }).entry!;
+      const known = entry.targetAppId && getApp(entry.targetAppId);
+      bundleApp =
+        known && applicationPath(known.id) === path
+          ? known.id
+          : (await importApplicationDirectory(path)).id;
+    } else if (info.isFile()) {
+      if (info.size > 24 * 1024 * 1024) throw new Error("tooLarge");
+      bundleApp = (await importApplication(readFileSync(absolute, "utf8"))).id;
+    }
+    broadcastApplications();
+    await broadcastDiskChanges();
+  }
+  if (!bundleApp && !info.isFile()) throw new Error("notFile");
   const skinFile = path.toLowerCase().endsWith(".vibeskin");
   if (skinFile) {
     if (info.size > MAX_SKIN_PACKAGE_BYTES) throw new Error("skins.error.packageSize");
     await handleSkinCommand({ action: "import", json: readFileSync(absolute, "utf8") });
   }
   const shortcut = path.toLowerCase().endsWith(".vibelink") ? readShortcut(absolute) : undefined;
-  const appId = skinFile
-    ? "skins"
-    : (shortcut?.appId ?? (fileMediaType(path) ? "media-viewer" : "text-viewer"));
+  const appId =
+    bundleApp ??
+    (skinFile
+      ? "skins"
+      : (shortcut?.appId ?? (fileMediaType(path) ? "media-viewer" : "text-viewer")));
   const app = getApp(appId);
   if (!app?.isInstalled) throw new Error("missingApp");
   const existing = app.manifest.singleInstance ? findOpenWindowByApp(appId) : null;
@@ -43,21 +69,30 @@ export async function openDiskFile(path: string) {
   }
   const window = await openWindow({
     appId,
-    title: shortcut || skinFile ? app.name : basename(path),
+    title: shortcut || skinFile || bundleApp ? app.name : basename(path),
     kind: app.presetId ? "system" : "app",
     size: app.manifest.defaultSize,
-    filePath: shortcut || skinFile ? undefined : path,
+    filePath: shortcut || skinFile || bundleApp ? undefined : path,
   });
   await ensureMemory(window.id, appId);
   broadcast("s2c.window.opened", { window });
-  if (shortcut || skinFile) await renderInitialWindow(window.id, app);
+  if (shortcut || skinFile || bundleApp) await renderInitialWindow(window.id, app);
   return window;
 }
 
 export async function broadcastDiskChanges() {
-  const { nodes, removed } = await syncDesktopFiles();
-  for (const node of nodes) broadcast("s2c.vfs.changed", { node });
+  const { removed } = await syncDesktopFiles();
+  for (const node of [...listByLocation("desktop"), ...listByLocation("recyclebin")])
+    broadcast("s2c.vfs.changed", { node });
   if (removed.length) broadcast("s2c.vfs.removed", { ids: removed });
+  for (const window of listOpenWindows())
+    if (!getApp(window.appId)) {
+      bus.emit("window.closed", { windowId: window.id });
+      await closeWindow(window.id);
+      broadcast("s2c.window.closed", { windowId: window.id });
+    }
+  broadcastApplications();
+  broadcastFileWindows();
   broadcast("s2c.files.changed", {});
 }
 
@@ -73,6 +108,27 @@ export async function executeFileCommand(
   beforeWrite = () => {},
 ): Promise<DiskResult & { windowId?: string }> {
   beforeWrite();
+  if (command.action === "reveal") {
+    const entry = executeDisk({ action: "stat", path: command.path }).entry!;
+    const app = getApp("file-manager")!;
+    const window = await openWindow({
+      appId: app.id,
+      title: app.name,
+      kind: "system",
+      size: app.manifest.defaultSize,
+    });
+    await ensureMemory(window.id, app.id);
+    broadcast("s2c.window.opened", { window });
+    broadcast("s2c.chrome.set", {
+      windowId: window.id,
+      patch: {
+        path: ["directory", "application"].includes(entry.kind)
+          ? command.path
+          : command.path.split("/").slice(0, -1).join("/"),
+      },
+    });
+    return { path: command.path, windowId: window.id };
+  }
   if (command.action === "open") {
     const window = await openDiskFile(command.path);
     return { path: command.path, windowId: window.id };
@@ -85,14 +141,7 @@ export async function executeFileCommand(
   for (const node of nodes) broadcast("s2c.vfs.changed", { node });
   if (removed.length) broadcast("s2c.vfs.removed", { ids: removed });
   if (!readOnly) {
-    broadcastFileWindows();
-    broadcast("s2c.files.changed", {
-      paths: [
-        command.path,
-        ...("destination" in command ? [command.destination] : []),
-        ...(result.path ? [result.path] : []),
-      ],
-    });
+    await broadcastDiskChanges();
   }
   return { path: command.path, ...result };
 }

@@ -90,13 +90,17 @@ export function hasSystemDiskVersion(db: Database, version = 1): boolean {
 export function backupBeforeStorageMigration(
   db: Database,
   paths: { dbPath: string; runtimeDir: string; diskDir: string },
+  targetVersion = 2,
 ): string | undefined {
   if (
-    hasSystemDiskVersion(db, 2) ||
+    hasSystemDiskVersion(db, targetVersion) ||
     !db.query("SELECT name FROM sqlite_master WHERE name = 'apps'").get()
   )
     return;
-  const pending = join(paths.runtimeDir, "system-disk-migration.json");
+  const pending = join(
+    paths.runtimeDir,
+    targetVersion === 2 ? "system-disk-migration.json" : "applications-migration.json",
+  );
   if (existsSync(pending)) {
     const record = JSON.parse(readFileSync(pending, "utf8"));
     if (record.source !== paths.dbPath || !existsSync(join(record.backup, "vibeos.db")))
@@ -125,7 +129,7 @@ export function backupBeforeStorageMigration(
   if (existsSync(cache))
     cpSync(cache, join(backup, "cache"), { recursive: true, verbatimSymlinks: true });
   const record = JSON.stringify(
-    { version: 2, source: paths.dbPath, backup, createdAt: Date.now() },
+    { version: targetVersion, source: paths.dbPath, backup, createdAt: Date.now() },
     null,
     2,
   );
