@@ -22,12 +22,14 @@ function request(kind: "application" | "memory", command: ApplicationCommand | M
       if (!connected) finish("error.disconnected");
     });
     const timer = setTimeout(() => finish("error.timeout"), 20000);
-    if (kind === "application")
-      wsClient.send("c2s.application.command", {
-        requestId,
-        command: command as ApplicationCommand,
-      });
-    else wsClient.send("c2s.memory.command", { requestId, command: command as MemoryCommand });
+    const sent =
+      kind === "application"
+        ? wsClient.send("c2s.application.command", {
+            requestId,
+            command: command as ApplicationCommand,
+          })
+        : wsClient.send("c2s.memory.command", { requestId, command: command as MemoryCommand });
+    if (!sent) finish("error.disconnected");
   });
 }
 export const requestApplication = (command: ApplicationCommand) => request("application", command);

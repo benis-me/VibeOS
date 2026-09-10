@@ -29,6 +29,7 @@ try {
   const scroll = surface.querySelector("[data-scroll]");
   const page = surface.firstElementChild;
   input.value = "Unsubmitted draft";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
   input.focus();
   input.setSelectionRange(3, 7);
   scroll.scrollTop = 90;
@@ -57,10 +58,10 @@ try {
     assert(rejected && useWindowStore.getState().snapshots.regression === before && surface.firstElementChild === page, "Invalid batch partially applied");
   }
   let op;
-  wsClient.send = (type, payload) => { if (type === "c2s.op") op = payload.op; };
+  wsClient.send = (type, payload) => { if (type === "c2s.op") op = payload.op; return true; };
   input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   assert(op?.regionPath.join("/") === "editor/page" && op.value === input.value, "Operation lost region context or input");
-  patch([{ region: "editor", html: '<section data-vibeos-region="editor"><input name="draft" data-vibeos-action="submit-draft"><div data-scroll="true" style="height:40px;overflow:auto"><div style="height:300px">Scrollable</div></div></section>' }]);
+  store.applyPatch({ windowId: "regression", operationId: op.id, mode: "regions", done: true, regions: [{ region: "editor", html: '<section data-vibeos-region="editor"><input name="draft" data-vibeos-action="submit-draft"><div data-scroll="true" style="height:40px;overflow:auto"><div style="height:300px">Scrollable</div></div></section>' }] });
   assert(surface.querySelector("input").value === "", "An explicit input-region reset was ignored");
   store.applyPatch({ windowId: "regression", mode: "full", html: '<article data-vibeos-region="page">New page</article>', done: true });
   assert(!page.isConnected && surface.firstElementChild.tagName === "ARTICLE", "Explicit full render did not replace the page");

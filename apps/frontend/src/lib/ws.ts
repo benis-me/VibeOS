@@ -37,7 +37,6 @@ class WsClient {
   private ws: WebSocket | null = null;
   private handlers = new Map<string, Set<AnyHandler>>();
   private statusHandlers = new Set<(connected: boolean) => void>();
-  private queue: string[] = [];
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   connect(): void {
@@ -52,8 +51,6 @@ class WsClient {
 
     ws.onopen = () => {
       this.notifyStatus(true);
-      for (const frame of this.queue) ws.send(frame);
-      this.queue = [];
     };
 
     ws.onmessage = (e) => {
@@ -107,13 +104,15 @@ class WsClient {
   send<T extends ClientToServer["type"]>(
     type: T,
     payload: Extract<ClientToServer, { type: T }>["payload"],
-  ): void {
+  ): boolean {
     const env = makeEnvelope(type, payload, ulid());
     const frame = JSON.stringify(env);
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(frame);
+      return true;
     } else {
-      this.queue.push(frame);
+      // The caller owns retries. Replaying a failed mutation after reconnect is unsafe.
+      return false;
     }
   }
 }

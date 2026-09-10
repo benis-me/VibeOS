@@ -29,6 +29,7 @@ import {
 } from "@vibeos/shared/domain";
 import { env } from "../config/env.ts";
 import { readShortcut } from "./shortcuts.ts";
+import { bus, messageContext } from "../events/bus.ts";
 
 const fail = (code: string): never => {
   throw new Error(code);
@@ -51,16 +52,69 @@ export function diskPath(path: string, internal = false): string {
     (!internal && (parts[0] === "Trash" || parts[0] === ".Trash"))
   )
     fail("path");
-  let current = diskRoot();
+  const root = diskRoot();
+  let current = root;
   for (const part of parts) {
     current = join(current, part);
     try {
       if (lstatSync(current).isSymbolicLink()) fail("symlink");
+      current = realpathSync(current);
+      if (current !== root && !current.startsWith(root + sep)) fail("path");
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
   }
+  if (!internal && ["Trash", ".Trash"].includes(relative(root, current).split(sep)[0]!))
+    fail("path");
   return current;
+}
+
+/** Resolve casing/normalization using the host filesystem before matching runtime indexes. */
+export function canonicalFileCommand<
+  T extends { action: string; path: string; destination?: string },
+>(command: T): T {
+  const canonical = (path: string) =>
+    relative(diskRoot(), diskPath(path, true)).split(sep).join("/");
+  return {
+    ...command,
+    path: ["restore", "delete"].includes(command.action) ? command.path : canonical(command.path),
+    ...("destination" in command ? { destination: canonical(command.destination!) } : {}),
+  };
+}
+
+const signatures = new Map<string, string>();
+const visibleChange = (path: string) =>
+  !!path &&
+  !/^(System|Cache)(\/|$)/.test(path) &&
+  !/(^|\/)(\.DS_Store|Thumbs\.db|desktop\.ini|\._[^/]*)$/.test(path) &&
+  !path.includes(".vibeos-write-");
+const signature = (path: string) => {
+  try {
+    const stat = lstatSync(diskPath(path, true), { bigint: true });
+    return `${stat.ino}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`;
+  } catch {
+    return "missing";
+  }
+};
+function rememberChange(path: string) {
+  signatures.delete(path);
+  signatures.set(path, signature(path));
+  // ponytail: bounded watcher deduplication; older paths simply get a fresh external notification.
+  if (signatures.size > 4096) signatures.delete(signatures.keys().next().value!);
+}
+export function noteDiskChanges(paths: string[]) {
+  const changed = [...new Set(paths)].filter(visibleChange);
+  for (const path of changed) {
+    rememberChange(path);
+    // Creating, replacing or removing an entry also produces parent-directory watch events.
+    for (let parent = dirname(path); parent !== "."; parent = dirname(parent))
+      rememberChange(parent);
+  }
+  if (changed.length) {
+    const trace = messageContext.getStore();
+    // Repositories finish their synchronous SQL/index updates before readers observe the change.
+    queueMicrotask(() => bus.emit("disk.changed", { paths: changed, trace }));
+  }
 }
 
 function fileBytes(path: string, limit: number): Buffer {
@@ -173,6 +227,7 @@ function trashInfo(id: string): { path: string; container: string } {
 }
 
 function assertMutable(path: string): void {
+  path = canonicalFileCommand({ action: "write", path }).path;
   if ((SYSTEM_FOLDERS as readonly string[]).includes(path) || path.startsWith("System/"))
     fail("systemFolder");
   // Published bundles are immutable; edit them through the application version command.
@@ -180,7 +235,7 @@ function assertMutable(path: string): void {
 }
 
 /** Synchronous filesystem mutations serialize naturally within the Bun event loop. */
-export function executeDisk(command: DiskCommand): DiskResult {
+function executeDiskCommand(command: DiskCommand): DiskResult {
   if (command.action === "list") return { entries: list(command.path) };
   if (command.action === "stat")
     return { entry: command.path === "Trash" ? entry("Trash", true) : entry(command.path) };
@@ -288,14 +343,41 @@ export function diskError(error: unknown): string {
     : "failed";
 }
 
-export function watchDisk(changed: () => void): void {
+export function executeDisk(input: DiskCommand): DiskResult {
+  const command = canonicalFileCommand(input);
+  const result = executeDiskCommand(command);
+  if (!["list", "read", "stat"].includes(command.action)) {
+    const from = ["restore", "delete"].includes(command.action)
+      ? `Trash/${command.path}`
+      : command.path;
+    const to = command.action === "trash" ? `Trash/${result.path}` : result.path;
+    noteDiskChanges([from, ...(to ? [to] : [])]);
+  }
+  return result;
+}
+
+export function watchDisk(changed: (paths: string[]) => void): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const watcher = watch(diskRoot(), { recursive: true }, () => {
+  const pending = new Set<string>();
+  const watcher = watch(diskRoot(), { recursive: true }, (_event, filename) => {
+    if (!filename) return;
+    const path = String(filename).split(sep).join("/");
+    if (!visibleChange(path)) return;
+    pending.add(path);
     clearTimeout(timer);
-    timer = setTimeout(changed, 120);
+    timer = setTimeout(() => {
+      const paths = [...pending].filter((p) => signatures.get(p) !== signature(p));
+      pending.clear();
+      for (const p of paths) rememberChange(p);
+      if (paths.length) changed(paths);
+    }, 120);
   });
   watcher.on("error", (error) => console.warn("[files] watch failed", error.message));
   watcher.unref();
+  return () => {
+    clearTimeout(timer);
+    watcher.close();
+  };
 }
 
 /** Internal repositories may archive their own protected system content. Never exposed as a file command. */

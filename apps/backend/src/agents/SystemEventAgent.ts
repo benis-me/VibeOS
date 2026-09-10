@@ -1,5 +1,5 @@
 import type { TimerAgent } from "./types.ts";
-import { run, recordSummary } from "../ai/SdkManager.ts";
+import { run, recordSummary, recordStep } from "../ai/SdkManager.ts";
 import { parseAiOutput } from "../ai/streamParser.ts";
 import { kernelState } from "../kernel/kernelState.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
@@ -23,6 +23,15 @@ export const SystemEventAgent: TimerAgent = {
     const result = await run({ role: "system-event", trigger: "timer", prompt, appName: "System" });
     if (!result.ok) return;
     const parsed = parseAiOutput(result.text);
+    if (parsed.syscallError || parsed.renderError) {
+      await recordStep(
+        "syscall.rejected",
+        { error: parsed.syscallError ?? parsed.renderError },
+        { id: result.runId!, runId: result.runId },
+        "error",
+      );
+      return;
+    }
     await recordSummary(result.runId, parsed.summary || "Ambient event");
     if (parsed.syscalls.length > 0) {
       await Syscalls.execute(parsed.syscalls, { source: "agent" });

@@ -5,6 +5,7 @@ import { communicationCommandSchema } from "../domain/communication.ts";
 import { z } from "zod";
 import type { ClientToServer } from "./client-to-server.ts";
 import { FILE_UPLOAD_LIMIT } from "../domain/files.ts";
+import { activityFilterSchema } from "../domain/agent.ts";
 
 /**
  * Runtime validation for inbound client→server messages. The WS boundary is the
@@ -13,12 +14,17 @@ import { FILE_UPLOAD_LIMIT } from "../domain/files.ts";
  */
 
 const aiOp = z.object({
+  id: z.string().max(100).optional(),
   kind: z.enum(["click", "input", "submit", "change", "key", "custom"]),
   action: z.string().optional(),
   sel: z.string().optional(),
   dataset: z.record(z.string(), z.string()).optional(),
   value: z.string().optional(),
   formData: z.record(z.string(), z.string()).optional(),
+  userInput: z
+    .array(z.object({ key: z.string(), type: z.string(), value: z.string() }))
+    .max(256)
+    .optional(),
   regionPath: z.array(z.string()).optional(),
 });
 
@@ -176,7 +182,17 @@ export const clientToServerSchema = z.discriminatedUnion("type", [
   msg("c2s.app.import", z.object({ json: z.string() })),
   msg(
     "c2s.activity.fetch",
-    z.object({ before: z.number().optional(), limit: z.number().optional() }),
+    z.object({
+      before: z.number().int().nonnegative().optional(),
+      beforeId: z.string().max(100).optional(),
+      limit: z.number().int().positive().optional(),
+      filter: activityFilterSchema.optional(),
+      requestId: z.string().max(100).optional(),
+    }),
+  ),
+  msg(
+    "c2s.activity.details",
+    z.object({ runId: z.string().max(100), requestId: z.string().max(100) }),
   ),
   msg("c2s.activity.stop", z.object({ runId: z.string() })),
   msg("c2s.command.run", z.object({ text: z.string(), requestId: z.string() })),

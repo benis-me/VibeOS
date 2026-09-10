@@ -9,6 +9,7 @@ import { replaceRegions } from "@/lib/patch";
 import { wsClient, API_BASE } from "@/lib/ws";
 import { useDelegatedEvents } from "@/hooks/useDelegatedEvents";
 import { useWindowStore } from "@/stores/windowStore";
+import { createDrafts, fieldKey, type Field } from "@/lib/fields";
 
 interface Props {
   windowId: string;
@@ -19,17 +20,6 @@ interface Props {
  * full replacements and any remount.
  */
 const scrollMemory = new Map<string, number>();
-
-/** Identify an input across re-renders (name → action → placeholder). */
-function inputKey(el: HTMLInputElement | HTMLTextAreaElement): string {
-  return (
-    el.getAttribute("name") ??
-    el.dataset.vibeosAction ??
-    el.getAttribute("placeholder") ??
-    el.getAttribute("aria-label") ??
-    ""
-  );
-}
 
 /**
  * Renders sanitized AI-generated HTML and routes all interactions back to the
@@ -70,12 +60,10 @@ export function AiHtmlSurface({ windowId }: Props) {
   }, [windowId, showError]);
   const busy = useWindowStore((s) => s.busy[windowId]);
 
-  // Remember the user's in-progress input across re-renders so a full-replace
-  // doesn't wipe what they were typing (e.g. a browser address bar).
-  const preserved = useRef<{ key: string; value: string; caret: number | null } | null>(null);
+  const drafts = useRef(createDrafts()).current;
 
   const onOp = useCallback(
-    (op: AiOp) => {
+    (op: AiOp, scope: HTMLElement) => {
       const directive = op.dataset?.vibeosCommand;
       if (directive) {
         try {
@@ -98,26 +86,15 @@ export function AiHtmlSurface({ windowId }: Props) {
         }
         return;
       }
-      // Snapshot the active input before we (likely) re-render.
-      const active = document.activeElement as HTMLElement | null;
-      if (active && ref.current?.contains(active) && /^(INPUT|TEXTAREA)$/.test(active.tagName)) {
-        const inp = active as HTMLInputElement;
-        const key = inputKey(inp);
-        if (key) {
-          preserved.current = {
-            key,
-            value: inp.value,
-            caret: typeof inp.selectionStart === "number" ? inp.selectionStart : null,
-          };
-        }
-      }
-      useWindowStore.getState().setBusy(windowId, true);
-      wsClient.send("c2s.op", { windowId, op });
+      if (wsClient.send("c2s.op", { windowId, op })) {
+        if (op.id) drafts.submit(op.id, op.formData ?? {}, scope);
+        useWindowStore.getState().setBusy(windowId, true);
+      } else showError(new Error("communication.disconnected"));
     },
-    [windowId, showError],
+    [windowId, showError, drafts],
   );
 
-  useDelegatedEvents(ref, onOp);
+  useDelegatedEvents(ref, onOp, drafts);
 
   // Subscribe synchronously: React may batch renders, but no region patch may be skipped.
   useLayoutEffect(() => {
@@ -125,10 +102,14 @@ export function AiHtmlSurface({ windowId }: Props) {
     if (!el) return;
     const render = (state: ReturnType<typeof useWindowStore.getState>, local: boolean) => {
       const html = state.snapshots[windowId] ?? "";
-      let out = html ? sanitizeAiHtml(html) : "";
+      let out = html ? sanitizeAiHtml(html, windowId) : "";
       if (API_BASE && out) out = out.replace(/(["'])\/api\/img\//g, `$1${API_BASE}/api/img/`);
       const patch = local ? state.patches[windowId] : undefined;
       const active = document.activeElement;
+      const focused =
+        active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement
+          ? { key: fieldKey(active), start: active.selectionStart, end: active.selectionEnd }
+          : null;
       const scroll = el.scrollTop || scrollMemory.get(windowId) || 0;
       if (patch?.mode === "regions") {
         // Sanitize the complete document first; sanitizing a bare <tr> drops its context.
@@ -154,18 +135,17 @@ export function AiHtmlSurface({ windowId }: Props) {
         bindCommunication(el, delivery, translate.current);
       if (!state.patches[windowId]?.streaming)
         void sendCommunication(windowId, { action: "refresh" }).catch(() => {});
-      const p = preserved.current;
-      preserved.current = null;
-      if (!p || active?.isConnected) return;
-      for (const f of el.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
-        "input, textarea",
-      )) {
-        if (inputKey(f) !== p.key) continue;
-        if (patch?.mode !== "regions" && !f.value) f.value = p.value;
-        if (p.caret != null) {
+      drafts.restore(el, patch?.done ? patch.operationId : undefined);
+      if (!focused || active?.isConnected) return;
+      for (const f of el.querySelectorAll<Field>("input, textarea")) {
+        if (fieldKey(f) !== focused.key) continue;
+        if (
+          focused.start != null &&
+          (f instanceof HTMLInputElement || f instanceof HTMLTextAreaElement)
+        ) {
           try {
             f.focus({ preventScroll: true });
-            f.setSelectionRange(p.caret, p.caret);
+            (f as HTMLInputElement).setSelectionRange(focused.start, focused.end);
           } catch {
             /* Some input types do not support selection. */
           }
@@ -177,13 +157,12 @@ export function AiHtmlSurface({ windowId }: Props) {
     return useWindowStore.subscribe((state, previous) => {
       if (
         state.snapshots[windowId] !== previous.snapshots[windowId] ||
-        (state.patches[windowId]?.mode === "regions" &&
-          state.patches[windowId] !== previous.patches[windowId])
+        state.patches[windowId] !== previous.patches[windowId]
       ) {
         render(state, true);
       }
     });
-  }, [windowId, showError]);
+  }, [windowId, showError, drafts]);
 
   // Retry generated images that fail to load (e.g. the held request was cut
   // short, or a transient error) instead of leaving a broken image. The image
@@ -244,10 +223,11 @@ export function AiHtmlSurface({ windowId }: Props) {
         if (val) source = { kind: "text", ref: val, label: val.slice(0, 80) };
       }
       if (!source?.ref) return;
-      useWindowStore.getState().setBusy(windowId, true);
-      wsClient.send("c2s.op.dragdrop", { windowId, source, target: { windowId } });
+      if (wsClient.send("c2s.op.dragdrop", { windowId, source, target: { windowId } }))
+        useWindowStore.getState().setBusy(windowId, true);
+      else showError(new Error("communication.disconnected"));
     },
-    [windowId],
+    [windowId, showError],
   );
 
   return (
@@ -281,7 +261,13 @@ export function AiHtmlSurface({ windowId }: Props) {
           h-full (not min-h-full) gives the AI root a *definite* parent height,
           so its `height:100%` resolves and fills the window vertically.
           overflow-auto here is the scroll fallback if the AI content is taller. */}
-      <div ref={ref} onScroll={onScroll} className="ai-surface h-full w-full overflow-auto" />
+      <div
+        ref={ref}
+        data-ai-window={windowId}
+        onScroll={onScroll}
+        style={{ contain: "layout paint style", isolation: "isolate" }}
+        className="ai-surface h-full w-full overflow-auto"
+      />
     </div>
   );
 }

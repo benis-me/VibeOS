@@ -1,4 +1,4 @@
-import { run, recordSummary } from "./SdkManager.ts";
+import { run, recordSummary, recordStep } from "./SdkManager.ts";
 import { parseAiOutput } from "./streamParser.ts";
 import type { Syscall } from "@vibeos/shared/domain";
 import { listApps } from "../db/repositories/AppRepo.ts";
@@ -58,7 +58,18 @@ export async function runCommand(text: string, abort?: AbortController): Promise
     abort,
   });
   if (abort?.signal.aborted) return [];
-  const { syscalls } = parseAiOutput(result.text);
+  if (!result.ok) throw new Error(result.error ?? "Generation failed");
+  const { syscalls, syscallError, renderError } = parseAiOutput(result.text);
+  if (syscallError || renderError) {
+    const error = syscallError ?? renderError!;
+    await recordStep(
+      "syscall.rejected",
+      { error },
+      { id: result.runId!, runId: result.runId },
+      "error",
+    );
+    throw new Error(error);
+  }
   await recordSummary(result.runId, `"${text}" → ${syscalls.length} call(s)`);
   log.info(
     `"${text}" → ${syscalls.map((c) => c.type).join(", ") || "none"} in ${(performance.now() - t0).toFixed(0)}ms`,

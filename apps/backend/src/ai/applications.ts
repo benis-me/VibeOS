@@ -25,7 +25,6 @@ const jobs = new Map<string, AbortController>();
 export function broadcastApplications() {
   broadcast("s2c.apps.changed", { apps: listApps(true) });
   broadcast("s2c.application.state", Applications.applicationState());
-  broadcast("s2c.files.changed", { paths: ["Applications"] });
 }
 
 export async function handleApplicationCommand(

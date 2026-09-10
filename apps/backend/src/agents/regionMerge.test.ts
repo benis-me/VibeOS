@@ -18,6 +18,23 @@ describe("applyRegionsServer", () => {
     );
   });
 
+  test("validation and merging agree on real elements, not comments, attribute text or textarea content", () => {
+    const comment = '<!-- <section data-vibeos-region="body">example</section> -->';
+    const body =
+      '<section title=\'data-vibeos-region="fake" >\' data-vibeos-region="body"><textarea><section data-vibeos-region="body">literal</section></textarea>Original</section>';
+    const current = comment + body + '<footer data-vibeos-region="footer">Keep</footer>';
+    expect(extractRegionIds(current)).toEqual(["body", "footer"]);
+    const next = '<section data-vibeos-region="body">Updated</section>';
+    expect(applyRegionsServer(current, [{ region: "body", html: next }])).toBe(
+      comment + next + '<footer data-vibeos-region="footer">Keep</footer>',
+    );
+    expect(() =>
+      applyRegionsServer(current, [
+        { region: "fake", html: '<section data-vibeos-region="fake">Wrong</section>' },
+      ]),
+    ).toThrow();
+  });
+
   test("rejects missing targets instead of appending unrelated content", () => {
     expect(() =>
       applyRegionsServer(`<div data-vibeos-region="a">1</div>`, [

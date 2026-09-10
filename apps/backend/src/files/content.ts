@@ -13,7 +13,7 @@ import {
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import { SYSTEM_FOLDERS, type AppDescriptor } from "@vibeos/shared/domain";
-import { diskPath } from "./disk.ts";
+import { diskPath, noteDiskChanges } from "./disk.ts";
 
 export function ensureDiskLayout(): void {
   for (const name of SYSTEM_FOLDERS)
@@ -52,6 +52,7 @@ export function writeContent(path: string, content: string | Uint8Array, migrati
   } finally {
     if (existsSync(temporary)) unlinkSync(temporary);
   }
+  noteDiskChanges([path]);
 }
 
 export const appPackagePath = (app: Pick<AppDescriptor, "id" | "name" | "kind">) =>

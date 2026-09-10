@@ -33,6 +33,7 @@ interface CodexDebugModel {
 
 interface MapState {
   text: string;
+  completed?: boolean;
   sessionId?: string;
   error?: string;
   usage?: TokenUsage;
@@ -75,10 +76,11 @@ class CodexProvider implements AiProvider {
 
     if (opts.abort?.signal.aborted)
       return { text: state.text, sessionId: state.sessionId, ok: false };
-    if (state.text.trim()) {
+    if (state.text.trim() && state.completed && !state.error && res.code === 0) {
       return { text: state.text, sessionId: state.sessionId, ok: true, usage: state.usage };
     }
-    const error = state.error ?? res.stderr ?? `codex exited ${res.code}`;
+    const error =
+      state.error || res.stderr || `codex did not complete successfully (exit ${res.code})`;
     log.error(`run failed: ${error}`);
     return { text: "", sessionId: state.sessionId, ok: false, error, usage: state.usage };
   }
@@ -121,6 +123,7 @@ function mapCodex(
       }
     }
   } else if (type === "turn.completed") {
+    state.completed = true;
     const u = o.usage as { input_tokens?: number; output_tokens?: number } | undefined;
     if (u) state.usage = { inputTokens: u.input_tokens, outputTokens: u.output_tokens };
   } else if (type === "turn.failed") {

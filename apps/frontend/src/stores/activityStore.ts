@@ -1,50 +1,110 @@
 import { create } from "zustand";
-import type { AgentRun } from "@vibeos/shared";
+import type { AgentRun, ActivityFilter } from "@vibeos/shared";
+import { ulid } from "@vibeos/shared/util";
 import { wsClient } from "@/lib/ws";
 
-/** Page size for scroll pagination (the boot payload sends the first ~50). */
 const PAGE = 40;
-
+const order = (a: AgentRun, b: AgentRun) => b.startedAt - a.startedAt || b.id.localeCompare(a.id);
+function matches(run: AgentRun, filter: ActivityFilter) {
+  return (
+    (!filter.status || run.status === filter.status) &&
+    (!filter.role || run.role === filter.role) &&
+    [run.appName, run.model, run.summary, run.error, run.traceId, run.id]
+      .join(" ")
+      .toLowerCase()
+      .includes(filter.query?.trim().toLowerCase() ?? "")
+  );
+}
 interface ActivityState {
   runs: AgentRun[];
+  filter: ActivityFilter;
   hasMore: boolean;
   loading: boolean;
-  /** Initial set (boot). */
+  error?: string;
+  requestId?: string;
+  cursor?: { startedAt: number; id: string };
   setAll: (runs: AgentRun[]) => void;
-  /** Older page appended on scroll. */
-  appendPage: (runs: AgentRun[], hasMore: boolean) => void;
-  /** Live insert/update of a single run. */
+  setFilter: (filter: ActivityFilter) => void;
+  appendPage: (runs: AgentRun[], hasMore: boolean, requestId?: string) => void;
   upsert: (run: AgentRun) => void;
-  /** Request the next older page (no-op while loading or exhausted). */
   fetchMore: () => void;
 }
 
-/** Live feed of agent runs for the Activity Monitor (boot + s2c.agent.run + paging). */
+let timeout: ReturnType<typeof setTimeout>;
 export const useActivityStore = create<ActivityState>((set, get) => ({
   runs: [],
+  filter: {},
   hasMore: false,
   loading: false,
-  setAll: (runs) => set({ runs, hasMore: runs.length >= 50, loading: false }),
-  appendPage: (runs, hasMore) =>
-    set((s) => {
-      const seen = new Set(s.runs.map((r) => r.id));
-      return { runs: [...s.runs, ...runs.filter((r) => !seen.has(r.id))], hasMore, loading: false };
-    }),
-  upsert: (run) =>
-    set((s) => {
-      const i = s.runs.findIndex((r) => r.id === run.id);
-      if (i === -1) return { runs: [run, ...s.runs] };
-      const next = s.runs.slice();
-      next[i] = run;
-      return { runs: next };
-    }),
-  fetchMore: () => {
-    const s = get();
-    if (s.loading || !s.hasMore || s.runs.length === 0) return;
-    set({ loading: true });
-    wsClient.send("c2s.activity.fetch", {
-      before: s.runs[s.runs.length - 1]!.startedAt,
-      limit: PAGE,
+  setAll: (runs) => {
+    clearTimeout(timeout);
+    if (Object.values(get().filter).some(Boolean)) return get().setFilter(get().filter);
+    const sorted = [...runs].sort(order);
+    set({
+      runs: sorted,
+      cursor: sorted.at(-1),
+      hasMore: runs.length >= 50,
+      loading: false,
+      requestId: undefined,
+      error: undefined,
     });
   },
+  setFilter: (filter) => {
+    clearTimeout(timeout);
+    set({ filter, runs: [], cursor: undefined, hasMore: true, loading: false, error: undefined });
+    get().fetchMore();
+  },
+  appendPage: (runs, hasMore, requestId) => {
+    if (!requestId || requestId !== get().requestId) return;
+    clearTimeout(timeout);
+    const seen = new Set(get().runs.map((r) => r.id));
+    set({
+      runs: [...get().runs, ...runs.filter((r) => !seen.has(r.id))].sort(order),
+      cursor: runs.at(-1) ?? get().cursor,
+      hasMore,
+      loading: false,
+      requestId: undefined,
+      error: undefined,
+    });
+  },
+  upsert: (run) =>
+    set((s) => ({
+      runs: [
+        ...s.runs.filter((r) => r.id !== run.id),
+        ...(matches(run, s.filter) ? [run] : []),
+      ].sort(order),
+    })),
+  fetchMore: () => {
+    const s = get();
+    if (s.loading || !s.hasMore) return;
+    const requestId = ulid();
+    set({ loading: true, requestId, error: undefined });
+    if (
+      !wsClient.send("c2s.activity.fetch", {
+        before: s.cursor?.startedAt,
+        beforeId: s.cursor?.id,
+        limit: PAGE,
+        filter: s.filter,
+        requestId,
+      })
+    ) {
+      set({ loading: false, requestId: undefined, error: "communication.disconnected" });
+      return;
+    }
+    timeout = setTimeout(
+      () => set({ loading: false, requestId: undefined, error: "communication.timeout" }),
+      15_000,
+    );
+  },
 }));
+
+wsClient.onStatus((connected) => {
+  if (!connected && useActivityStore.getState().loading) {
+    clearTimeout(timeout);
+    useActivityStore.setState({
+      loading: false,
+      requestId: undefined,
+      error: "communication.disconnected",
+    });
+  }
+});

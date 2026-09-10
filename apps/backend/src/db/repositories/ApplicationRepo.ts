@@ -21,6 +21,7 @@ import { getWindow } from "./WindowRepo.ts";
 import { getSnapshot } from "./AppMemoryRepo.ts";
 import { contentName, writeContent } from "../../files/content.ts";
 import { diskPath } from "../../files/disk.ts";
+import { applyDiskMutation } from "./VfsRepo.ts";
 
 interface AppIndex {
   id: string;
@@ -369,26 +370,14 @@ export function renameApplication(appId: string, name: string): Promise<void> {
     if (!app || app.kind !== "virtual") throw new Error("applications.error.readOnly");
     const row = index(appId)!;
     const root = dirname(row.content_path);
-    const target = `${app.isInstalled ? "Applications" : "Cache/Applications"}/${contentName(name, app.id)}.vibeapp`;
+    const target = `${dirname(root)}/${contentName(name, app.id)}.vibeapp`;
     if (root !== target && existsSync(diskPath(target))) throw new Error("exists");
     if (!stripEmoji(name).trim()) throw new Error("applications.error.name");
     const meta = JSON.parse(readFileSync(diskPath(row.content_path), "utf8"));
     meta.name = stripEmoji(name);
     meta.updatedAt = Date.now();
     writeContent(row.content_path, JSON.stringify(meta, null, 2));
-    if (root !== target) {
-      if (existsSync(diskPath(target))) throw new Error("exists");
-      mkdirSync(dirname(diskPath(target)), { recursive: true });
-      renameSync(diskPath(root), diskPath(target));
-      for (const table of ["app_versions", "apps"]) {
-        const column = table === "apps" ? "content_path" : "path";
-        getDb()
-          .query(
-            `UPDATE ${table} SET ${column} = ? || substr(${column}, ?) WHERE substr(${column},1,?) = ?`,
-          )
-          .run(target, root.length + 1, root.length + 1, root + "/");
-      }
-    }
+    if (root !== target) applyDiskMutation({ action: "move", path: root, destination: target });
     getDb()
       .query("UPDATE apps SET name=?, updated_at=? WHERE id=?")
       .run(meta.name, meta.updatedAt, appId);

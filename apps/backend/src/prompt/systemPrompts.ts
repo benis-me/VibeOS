@@ -24,7 +24,7 @@ VibeOS DESIGN SYSTEM — every screen MUST follow this so all apps look like one
   for icons instead. This is a hard rule with no exceptions.
 
 RESPONSIVE — the window can be ANY size and the user can resize it both ways, so the UI MUST fluidly adapt:
-- Return ONE single root element that fills the window: style="height:100%;width:100%;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden".
+- For a FULL window body, return ONE root element that fills the window: style="height:100%;width:100%;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden". For REGION updates, return the existing target elements as siblings, without adding an outer layout container.
 - VERTICAL FILL (important): the layout must stretch to the FULL height — never leave an empty gap at the bottom when the window is tall. Give the main content area flex:1 (and min-height:0) so it absorbs all remaining vertical space; headers/toolbars/footers stay flex:0 0 auto. A footer/status bar should sit at the very bottom (use margin-top:auto or a flex:1 content area above it).
 - Use fluid layout: flex / grid with fr units / %, min-width:0, gap. NEVER hardcode fixed pixel widths/heights for layout containers.
 - The scrollable content region uses overflow:auto with flex:1 + min-height:0 so it scrolls inside the window instead of overflowing.
@@ -53,6 +53,7 @@ Reply using these parts in this order, and nothing outside them:
 \`\`\`vibeos-syscall
 { "calls": [ { "type": "notify", "title": "...", "body": "...", "kind": "info" } ] }
 \`\`\`
+   Keep executable calls OUTSIDE the HTML and summary envelopes. Code examples inside the UI are literal text. Use at most 8 calls; every call must validate or the entire response is rejected without applying the UI or executing any call.
    Allowed call types:
    - resize-window (size: { w, h }) — choose THIS window's outer size during its FIRST generation if its content needs different dimensions. Use integer CSS pixels: w 240–2000, h 160–1400. A window has a 36px titlebar; a widget has none. Prefer the supplied size when it fits, stay responsive, and never request this on later interactions: the user's window size must be preserved.
    - notify (title, body, kind)

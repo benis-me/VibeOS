@@ -5,18 +5,22 @@ import { API_BASE, wsClient } from "./ws";
 export function requestFiles(command: FileRequestCommand): Promise<DiskResult> {
   return new Promise((resolve, reject) => {
     const requestId = ulid();
-    const off = wsClient.on("s2c.files.result", (payload) => {
-      if (payload.requestId !== requestId) return;
+    const finish = (error?: string, result?: DiskResult) => {
       clearTimeout(timer);
       off();
-      if (payload.result.error) reject(new Error(payload.result.error));
-      else resolve(payload.result);
+      offStatus();
+      if (error) reject(new Error(error));
+      else resolve(result!);
+    };
+    const off = wsClient.on("s2c.files.result", (payload) => {
+      if (payload.requestId !== requestId) return;
+      finish(payload.result.error, payload.result);
     });
-    const timer = setTimeout(() => {
-      off();
-      reject(new Error("timeout"));
-    }, 30000);
-    wsClient.send("c2s.files.request", { requestId, command });
+    const offStatus = wsClient.onStatus((connected) => {
+      if (!connected) finish("disconnected");
+    });
+    const timer = setTimeout(() => finish("timeout"), 30000);
+    if (!wsClient.send("c2s.files.request", { requestId, command })) finish("disconnected");
   });
 }
 

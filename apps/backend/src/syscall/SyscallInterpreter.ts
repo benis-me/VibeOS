@@ -15,6 +15,8 @@ import {
 import { ensureMemory } from "../db/repositories/AppMemoryRepo.ts";
 import { renderInitialWindow } from "../kernel/windowInit.ts";
 import { logger } from "../util/log.ts";
+import { recordStep } from "../ai/SdkManager.ts";
+import { createHash } from "node:crypto";
 
 const log = logger("syscall");
 
@@ -38,8 +40,15 @@ export async function execute(calls: Syscall[], ctx: SyscallContext): Promise<vo
       );
       await one(call, ctx);
     } catch (e) {
+      if (ctx.canCommit && !ctx.canCommit()) return;
+      await recordStep(
+        "syscall.failed",
+        { type: call.type, error: e instanceof Error ? e.message : String(e) },
+        undefined,
+        "error",
+      );
       log.error(`failed ${call.type}`, e instanceof Error ? e.message : e);
-      if (call.type === "communication") throw e;
+      throw e;
     }
   }
 }
@@ -48,7 +57,14 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
   switch (call.type) {
     case "communication": {
       if (!ctx.windowId) throw new Error("communication.closed");
-      await communicate(ctx.windowId, call.command);
+      const outcome = await communicate(
+        ctx.windowId,
+        call.command,
+        undefined,
+        undefined,
+        ctx.canCommit,
+      );
+      if (outcome?.error) throw new Error(outcome.error);
       return;
     }
     case "resize-window": {
@@ -135,14 +151,26 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
     }
 
     case "create-file": {
-      const node = await VfsRepo.createNode({
-        name: call.name,
-        type: "file",
-        mime: call.mime,
-        content: call.content,
-        location: call.location ?? "desktop",
-      });
+      const node = await VfsRepo.createNode(
+        {
+          name: call.name,
+          type: "file",
+          mime: call.mime,
+          content: call.content,
+          location: call.location ?? "desktop",
+        },
+        () => {
+          if (ctx.canCommit && !ctx.canCommit()) throw new Error("communication.interrupted");
+        },
+      );
       broadcast("s2c.syscall.fileCreated", { node });
+      await recordStep("files.write", {
+        path: node.meta.diskPath,
+        version: createHash("sha256")
+          .update(call.content ?? "")
+          .digest("hex"),
+        bytes: Buffer.byteLength(call.content ?? ""),
+      });
       return;
     }
 

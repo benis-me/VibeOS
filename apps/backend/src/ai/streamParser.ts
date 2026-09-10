@@ -1,41 +1,82 @@
 import { syscallSchema, type ParsedAiOutput } from "@vibeos/shared/prompt";
 
-const HTML_OPEN = /<vibeos-html\b([^>]*)>/i;
-const HTML_CLOSE = "</vibeos-html>";
-const SUMMARY_RE = /<vibeos-summary>([\s\S]*?)<\/vibeos-summary>/i;
-const SYSCALL_RE = /```vibeos-syscall\s*([\s\S]*?)```/i;
+/** Read protocol blocks at the response's top level, never from displayed content. */
+function outputBlocks(full: string) {
+  const blocks: { kind: string; body: string; attrs: string; complete: boolean }[] = [];
+  const token =
+    /<!--[\s\S]*?(?:-->|$)|<vibeos-(html|summary)\b((?:"[^"]*"|'[^']*'|[^'">])*)>|(`{3,})([^\r\n`]*)\r?\n/gi;
+  let match: RegExpExecArray | null;
+  while ((match = token.exec(full))) {
+    if (match[0].startsWith("<!--")) continue;
+    const from = token.lastIndex;
+    if (match[1]) {
+      const kind = match[1].toLowerCase();
+      let depth = 1;
+      const end = htmlTags(full.slice(from)).find((tag) => {
+        if (tag.tag !== `vibeos-${kind}`) return false;
+        if (tag.close) depth--;
+        else if (!tag.single) depth++;
+        return depth === 0;
+      });
+      blocks.push({
+        kind,
+        attrs: match[2] ?? "",
+        body: full.slice(from, end ? from + end.start : full.length),
+        complete: !!end,
+      });
+      token.lastIndex = end ? from + end.end : full.length;
+    } else {
+      const close = new RegExp(
+        "(?:^|\\n)[ \\t]*`{" + match[3]!.length + ",}[ \\t]*(?=\\r?\\n|$|<vibeos-)",
+        "g",
+      );
+      close.lastIndex = from;
+      const end = close.exec(full);
+      if (match[4]!.trim().toLowerCase() === "vibeos-syscall")
+        blocks.push({
+          kind: "syscall",
+          attrs: "",
+          body: full.slice(from, end?.index ?? full.length),
+          complete: !!end,
+        });
+      token.lastIndex = end ? close.lastIndex : full.length;
+    }
+  }
+  return blocks;
+}
 
 /** Incrementally extract the streaming HTML body for live patching. */
 export function extractStreamingHtml(buffer: string): string | null {
-  const open = HTML_OPEN.exec(buffer);
-  if (!open) return null;
-  const from = open.index + open[0].length;
-  const end = buffer.indexOf(HTML_CLOSE, from);
-  return end === -1 ? buffer.slice(from) : buffer.slice(from, end);
+  return outputBlocks(buffer).find((block) => block.kind === "html")?.body ?? null;
 }
 
 /** Parse the complete AI output into its structured parts. */
 export function parseAiOutput(full: string, legacyMode?: "full"): ParsedAiOutput {
-  const summary = SUMMARY_RE.exec(full)?.[1]?.trim() ?? "";
-  const syscalls = parseSyscalls(full);
-
-  const result: ParsedAiOutput = { syscalls, summary };
-
-  const open = HTML_OPEN.exec(full);
+  const blocks = outputBlocks(full);
+  const summary = blocks.find((block) => block.kind === "summary")?.body.trim() ?? "";
+  const result: ParsedAiOutput = {
+    ...parseSyscalls(blocks.filter((b) => b.kind === "syscall")),
+    summary,
+  };
+  const htmlBlocks = blocks.filter((block) => block.kind === "html");
+  const open = htmlBlocks[0];
   if (open) {
-    const from = open.index + open[0].length;
-    const end = full.indexOf(HTML_CLOSE, from);
-    const declaredMode = /\bmode\s*=\s*["']([^"']*)["']/i.exec(open[1] ?? "")?.[1];
+    const declaredMode = /\bmode\s*=\s*["']([^"']*)["']/i.exec(open.attrs)?.[1];
     if (
-      end === -1 ||
+      !open.complete ||
+      htmlBlocks.length !== 1 ||
       (declaredMode !== undefined && declaredMode !== "full" && declaredMode !== "regions")
     ) {
       result.renderError = "Incomplete HTML envelope or invalid render mode";
       return result;
     }
-    const html = full.slice(from, end).trim();
-    const regions = extractRegions(html);
-    const onlyRegions = regions.length > 0 && isOnlyRegions(html, regions);
+    const html = open.body.trim();
+    const spans = extractRegionSpans(html);
+    const regions = spans.map(({ region, start, end }) => ({
+      region,
+      html: html.slice(start, end),
+    }));
+    const onlyRegions = regions.length > 0 && isOnlyRegions(html, spans);
     const mode = declaredMode ?? legacyMode;
     if (!html || (mode === "regions" && !onlyRegions)) {
       result.renderError = "Expected complete region blocks with stable ids";
@@ -64,8 +105,50 @@ const VOID_TAGS = new Set([
   "track",
   "wbr",
 ]);
-const OPEN_TAG = /<([a-zA-Z][a-zA-Z0-9-]*)\b([^>]*)>/g;
-const REGION_ATTR = /\bdata-vibeos-region\s*=\s*["']([^"']+)["']/;
+const RAW_TEXT_TAGS = new Set(["script", "style", "textarea", "title"]);
+
+/** Token boundaries only; preserve original bytes instead of repairing/serializing model HTML. */
+function htmlTags(html: string) {
+  const re =
+    /<!--[\s\S]*?(?:-->|$)|<(\/?)([a-zA-Z][a-zA-Z0-9:-]*)\b((?:"[^"]*"|'[^']*'|[^'">])*)>/g;
+  const tags: {
+    tag: string;
+    close: boolean;
+    single: boolean;
+    region?: string;
+    start: number;
+    end: number;
+  }[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html))) {
+    if (!match[2]) continue; // Comments, including tag-like text inside them, are not elements.
+    const tag = match[2].toLowerCase(),
+      attrs = match[3] ?? "",
+      close = match[1] === "/";
+    const attributes = /([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
+    let region: string | undefined, attr: RegExpExecArray | null;
+    while ((attr = attributes.exec(attrs))) {
+      if (attr[1]!.toLowerCase() === "data-vibeos-region") {
+        region = attr[2] ?? attr[3] ?? attr[4];
+        break;
+      }
+    }
+    tags.push({
+      tag,
+      close,
+      single: VOID_TAGS.has(tag) || attrs.trim().endsWith("/"),
+      region,
+      start: match.index,
+      end: re.lastIndex,
+    });
+    if (!close && RAW_TEXT_TAGS.has(tag)) {
+      const end = new RegExp(`</${tag}\\s*>`, "gi");
+      end.lastIndex = re.lastIndex;
+      re.lastIndex = end.exec(html)?.index ?? html.length;
+    }
+  }
+  return tags;
+}
 
 /**
  * Depth-aware extraction of every element carrying data-vibeos-region, including
@@ -74,85 +157,73 @@ const REGION_ATTR = /\bdata-vibeos-region\s*=\s*["']([^"']+)["']/;
  * balance open/close tags to find the true end of each region element.
  */
 export function extractRegions(html: string): { region: string; html: string }[] {
-  const out: { region: string; html: string }[] = [];
-  OPEN_TAG.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = OPEN_TAG.exec(html)) !== null) {
-    const tag = m[1]!.toLowerCase();
-    const attrs = m[2] ?? "";
-    const regionMatch = REGION_ATTR.exec(attrs);
-    if (!regionMatch) continue;
-    const regionId = regionMatch[1]!;
-    const startIdx = m.index;
+  return extractRegionSpans(html).map(({ region, start, end }) => ({
+    region,
+    html: html.slice(start, end),
+  }));
+}
 
-    // Self-closing or void → the element is just the open tag.
-    if (attrs.trim().endsWith("/") || VOID_TAGS.has(tag)) {
-      out.push({ region: regionId, html: html.slice(startIdx, OPEN_TAG.lastIndex) });
-      continue;
+/** Shared by output validation and disk-snapshot merging, so they agree on actual target elements. */
+export function extractRegionSpans(
+  html: string,
+  includeNested = false,
+): { region: string; start: number; end: number }[] {
+  const tags = htmlTags(html),
+    spans: { region: string; start: number; end: number }[] = [];
+  for (let i = 0; i < tags.length; i++) {
+    const open = tags[i]!;
+    if (open.close || !open.region) continue;
+    let endIndex = open.single ? i : -1;
+    if (!open.single) {
+      let depth = 1;
+      for (let j = i + 1; j < tags.length; j++) {
+        const tag = tags[j]!;
+        if (tag.tag !== open.tag) continue;
+        if (tag.close) depth--;
+        else if (!tag.single) depth++;
+        if (depth === 0) {
+          endIndex = j;
+          break;
+        }
+      }
     }
-
-    const endIdx = findElementEnd(html, OPEN_TAG.lastIndex, tag);
-    if (endIdx === -1) continue;
-    out.push({ region: regionId, html: html.slice(startIdx, endIdx) });
-    OPEN_TAG.lastIndex = endIdx; // skip past this element to avoid nested re-capture
+    if (endIndex < 0) continue;
+    spans.push({ region: open.region, start: open.start, end: tags[endIndex]!.end });
+    if (!includeNested) i = endIndex;
   }
-  return out;
+  return spans;
 }
 
-/** Find the index just past the matching close tag for `tag`, starting at `from`. */
-function findElementEnd(html: string, from: number, tag: string): number {
-  const re = new RegExp(`<(/?)(${tag})\\b[^>]*?(/?)>`, "gi");
-  re.lastIndex = from;
-  let depth = 1;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(html)) !== null) {
-    const isClose = m[1] === "/";
-    const selfClose = m[3] === "/";
-    if (isClose) {
-      depth--;
-      if (depth === 0) return re.lastIndex;
-    } else if (!selfClose) {
-      depth++;
+function isOnlyRegions(html: string, regions: { start: number; end: number }[]): boolean {
+  const trivia = (text: string) => !text.replace(/<!--[\s\S]*?-->/g, "").trim();
+  let end = 0;
+  for (const region of regions) {
+    if (!trivia(html.slice(end, region.start))) return false;
+    end = region.end;
+  }
+  return trivia(html.slice(end));
+}
+
+function parseSyscalls(
+  blocks: { body: string; complete: boolean }[],
+): Pick<ParsedAiOutput, "syscalls" | "syscallError"> {
+  const calls: unknown[] = [];
+  for (const block of blocks) {
+    if (!block.complete) return { syscalls: [], syscallError: "Incomplete syscall block" };
+    try {
+      const json = JSON.parse(block.body);
+      const batch = Array.isArray(json) ? json : json?.calls;
+      if (!Array.isArray(batch)) throw new Error();
+      calls.push(...batch);
+    } catch {
+      return { syscalls: [], syscallError: "Expected syscall JSON with a calls array" };
     }
   }
-  return -1;
-}
-
-function isOnlyRegions(html: string, regions: { html: string }[]): boolean {
-  let rest = html;
-  for (const r of regions) rest = rest.replace(r.html, "");
-  return rest.trim().length === 0;
-}
-
-function parseSyscalls(full: string): ParsedAiOutput["syscalls"] {
-  const block = SYSCALL_RE.exec(full)?.[1]?.trim();
-  if (!block) return [];
-  let json: unknown;
-  try {
-    json = JSON.parse(block);
-  } catch {
-    console.warn("[syscall] unparseable block dropped");
-    return [];
-  }
-
-  // Be tolerant: validate each call individually so one malformed entry doesn't
-  // discard the rest. Accept either { calls: [...] } or a bare array.
-  const raw = Array.isArray(json)
-    ? json
-    : Array.isArray((json as { calls?: unknown })?.calls)
-      ? (json as { calls: unknown[] }).calls
-      : [];
-
-  const out: ParsedAiOutput["syscalls"] = [];
-  for (const item of raw) {
-    const parsed = syscallSchema.safeParse(item);
-    if (parsed.success) out.push(parsed.data);
-    else
-      console.warn(
-        "[syscall] dropped invalid call:",
-        parsed.error.issues[0]?.message,
-        JSON.stringify(item).slice(0, 120),
-      );
-  }
-  return out;
+  const parsed = syscallSchema.array().max(8).safeParse(calls);
+  return parsed.success
+    ? { syscalls: parsed.data }
+    : {
+        syscalls: [],
+        syscallError: `Invalid syscall at ${parsed.error.issues[0]?.path.join(".")}: ${parsed.error.issues[0]?.message}`,
+      };
 }

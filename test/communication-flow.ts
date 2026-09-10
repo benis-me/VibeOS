@@ -26,6 +26,7 @@ import {
 import { registerUiGenerationAgent } from "../apps/backend/src/agents/UiGenerationAgent.ts";
 import { bus } from "../apps/backend/src/events/bus.ts";
 import { executeDisk, diskPath } from "../apps/backend/src/files/disk.ts";
+import { recentRuns, runDetails } from "../apps/backend/src/db/repositories/AgentRepo.ts";
 
 const messages: AppDelivery[] = [];
 const seen: string[] = [];
@@ -190,6 +191,19 @@ try {
     "ACTUAL DISK CONTENT",
   );
   assert.equal(getMemory(target.id)?.htmlSnapshot.includes('value="keep me"'), true);
+
+  const fileRuns = recentRuns(100).filter((r) => r.traceId === "file");
+  assert.equal(fileRuns.length, 3, "read, processing and write continuation share one operation");
+  const detail = runDetails(fileRuns[0]!.id)!;
+  assert.equal(detail.relatedRuns.length, 3);
+  const read = detail.logs.find((l) => l.message === "files.read")!.data as Record<string, unknown>;
+  const write = detail.logs.find((l) => l.message === "files.write")!.data as Record<string, unknown>;
+  assert.equal(read.path, "Documents/input.txt");
+  assert.equal(read.version, executeDisk({ action: "read", path: "Documents/input.txt" }).version);
+  assert.equal(write.path, "Documents/input.txt.result");
+  assert.equal(write.version, executeDisk({ action: "read", path: "Documents/input.txt.result" }).version);
+  assert(!JSON.stringify(detail.logs).includes("ACTUAL DISK CONTENT"), "activity never duplicates file contents");
+  assert(detail.logs.some((l) => l.message === "message.replied" && (l.data as { requestId: string }).requestId === "file"));
 
   await communicate(
     source.id,

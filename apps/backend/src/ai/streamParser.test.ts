@@ -41,6 +41,39 @@ describe("parseAiOutput", () => {
     }
   });
 
+  test("Notes-style commented patches keep exact region bytes without requiring another model call", () => {
+    const sidebar =
+      '<aside data-vibeos-region="notes-sidebar" title="1 > 0"><!-- <aside> -->Selected</aside>';
+    const editor =
+      '<section data-vibeos-region="notes-editor"><textarea><!-- <section data-vibeos-region="example">literal</section> --></textarea></section>';
+    const output = `<vibeos-html mode="regions"><!-- 左侧边栏 -->${sidebar}\n<!-- 右侧编辑器 -->${editor}<!-- end --></vibeos-html>`;
+    expect(parseAiOutput(output)).toMatchObject({
+      regions: [
+        { region: "notes-sidebar", html: sidebar },
+        { region: "notes-editor", html: editor },
+      ],
+    });
+    expect(parseAiOutput(output).renderError).toBeUndefined();
+    expect(extractRegions("<!-- " + sidebar + " -->" + sidebar)).toEqual([
+      { region: "notes-sidebar", html: sidebar },
+    ]);
+    expect(
+      parseAiOutput(
+        '<vibeos-html mode="regions"><!-- <div data-vibeos-region="fake">ignored</div> --></vibeos-html>',
+      ).renderError,
+    ).toBeDefined();
+    for (const suffix of [
+      "<!-- unfinished",
+      "unexpected text",
+      "<div>untargeted content</div>",
+      '<section data-vibeos-region="broken">',
+    ]) {
+      const parsed = parseAiOutput(`<vibeos-html mode="regions">${sidebar}${suffix}</vibeos-html>`);
+      expect(parsed.renderError).toBeDefined();
+      expect(parsed.regions).toBeUndefined();
+    }
+  });
+
   test("full body → html mode, with summary + syscalls", () => {
     const out = parseAiOutput(
       `<vibeos-html><div style="padding:8px"><h1>Hi</h1></div></vibeos-html>
@@ -74,15 +107,45 @@ describe("parseAiOutput", () => {
     expect(out.html).toContain("<header>bar</header>");
   });
 
-  test("malformed syscall entries are dropped, valid ones kept", () => {
+  test("malformed syscall entries reject the entire batch before UI or actions commit", () => {
     const out = parseAiOutput(
       `<vibeos-html><div>z</div></vibeos-html>
 \`\`\`vibeos-syscall
 { "calls": [ { "type": "notify", "title": "" }, { "type": "notify", "title": "ok" } ] }
 \`\`\``,
     );
-    expect(out.syscalls).toHaveLength(1);
-    expect(out.syscalls[0]).toMatchObject({ title: "ok" });
+    expect(out.syscalls).toHaveLength(0);
+    expect(out.syscallError).toBeDefined();
+    for (const block of ["{broken", "{}", '{"calls": {}}']) {
+      const parsed = parseAiOutput("```vibeos-syscall\n" + block + "\n```");
+      expect(parsed.syscallError).toBeDefined();
+      expect(parsed.syscalls).toEqual([]);
+    }
+    expect(parseAiOutput('```vibeos-syscall\n{"calls":[]}').syscallError).toBeDefined();
+  });
+
+  test("only top-level syscall blocks execute; HTML, summaries and code examples are literal", () => {
+    const call = (title: string) =>
+      "```vibeos-syscall\n" + JSON.stringify({ calls: [{ type: "notify", title }] }) + "\n```";
+    const body = `<main><textarea>literal </vibeos-html>\n${call("textarea")}</textarea><pre>${call("pre")}</pre><!-- ${call("comment")} --></main>`;
+    const output = `<vibeos-html mode="full">${body}</vibeos-html><vibeos-summary>${call("summary")}</vibeos-summary>\n${call("real")}`;
+    const parsed = parseAiOutput(output);
+    expect(parsed.html).toBe(body);
+    expect(parsed.syscalls).toEqual([{ type: "notify", title: "real" }]);
+    expect(parsed.syscallError).toBeUndefined();
+    expect(extractStreamingHtml(output)).toBe(body);
+    expect(parseAiOutput(`<vibeos-html><textarea>${call("unfinished")}`).syscalls).toEqual([]);
+    expect(parseAiOutput("````text\n" + call("example") + "\n````").syscalls).toEqual([]);
+    const literal = "<vibeos-html>file contents</vibeos-html>";
+    expect(
+      parseAiOutput(
+        "```vibeos-syscall\n" +
+          JSON.stringify({
+            calls: [{ type: "create-file", name: "sample.txt", content: literal }],
+          }) +
+          "\n```",
+      ).syscalls[0],
+    ).toMatchObject({ content: literal });
   });
 
   test("no html → html and regions both undefined", () => {

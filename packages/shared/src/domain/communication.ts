@@ -99,6 +99,8 @@ export type AppSubscription = z.infer<typeof subscriptionSchema>;
 export type MessageTarget = z.infer<typeof messageTargetSchema>;
 export type MessageSource = { system: true } | { appId: string; windowId: string };
 export interface MessageTrace {
+  /** Runtime-owned model run that initiated this step. */
+  runId?: string;
   /** Runtime reference to the user operation that started this continuation. */
   interaction?: { windowId: string; id: string };
   id: string;

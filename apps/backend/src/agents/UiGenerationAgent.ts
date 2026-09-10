@@ -21,7 +21,7 @@ import {
 import { kernelState } from "../kernel/kernelState.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 import { assemblePrompt, decideRenderMode } from "../prompt/PromptAssembler.ts";
-import { run, recordSummary } from "../ai/SdkManager.ts";
+import { run, recordSummary, recordStep } from "../ai/SdkManager.ts";
 import { parseAiOutput, extractStreamingHtml } from "../ai/streamParser.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
 import { applyRegionsServer, extractRegionIds } from "./regionMerge.ts";
@@ -228,6 +228,21 @@ async function generate(
   }
 
   const snapshot = memory?.htmlSnapshot ?? "";
+  const workflowInput =
+    trigger.message?.trace.interaction?.windowId === windowId
+      ? (interactionInput(windowId, trigger.message.trace.interaction.id) as AiOp | undefined)
+      : undefined;
+  const operationId =
+    trigger.op?.id ??
+    (trigger.message?.kind === "response" && !trigger.message.error
+      ? workflowInput?.id
+      : undefined);
+  const trace = trigger.message?.trace ?? {
+    id: ulid(),
+    hops: 0,
+    windows: [windowId],
+    interaction: interactionId ? { windowId, id: interactionId } : undefined,
+  };
   const regionIds = extractRegionIds(snapshot);
   // Decide render mode BEFORE calling the AI — the model is then told exactly
   // which mode to use, rather than guessing.
@@ -291,6 +306,9 @@ async function generate(
       // Every attempt is stateless, including a repair of invalid output.
       abort,
       appName: app.name,
+      traceId: trace.id,
+      windowId,
+      appId: app.id,
       onDelta: (text) => {
         // ponytail: stream only first paint; existing windows commit one validated
         // batch. Streaming edits would need transactional preview + rollback.
@@ -305,6 +323,7 @@ async function generate(
     });
 
     if (!canCommit()) {
+      await recordStep("ui.cancelled", { windowId }, { ...trace, runId: result.runId });
       return;
     }
     if (!result.ok) throw new Error(result.error ?? "Generation failed");
@@ -313,6 +332,7 @@ async function generate(
     let html: string | undefined;
     let regions = parsed.regions;
     try {
+      if (parsed.syscallError) throw new Error(parsed.syscallError);
       if (parsed.renderError) throw new Error(parsed.renderError);
       if (regions?.length) {
         if (fullRequired) throw new Error("A complete window body is required");
@@ -325,30 +345,89 @@ async function generate(
       if (html !== undefined) await parseSubscriptions(html);
     } catch (error) {
       repairReason = error instanceof Error ? error.message : String(error);
-      await recordSummary(result.runId, `Rejected UI: ${repairReason}`);
+      await recordSummary(result.runId, `Rejected output: ${repairReason}`);
+      await recordStep(
+        parsed.syscallError ? "syscall.rejected" : "ui.rejected",
+        { windowId, error: repairReason },
+        { ...trace, runId: result.runId },
+        "error",
+      );
       if (!canCommit()) return;
       if (attempt === 1) throw error;
       log.warn(`Invalid UI [${windowId.slice(-6)}]: ${repairReason}; retrying full render`);
       continue;
     }
 
+    // Complete system actions before publishing a success UI or acknowledging input.
+    // A successful reply settles its delivery; cancellation still aborts the generation.
+    const replies = pendingReplies(windowId, trigger.message?.trace).map((reply) => reply.id);
+    const settlesDelivery = parsed.syscalls.some(
+      (call) =>
+        call.type === "communication" &&
+        call.command.action === "reply" &&
+        replies.includes(call.command.messageId),
+    );
+    const current = () => !isStale(windowId, gen, abort);
+    if (!canCommit()) return;
+    if (parsed.syscalls.length) {
+      await messageContext.run({ ...trace, runId: result.runId }, () =>
+        Syscalls.execute(parsed.syscalls, {
+          windowId,
+          appId: app.id,
+          source: "syscall",
+          resizeFrom: firstRender ? win.rect : undefined,
+          canCommit: current,
+        }),
+      );
+    }
+    const canPublish = () =>
+      current() && (settlesDelivery || !trigger.message || deliveryAlive(trigger.message));
+    if (!canPublish()) {
+      await recordStep("ui.cancelled", { windowId }, { ...trace, runId: result.runId });
+      return;
+    }
+    const continues = parsed.syscalls.some(
+      (call) =>
+        call.type === "communication" &&
+        call.command.action === "request" &&
+        call.command.responseMode === "ai",
+    );
+    const acknowledged = continues ? undefined : operationId;
     if (html !== undefined) {
       // Image generation starts only after the output has passed validation.
       html = rewriteImages(html);
       regions = regions?.map((r) => ({ ...r, html: rewriteImages(r.html) }));
       // Evaluate the guard INSIDE the single-writer queue, not just before awaiting it.
-      if (!(await saveSnapshot(windowId, html, canCommit)) || !canCommit()) return;
+      if (!(await saveSnapshot(windowId, html, canPublish)) || !canPublish()) return;
+      await recordStep(
+        "ui.committed",
+        {
+          windowId,
+          mode: regions?.length ? "regions" : "full",
+          regions: regions?.map((r) => r.region),
+        },
+        { ...trace, runId: result.runId },
+      );
+      if (!canPublish()) return;
       broadcast(
         "s2c.ui.patch",
         regions?.length
-          ? { windowId, mode: "regions", regions, done: true }
-          : { windowId, mode: "full", html, done: true },
+          ? { windowId, operationId: acknowledged, mode: "regions", regions, done: true }
+          : { windowId, operationId: acknowledged, mode: "full", html, done: true },
       );
     } else {
       // Clear any first-paint preview when a successful response has only syscalls.
       if (!snapshot.trim() && lastStreamed) {
         broadcast("s2c.ui.patch", { windowId, mode: "full", html: snapshot, done: true });
       }
+      if (acknowledged)
+        broadcast("s2c.ui.patch", {
+          windowId,
+          mode: "regions",
+          regions: [],
+          operationId: acknowledged,
+          done: true,
+        });
       broadcast("s2c.ui.busy", { windowId, busy: false });
     }
 
@@ -362,38 +441,17 @@ async function generate(
     log.info(
       `✓ ${app.name} [${windowId.slice(-6)}] ${regions?.length ? `${regions.length} region(s)` : "full"}, ${(performance.now() - t0).toFixed(0)}ms`,
     );
-    if (parsed.summary) await saveSummary(windowId, parsed.summary, canCommit);
+    if (parsed.summary) await saveSummary(windowId, parsed.summary, canPublish);
     await recordSummary(result.runId, what);
-    if (!canCommit()) return;
-    if (parsed.syscalls.length > 0) {
-      const execute = () =>
-        Syscalls.execute(parsed.syscalls, {
-          windowId,
-          appId: app.id,
-          source: "syscall",
-          resizeFrom: firstRender ? win.rect : undefined,
-          canCommit,
-        });
-      if (trigger.message) await messageContext.run(trigger.message.trace, execute);
-      else if (trigger.op && interactionId)
-        await messageContext.run(
-          {
-            id: ulid(),
-            hops: 0,
-            windows: [windowId],
-            interaction: { windowId, id: interactionId },
-          },
-          execute,
-        );
-      else await execute();
-    }
+    if (!canPublish()) return;
     if (trigger.op) {
-      const op = trigger.op;
-      const values = Object.entries(op.formData ?? {})
-        .filter(([key]) => !/password|secret|token|key|credential/i.test(key))
-        .map(([, value]) => value);
-      if (op.value && !/password|secret|token|credential/i.test(op.action ?? ""))
-        values.push(op.value);
+      const values = (trigger.op.userInput ?? [])
+        .filter(
+          ({ key, type }) =>
+            !/password|secret|token|key|credential|密码|密钥/i.test(key) &&
+            !/^(password|hidden|file)$/i.test(type),
+        )
+        .map(({ value }) => value);
       if (values.length) learnFromUser(values.join("\n"), app.name);
     }
     return;

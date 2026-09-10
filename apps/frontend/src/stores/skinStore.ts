@@ -62,17 +62,22 @@ export function applySkin(id: Skin): void {
 export function sendSkinCommand(command: SkinCommand): Promise<Skin | undefined> {
   const requestId = crypto.randomUUID();
   return new Promise((resolve, reject) => {
-    const off = wsClient.on("s2c.skin.result", (result) => {
-      if (result.requestId !== requestId) return;
+    const finish = (error?: string, skinId?: Skin) => {
       clearTimeout(timer);
       off();
-      if (result.error) reject(new Error(result.error));
-      else resolve(result.skinId);
+      offStatus();
+      if (error) reject(new Error(error));
+      else resolve(skinId);
+    };
+    const off = wsClient.on("s2c.skin.result", (result) => {
+      if (result.requestId !== requestId) return;
+      finish(result.error, result.skinId);
     });
-    const timer = setTimeout(() => {
-      off();
-      reject(new Error("skins.error.timeout"));
-    }, 15000);
-    wsClient.send("c2s.skin.command", { requestId, command });
+    const offStatus = wsClient.onStatus((connected) => {
+      if (!connected) finish("communication.disconnected");
+    });
+    const timer = setTimeout(() => finish("skins.error.timeout"), 15000);
+    if (!wsClient.send("c2s.skin.command", { requestId, command }))
+      finish("communication.disconnected");
   });
 }

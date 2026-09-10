@@ -6,7 +6,7 @@ import type { AppDescriptor } from "../domain/app.ts";
 import type { VfsNode } from "../domain/vfs.ts";
 import type { Notification } from "../domain/notification.ts";
 import type { Settings, ProviderId, ProviderModel } from "../domain/settings.ts";
-import type { AgentRole, AgentRun } from "../domain/agent.ts";
+import type { AgentRole, AgentRun, ActivityDetails } from "../domain/agent.ts";
 import type { DiskResult } from "../domain/files.ts";
 
 export type BootPhase = "connecting" | "restoring" | "ready";
@@ -59,6 +59,8 @@ export interface UiRegion {
 
 export interface UiPatchPayload {
   windowId: string;
+  /** Only this successful operation may acknowledge its submitted draft values. */
+  operationId?: string;
   mode: "full" | "regions";
   html?: string;
   regions?: UiRegion[];
@@ -116,7 +118,15 @@ export type ServerToClient =
       payload: { role: AgentRole; kind: string; data?: unknown };
     }
   | { type: "s2c.agent.run"; payload: { run: AgentRun } }
-  | { type: "s2c.activity.page"; payload: { runs: AgentRun[]; hasMore: boolean } }
+  | {
+      type: "s2c.activity.page";
+      payload: { runs: AgentRun[]; hasMore: boolean; requestId?: string };
+    }
+  | {
+      type: "s2c.activity.details";
+      payload: { requestId: string; details: ActivityDetails | null };
+    }
+  | { type: "s2c.activity.changed"; payload: { traceId: string } }
   | { type: "s2c.settings.changed"; payload: { settings: Settings } }
   | { type: "s2c.models.updated"; payload: { models: ModelInfo[] } }
   | { type: "s2c.providers.updated"; payload: { availableProviders: ProviderId[] } }

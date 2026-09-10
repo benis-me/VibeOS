@@ -6,7 +6,7 @@ import { enqueue } from "./writeQueue.ts";
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import type { DiskCommand, DiskResult } from "@vibeos/shared/domain";
-import { diskPath, executeDisk } from "../../files/disk.ts";
+import { diskPath, executeDisk, canonicalFileCommand, noteDiskChanges } from "../../files/disk.ts";
 
 interface VfsRow {
   id: string;
@@ -69,16 +69,20 @@ function gridSlot(): { x: number; y: number } {
   return { x: 24 + col * 96, y: 24 + rowIdx * 100 };
 }
 
-export function createNode(input: {
-  name: string;
-  type: VfsNodeType;
-  mime?: string;
-  content?: string;
-  targetAppId?: string;
-  location?: VfsLocation;
-  meta?: Record<string, unknown>;
-}): Promise<VfsNode> {
+export function createNode(
+  input: {
+    name: string;
+    type: VfsNodeType;
+    mime?: string;
+    content?: string;
+    targetAppId?: string;
+    location?: VfsLocation;
+    meta?: Record<string, unknown>;
+  },
+  beforeWrite = () => {},
+): Promise<VfsNode> {
   return enqueue(() => {
+    beforeWrite();
     const db = getDb();
     const now = Date.now();
     const id = ulid(now);
@@ -265,6 +269,7 @@ function materializeFile(id: string, ancestors = new Set<string>()): string | un
   if (!existsSync(diskPath(path))) {
     if (node.type === "folder") mkdirSync(diskPath(path), { mode: 0o700 });
     else writeFileSync(diskPath(path), content, { flag: "wx", mode: 0o600 });
+    noteDiskChanges([path]);
   } else if (!matches(path))
     throw new Error(`Legacy file conflicts with existing disk content: ${path}`);
   const meta = { ...node.meta, diskPath: path };
@@ -306,7 +311,8 @@ export function migrateVirtualFiles(): Promise<void> {
   return enqueue(() => materializeLegacyFiles());
 }
 
-function applyDiskMutation(
+/** Called inside the single writer, also used by application bundle renames. */
+export function applyDiskMutation(
   command: DiskCommand,
   recovered?: DiskResult,
 ): {
@@ -314,6 +320,7 @@ function applyDiskMutation(
   nodes: VfsNode[];
   removed: string[];
 } {
+  command = canonicalFileCommand(command);
   const result = recovered ?? executeDisk(command);
   const nodes: VfsNode[] = [];
   const removed: string[] = [];

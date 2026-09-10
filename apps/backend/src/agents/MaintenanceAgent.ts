@@ -2,7 +2,13 @@ import type { TimerAgent } from "./types.ts";
 import { run, recordSummary } from "../ai/SdkManager.ts";
 import { parseAiOutput } from "../ai/streamParser.ts";
 import { listOpenWindows } from "../db/repositories/WindowRepo.ts";
-import { getMemory, recentInteractions, saveSummary } from "../db/repositories/AppMemoryRepo.ts";
+import {
+  getMemory,
+  recentInteractions,
+  consolidationCursor,
+  saveConsolidation,
+} from "../db/repositories/AppMemoryRepo.ts";
+import { NATIVE_PRESET_APPS } from "@vibeos/shared";
 import { getApp } from "../db/repositories/AppRepo.ts";
 import * as AgentRepo from "../db/repositories/AgentRepo.ts";
 
@@ -18,11 +24,12 @@ export const MaintenanceAgent: TimerAgent = {
     await AgentRepo.prune(500);
 
     for (const win of listOpenWindows()) {
+      const app = getApp(win.appId);
+      if (app?.presetId && NATIVE_PRESET_APPS.includes(app.presetId)) continue;
       const memory = getMemory(win.id);
       const recent = recentInteractions(win.id);
-      if (recent.length < 6) continue; // not enough to bother consolidating
-
-      const app = getApp(win.appId);
+      const seq = recent.at(-1)?.seq ?? 0;
+      if (recent.length < 6 || seq <= consolidationCursor(win.id)) continue;
       const prompt = `[APP]\n${app?.name ?? win.appId}\n\n[CURRENT EPISODE SUMMARY]\n${memory?.episodeSummary ?? "(none)"}\n\n[RECENT INTERACTIONS]\n${recent
         .map((r) => `- ${r.opKind} ${JSON.stringify(r.opPayload).slice(0, 120)}`)
         .join("\n")}\n\n[TASK]\nProduce an updated concise episode summary.`;
@@ -32,12 +39,14 @@ export const MaintenanceAgent: TimerAgent = {
         trigger: "timer",
         prompt,
         appName: app?.name ?? "Maintenance",
+        windowId: win.id,
+        appId: win.appId,
       });
       if (!result.ok) continue;
       const parsed = parseAiOutput(result.text);
       await recordSummary(result.runId, parsed.summary || "Consolidated memory");
       if (parsed.summary) {
-        await saveSummary(win.id, parsed.summary);
+        await saveConsolidation(win.id, parsed.summary, seq, memory?.episodeSummary ?? "");
       }
     }
   },

@@ -57,8 +57,8 @@ export function startHttpServer(): Server<WsData> {
       },
     },
   });
-  watchDisk(() => {
-    void broadcastDiskChanges().catch((error) =>
+  watchDisk((paths) => {
+    void broadcastDiskChanges(paths).catch((error) =>
       console.warn("[files] desktop refresh failed", error),
     );
   });

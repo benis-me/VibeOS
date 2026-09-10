@@ -22,7 +22,7 @@ import { ulid } from "@vibeos/shared/util";
 import { basename } from "node:path";
 import { bus, messageContext } from "./bus.ts";
 import { broadcast } from "../server/wsGateway.ts";
-import { executeFileCommand } from "../server/filesHandlers.ts";
+import { executeFileCommand, broadcastDiskChanges } from "../server/filesHandlers.ts";
 import { getApp, listApps } from "../db/repositories/AppRepo.ts";
 import { ensureMemory, getMemory } from "../db/repositories/AppMemoryRepo.ts";
 import {
@@ -43,8 +43,10 @@ import { getSkin } from "../db/repositories/SkinRepo.ts";
 import { handleSkinCommand } from "../ai/skins.ts";
 import { renderInitialWindow } from "../kernel/windowInit.ts";
 import { diskError } from "../files/disk.ts";
+import { recordStep } from "../ai/SdkManager.ts";
 
 type Pending = {
+  canCommit: () => boolean;
   request: AppDelivery;
   sender: string;
   responseMode: "data" | "ai";
@@ -52,7 +54,10 @@ type Pending = {
   timer: ReturnType<typeof setTimeout>;
 };
 const pending = new Map<string, Pending>();
-const eventTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const eventTimers = new Map<
+  string,
+  { timer: ReturnType<typeof setTimeout>; data: MessageData; trace?: MessageTrace }
+>();
 const opening = new Map<string, Promise<string>>();
 let registered = false;
 const object = (data: MessageData) =>
@@ -87,11 +92,15 @@ function deliver(delivery: AppDelivery) {
   broadcast("s2c.communication.delivery", { delivery });
   if (delivery.mode === "ai") bus.emit("app.delivery", { delivery });
 }
+const requestAlive = (id: string) => {
+  const item = pending.get(id);
+  return !!item && item.canCommit();
+};
 export function deliveryAlive(delivery: AppDelivery) {
   return (
     delivery.expiresAt > Date.now() &&
-    (delivery.kind !== "request" || pending.has(delivery.id)) &&
-    (delivery.trace.requests ?? []).every((id) => pending.has(id))
+    (delivery.kind !== "request" || requestAlive(delivery.id)) &&
+    (delivery.trace.requests ?? []).every(requestAlive)
   );
 }
 export function failDelivery(delivery: AppDelivery, error: string) {
@@ -111,8 +120,30 @@ export function pendingReplies(windowId: string, trace?: MessageTrace) {
 function finish(id: string, data: MessageData, error?: string) {
   const item = pending.get(id);
   if (!item) return;
+  const interrupted = !item.canCommit();
+  if (interrupted) {
+    data = null;
+    error = "communication.interrupted";
+  }
   clearTimeout(item.timer);
   pending.delete(id);
+  const result = object(data);
+  void recordStep(
+    "message.replied",
+    {
+      requestId: id,
+      topic: item.request.topic,
+      from: item.request.windowId || "system",
+      to: item.sender,
+      path: typeof result.path === "string" ? result.path : undefined,
+      version: typeof result.version === "string" ? result.version : undefined,
+      error,
+    },
+    messageContext.getStore()?.id === item.request.trace.id
+      ? messageContext.getStore()
+      : item.request.trace,
+    error ? "error" : "info",
+  ).catch((e) => console.warn("[activity] reply log failed", e));
   bus.emit("app.delivery.cancel", { id, windowId: item.request.windowId, abort: !!error });
   // A cancelled parent must also stop read/write continuations and child requests.
   for (const [childId, child] of pending)
@@ -130,7 +161,8 @@ function finish(id: string, data: MessageData, error?: string) {
     topic: item.request.topic,
     data,
     error,
-    mode: native && NATIVE_PRESET_APPS.includes(native) ? "data" : item.responseMode,
+    mode:
+      interrupted || (native && NATIVE_PRESET_APPS.includes(native)) ? "data" : item.responseMode,
     channel: item.channel,
     expiresAt: Date.now() + MESSAGE_TIMEOUT,
     trace: {
@@ -209,6 +241,11 @@ async function systemCall(
           ? await setAppData(appId, data, beforeWrite)
           : null;
     if (!snapshot) throw new Error("communication.unsupported");
+    await recordStep(topic === "get" ? "appData.read" : "appData.write", {
+      appId,
+      version: snapshot.version,
+      previousVersion: typeof args.version === "string" ? args.version : undefined,
+    });
     if (topic === "set") broadcast("s2c.appData.changed", snapshot);
     return JSON.parse(JSON.stringify(snapshot));
   }
@@ -250,7 +287,10 @@ async function systemCall(
         .safeParse(args);
       if (!result.success) throw new Error("communication.invalid");
       if (result.data.skin) getSkin(result.data.skin);
-      await updateSettings(result.data);
+      await updateSettings(() => {
+        beforeWrite();
+        return result.data;
+      });
       broadcast("s2c.settings.changed", { settings: loadSettings() });
     } else if (topic !== "get") throw new Error("communication.unsupported");
     const settings = loadSettings();
@@ -267,6 +307,7 @@ async function nativeCall(
   windowId: string,
   topic: string,
   data: MessageData,
+  beforeWrite = () => {},
 ): Promise<MessageData> {
   const window = getWindow(windowId)!;
   const preset = getApp(window.appId)?.presetId;
@@ -276,7 +317,8 @@ async function nativeCall(
     topic === "file.open"
   ) {
     if (typeof args.path !== "string") throw new Error("communication.invalid");
-    const stat = await executeFileCommand({ action: "stat", path: args.path });
+    const stat = await executeFileCommand({ action: "stat", path: args.path }, beforeWrite);
+    beforeWrite();
     if (stat.entry?.kind === "symlink" || !stat.entry) throw new Error("communication.invalid");
     if (preset === "file-manager") {
       const path =
@@ -305,7 +347,7 @@ async function nativeCall(
     });
     return { skin: args.id };
   }
-  if (preset === "settings") return systemCall("settings", topic, data);
+  if (preset === "settings") return systemCall("settings", topic, data, beforeWrite);
   throw new Error("communication.unsupported");
 }
 
@@ -315,9 +357,12 @@ export async function communicate(
   input: CommunicationCommand,
   requestId = ulid(),
   trace = messageContext.getStore(),
-): Promise<void> {
+  canCommit = () => true,
+): Promise<{ error: string } | undefined> {
+  if (!canCommit()) throw new Error("communication.interrupted");
   const source = sourceFor(windowId);
-  if (trace?.requests?.some((id) => !pending.has(id))) throw new Error("communication.interrupted");
+  if (trace?.requests?.some((id) => !requestAlive(id)))
+    throw new Error("communication.interrupted");
   const command = communicationCommandSchema.parse(input);
   if (command.action === "refresh") {
     refreshAppData(windowId);
@@ -380,6 +425,7 @@ export async function communicate(
     );
     timer.unref?.();
     pending.set(requestId, {
+      canCommit,
       request,
       sender: windowId,
       responseMode: command.responseMode,
@@ -392,15 +438,26 @@ export async function communicate(
       targetWindow = await resolveTarget(command.target, command.mode);
     sourceFor(windowId);
     request.windowId = targetWindow;
-    request.trace = nextTrace(trace, source, targetWindow || undefined);
+    request.trace = nextTrace(request.trace, source, targetWindow || undefined);
     if (command.action === "request")
       request.trace.requests = [...(request.trace.requests ?? []), requestId];
     if (Date.now() >= expiresAt || (command.action === "request" && !pending.has(requestId)))
       return;
+    await recordStep(
+      command.action === "request" ? "message.requested" : "message.sent",
+      {
+        requestId,
+        from: windowId,
+        to: "system" in command.target ? command.target.system : targetWindow,
+        topic: command.topic,
+        mode: command.mode,
+      },
+      request.trace,
+    );
     const preset = targetWindow ? getApp(getWindow(targetWindow)!.appId)?.presetId : undefined;
     if ("system" in command.target || (preset && NATIVE_PRESET_APPS.includes(preset))) {
       const beforeWrite = () => {
-        if (!deliveryAlive(request) || !getWindow(windowId)?.isOpen)
+        if (!canCommit() || !deliveryAlive(request) || !getWindow(windowId)?.isOpen)
           throw new Error("communication.interrupted");
       };
       const result = await messageContext.run(request.trace, () =>
@@ -412,7 +469,7 @@ export async function communicate(
               beforeWrite,
               source.appId,
             )
-          : nativeCall(targetWindow, command.topic, request.data),
+          : nativeCall(targetWindow, command.topic, request.data, beforeWrite),
       );
       const resultSize = new TextEncoder().encode(JSON.stringify(result)).length;
       if (resultSize > MESSAGE_BYTES) throw new Error("communication.tooLarge");
@@ -424,8 +481,11 @@ export async function communicate(
       deliver(request);
     }
   } catch (error) {
-    if (command.action === "request") finish(requestId, null, communicationError(error));
-    else throw error;
+    if (command.action === "request") {
+      const code = communicationError(error);
+      finish(requestId, null, code);
+      return { error: code };
+    } else throw error;
   }
 }
 
@@ -438,13 +498,10 @@ function matchesPath(filter: string | undefined, data: MessageData): boolean {
       ? [args.path]
       : [];
   const base = filter.replace(/^\/+|\/+$/g, "");
-  return (
-    !paths.length ||
-    paths.some(
-      (p) =>
-        typeof p === "string" &&
-        (!base || p === base || p.startsWith(base + "/") || base.startsWith(p + "/")),
-    )
+  return paths.some(
+    (p) =>
+      typeof p === "string" &&
+      (!base || p === base || p.startsWith(base + "/") || base.startsWith(p + "/")),
   );
 }
 function publish(topic: string, data: MessageData, source: MessageSource, trace?: MessageTrace) {
@@ -468,13 +525,29 @@ function publish(topic: string, data: MessageData, source: MessageSource, trace?
       continue;
     }
     const key = windowId + ":" + sub.id;
-    clearTimeout(eventTimers.get(key));
+    const previous = eventTimers.get(key);
+    clearTimeout(previous?.timer);
+    let batchData = data;
+    let batchTrace = trace;
+    if (topic === "files.changed" && previous) {
+      const paths = [
+        ...((object(previous.data).paths as string[]) ?? []),
+        ...((object(data).paths as string[]) ?? []),
+      ];
+      batchData = { paths: [...new Set(paths)] };
+      if (previous.trace)
+        batchTrace = {
+          ...(trace ?? previous.trace),
+          windows: [...new Set([...previous.trace.windows, ...(trace?.windows ?? [])])],
+          hops: Math.max(previous.trace.hops, trace?.hops ?? 0),
+        };
+    }
     const timer = setTimeout(() => {
       eventTimers.delete(key);
-      void eventDelivery(windowId, sub, topic, data, source, trace).catch(() => {});
+      void eventDelivery(windowId, sub, topic, batchData, source, batchTrace).catch(() => {});
     }, 60);
     timer.unref?.();
-    eventTimers.set(key, timer);
+    eventTimers.set(key, { timer, data: batchData, trace: batchTrace });
   }
 }
 async function eventDelivery(
@@ -556,13 +629,9 @@ function observe(message: ServerToClient, trace?: MessageTrace) {
       publish("apps.changed", {}, source, trace);
       break;
     case "s2c.files.changed":
-      publish("files.changed", { paths: message.payload.paths ?? [] }, source, trace);
+      if (message.payload.paths?.length)
+        publish("files.changed", { paths: message.payload.paths }, source, trace);
       break;
-    case "s2c.syscall.fileCreated": {
-      const path = message.payload.node.meta.diskPath;
-      publish("files.changed", { paths: typeof path === "string" ? [path] : [] }, source, trace);
-      break;
-    }
     case "s2c.settings.changed": {
       const s = message.payload.settings;
       publish(
@@ -592,9 +661,9 @@ function observe(message: ServerToClient, trace?: MessageTrace) {
 }
 export function closeCommunicationWindow(windowId: string) {
   void removeSubscription(windowId);
-  for (const [key, timer] of eventTimers)
+  for (const [key, item] of eventTimers)
     if (key.startsWith(windowId + ":")) {
-      clearTimeout(timer);
+      clearTimeout(item.timer);
       eventTimers.delete(key);
     }
   for (const [id, item] of pending) {
@@ -606,5 +675,14 @@ export async function registerCommunication() {
   if (registered) return;
   await recoverSubscriptions();
   registered = true;
+  bus.on("disk.changed", ({ paths, trace }) => {
+    const refresh = () => {
+      void broadcastDiskChanges(paths).catch((error) =>
+        console.warn("[files] refresh failed", error),
+      );
+    };
+    if (trace) messageContext.run(trace, refresh);
+    else messageContext.exit(refresh);
+  });
   bus.on("system.broadcast", ({ message, trace }) => observe(message, trace));
 }

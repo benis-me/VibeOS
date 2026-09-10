@@ -56,7 +56,8 @@ export function sendCommunication(
         ? (command.timeoutMs ?? MESSAGE_TIMEOUT)
         : MESSAGE_TIMEOUT) + 1000,
     );
-    wsClient.send("c2s.communication.command", { windowId, requestId, command });
+    if (!wsClient.send("c2s.communication.command", { windowId, requestId, command }))
+      finish(null, "communication.disconnected");
   });
 }
 

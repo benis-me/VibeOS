@@ -85,7 +85,7 @@ export function useBoot(): void {
     offs.push(
       wsClient.on("s2c.agent.run", (p) => useActivityStore.getState().upsert(p.run)),
       wsClient.on("s2c.activity.page", (p) =>
-        useActivityStore.getState().appendPage(p.runs, p.hasMore),
+        useActivityStore.getState().appendPage(p.runs, p.hasMore, p.requestId),
       ),
     );
 

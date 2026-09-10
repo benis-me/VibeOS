@@ -4,11 +4,12 @@ import {
   importApplicationDirectory,
 } from "../db/repositories/ApplicationPackageRepo.ts";
 import { broadcastApplications } from "../ai/applications.ts";
+import { recordStep } from "../ai/SdkManager.ts";
 import { bus } from "../events/bus.ts";
 import { closeWindow } from "../db/repositories/WindowRepo.ts";
 import type { ServerWebSocket } from "bun";
 import type { ClientToServerPayload } from "@vibeos/shared/protocol";
-import { executeDisk, diskError, diskPath } from "../files/disk.ts";
+import { executeDisk, diskError, diskPath, canonicalFileCommand } from "../files/disk.ts";
 import { broadcast, sendTo, type WsData } from "./wsGateway.ts";
 import { lstatSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
@@ -29,6 +30,7 @@ import {
 
 /** Shared file dispatch: native viewers for content, normal app launch for shortcuts. */
 export async function openDiskFile(path: string) {
+  path = canonicalFileCommand({ action: "open", path }).path;
   const absolute = diskPath(path);
   const info = lstatSync(absolute);
   let bundleApp: string | undefined;
@@ -80,7 +82,7 @@ export async function openDiskFile(path: string) {
   return window;
 }
 
-export async function broadcastDiskChanges() {
+export async function broadcastDiskChanges(paths: string[] = []) {
   const { removed } = await syncDesktopFiles();
   for (const node of [...listByLocation("desktop"), ...listByLocation("recyclebin")])
     broadcast("s2c.vfs.changed", { node });
@@ -91,9 +93,10 @@ export async function broadcastDiskChanges() {
       await closeWindow(window.id);
       broadcast("s2c.window.closed", { windowId: window.id });
     }
-  broadcastApplications();
+  if (!paths.length || paths.some((path) => path === "Applications" || path.includes(".vibeapp")))
+    broadcastApplications();
   broadcastFileWindows();
-  broadcast("s2c.files.changed", {});
+  broadcast("s2c.files.changed", { paths });
 }
 
 export function broadcastFileWindows() {
@@ -107,6 +110,39 @@ export async function executeFileCommand(
   command: ClientToServerPayload<"c2s.files.request">["command"],
   beforeWrite = () => {},
 ): Promise<DiskResult & { windowId?: string }> {
+  try {
+    const result = await fileCommand(command, beforeWrite);
+    await recordStep(`files.${command.action}`, {
+      path: result.path ?? command.path,
+      version: result.version,
+      previousVersion: "version" in command ? command.version : undefined,
+      sourcePath: "destination" in command ? command.path : undefined,
+      bytes:
+        result.content !== undefined
+          ? Buffer.byteLength(result.content)
+          : command.action === "write"
+            ? Buffer.byteLength(command.content, command.encoding ?? "utf8")
+            : undefined,
+      windowId: result.windowId,
+      count: result.entries?.length,
+    });
+    return result;
+  } catch (error) {
+    await recordStep(
+      `files.${command.action}`,
+      { path: command.path, error: diskError(error) },
+      undefined,
+      "error",
+    );
+    throw error;
+  }
+}
+
+async function fileCommand(
+  command: ClientToServerPayload<"c2s.files.request">["command"],
+  beforeWrite = () => {},
+): Promise<DiskResult & { windowId?: string }> {
+  command = canonicalFileCommand(command);
   beforeWrite();
   if (command.action === "reveal") {
     const entry = executeDisk({ action: "stat", path: command.path }).entry!;
@@ -140,9 +176,6 @@ export async function executeFileCommand(
     : await mutateDisk(command, beforeWrite);
   for (const node of nodes) broadcast("s2c.vfs.changed", { node });
   if (removed.length) broadcast("s2c.vfs.removed", { ids: removed });
-  if (!readOnly) {
-    await broadcastDiskChanges();
-  }
   return { path: command.path, ...result };
 }
 

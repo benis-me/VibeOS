@@ -85,7 +85,12 @@ test("local app lifecycle preserves identities, versions, data, portable assets 
       await syncDesktopFiles();const bundleNode=listByLocation("desktop").find(n=>n.meta.diskPath==="Desktop/Moved.vibeapp");
       await moveNode({nodeId:bundleNode.id,location:"recyclebin"});assert.equal(getApp(app.id),null);assert.equal(getNode(shortcut.id).location,"recyclebin");
       await moveNode({nodeId:bundleNode.id,location:"desktop"});assert(getApp(app.id).isInstalled);assert.equal(getNode(shortcut.id).location,"desktop");
+      const oldBundle=A.applicationPath(app.id);
+      const viewer=await executeFileCommand({action:"open",path:oldBundle+"/manifest.json"});
       await A.renameApplication(app.id,"Renamed Notes");assert.equal(getApp(app.id).name,"Renamed Notes");assert(A.readApplicationVersion(app.id).seedHtml.includes("a word"));
+      assert(A.applicationPath(app.id).startsWith("Desktop/"));
+      assert.equal(getWindow(viewer.windowId).filePath,A.applicationPath(app.id)+"/manifest.json");
+      assert(JSON.parse(executeDisk({action:"read",path:getWindow(viewer.windowId).filePath}).content).name==="Renamed Notes");
       const created=await handleApplicationCommand({action:"create",name:"Background",prompt:"A compact imaginary library"});
       for(let i=0;i<100;i++){if(A.applicationState().applications.find(a=>a.appId===created.appId).requests[0]?.status==="succeeded")break;await Bun.sleep(10);}
       assert.equal(A.applicationState().applications.find(a=>a.appId===created.appId).requests[0].status,"succeeded");
@@ -170,7 +175,7 @@ test("AI read/write continuations retain complete original fields and system mem
           return {ok:true,text:'<vibeos-html mode="full"><main data-vibeos-region="root">Saved</main></vibeos-html>'};
         } catch(e) {error=e;return {ok:false,text:"",error:"fixture assertion"};}
       };
-      bus.emit("op.received",{windowId:win.id,op:{kind:"submit",action:"save",formData:{title:"Input",body}}});
+      bus.emit("op.received",{windowId:win.id,op:{id:"submitted",kind:"submit",action:"save",formData:{title:"Input",body},userInput:[{key:"body",type:"textarea",value:body}]}});
       for(let i=0;i<200;i++){if(step>=3)break;await Bun.sleep(10);}
       if(error)throw error;assert.equal(step,3);assert(memorySeen);assert.equal(getAppData(app.id).data.body,body);
       for(let i=0;i<100;i++){if(systemMemoryState().entries.length===2)break;await Bun.sleep(10);}

@@ -31,7 +31,7 @@ test("notify: creates a notification", async () => {
   expect(NotificationRepo.listRecent(50).some((n) => n.title === "Ping")).toBe(true);
 });
 
-test("a failing call is swallowed, not thrown (batch keeps going)", async () => {
+test("focusing a missing window is a harmless no-op", async () => {
   await expect(
     execute([{ type: "focus", windowId: "does-not-exist" }], { source: "syscall" }),
   ).resolves.toBeUndefined();

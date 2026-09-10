@@ -1,0 +1,163 @@
+<!doctype html>
+<!-- NODE_OPTIONS= bunx vite --config apps/frontend/vite.config.ts --port 17733
+     Open /test/reliability.browser.html. No real model, socket or user data is used. -->
+<meta charset="utf-8"><title>VibeOS input and isolation regressions</title>
+<div id="os-chrome">OS chrome</div><div id="surface" style="height:280px;width:500px"></div>
+<div id="other" class="ai-surface" data-ai-window="other"><p class="test-color">Other application</p></div>
+<pre id="result">Running…</pre>
+<script type="module">
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
+import { AiHtmlSurface } from "/apps/frontend/src/components/window/AiHtmlSurface.tsx";
+import { useWindowStore } from "/apps/frontend/src/stores/windowStore.ts";
+import { wsClient } from "/apps/frontend/src/lib/ws.ts";
+import { requestApplication } from "/apps/frontend/src/lib/nativeCommands.ts";
+import { requestFiles } from "/apps/frontend/src/lib/files.ts";
+import { sendSkinCommand } from "/apps/frontend/src/stores/skinStore.ts";
+import { useActivityStore } from "/apps/frontend/src/stores/activityStore.ts";
+import { ActivityMonitorApp } from "/apps/frontend/src/components/activity/ActivityMonitorApp.tsx";
+const checks = [];
+function assert(value, message) { if (!value) throw new Error(message); checks.push(message); }
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+try {
+  const realSend = wsClient.send.bind(wsClient); let op;
+  wsClient.send = (type, payload) => { if (type === "c2s.op") op = payload.op; return true; };
+  const store = useWindowStore.getState();
+  const initial = '<main data-vibeos-region="root"><section data-vibeos-region="editor"><input name="title"><textarea name="body"></textarea><input name="prefilled" value="AI example"><input name="credential" type="password"><button data-vibeos-action="save">Save</button></section><p data-vibeos-region="result">Ready</p></main>';
+  store.setAll([], { regression: initial });
+  const root = createRoot(document.getElementById("surface"));
+  flushSync(() => root.render(React.createElement(AiHtmlSurface, { windowId: "regression" })));
+  await wait(0);
+  const surface = document.querySelector("#surface .ai-surface");
+  const field = (key) => surface.querySelector('[data-vibeos-field="' + key + '"]');
+  const type = (key, value) => { const el = field(key); el.value = value; el.dispatchEvent(new Event("input", { bubbles: true })); return el; };
+  const patch = (html, operationId) => store.applyPatch({ windowId: "regression", mode: "full", html, operationId, done: true });
+  type("title", "My title"); const body = "x".repeat(2500) + " EXACT_END"; type("body", body);
+  surface.querySelector("button").click();
+  assert(op.formData.title === "My title" && op.formData.body === body, "Reserved title/body names and long no-form input arrive intact");
+  assert(op.userInput.length === 2 && !op.userInput.some(f => f.key === "prefilled"), "Memory provenance includes edited fields only");
+  const submitted = op.id;
+  patch(initial.replace("Ready", "Background update"));
+  assert(field("body").value === body, "Intermediate/background full patches retain submitted values");
+  const draft = type("body", "Unsubmitted newer draft"); draft.focus(); draft.setSelectionRange(2, 9);
+  patch(initial, submitted);
+  assert(field("title").value === "" && field("body").value === "Unsubmitted newer draft", "Acknowledgement clears its submission, never newer typing");
+  assert(document.activeElement === field("body") && field("body").selectionStart === 2 && field("body").selectionEnd === 9, "Full patch restores focus and selection");
+  store.applyPatch({ windowId: "regression", mode: "regions", done: true, regions: [{ region: "editor", html: '<section data-vibeos-region="editor"><textarea name="body"></textarea><button data-vibeos-action="save">Save again</button></section>' }] });
+  assert(field("body").value === "Unsubmitted newer draft", "An affected region preserves an unsent draft");
+  surface.querySelector("button").click(); const latest = op.id;
+  patch(initial, latest);
+  assert(field("body").value === "", "A successful submission can reset its field");
+  type("body", "same snapshot submit"); surface.querySelector("button").click();
+  patch(initial, op.id);
+  assert(field("body").value === "", "An identical HTML snapshot still acknowledges its operation");
+  const unchangedEditor = initial.match(/<section[\s\S]*?<\/section>/)[0];
+  store.applyPatch({ windowId: "regression", mode: "regions", regions: [{ region: "editor", html: unchangedEditor }], done: true });
+  type("body", "repeat same region"); surface.querySelector("button").click();
+  store.applyPatch({ windowId: "regression", mode: "regions", regions: [{ region: "editor", html: unchangedEditor }], operationId: op.id, done: true });
+  assert(field("body").value === "", "An unchanged region resets acknowledged live values to its declared defaults");
+  patch('<main><form data-vibeos-action="send"><input name="title"><textarea name="body"></textarea><button type="submit">Send</button></form></main>');
+  type("title", "Form title"); type("body", body); surface.querySelector("button").click();
+  assert(op.kind === "submit" && op.formData.title === "Form title" && op.formData.body === body, "Real forms retain sanitized names and full values without navigation");
+  const twoForms = '<main><form id="a"><textarea name="body"></textarea><button>Save A</button></form><form id="b"><textarea name="body"></textarea><button>Save B</button></form></main>';
+  patch(twoForms); const edits = [...surface.querySelectorAll("textarea")];
+  edits.forEach((el, index) => { el.value = "Draft " + index; el.dispatchEvent(new Event("input", { bubbles: true })); });
+  surface.querySelector("#b button").click(); const formB = op.id;
+  patch(twoForms + '<p>Background</p>');
+  assert([...surface.querySelectorAll("textarea")].map(el => el.value).join("/") === "Draft 0/Draft 1", "Separate forms with the same field names keep independent drafts");
+  patch(twoForms, formB);
+  assert(surface.querySelector("#a textarea").value === "Draft 0" && surface.querySelector("#b textarea").value === "", "Submitting one form cannot acknowledge another form's draft");
+  patch('<main><style>#os-chrome{display:none!important}.test-color{color:rgb(1,2,3)!important}@media(min-width:1px){.inside{color:rgb(4,5,6)}}@import url(/forbidden.css);</style><p class="test-color">Inside</p><p class="inside">Media</p><div id="fixed" style="position:fixed;inset:0;z-index:999999">Fixed content</div></main>');
+  assert(getComputedStyle(document.getElementById("os-chrome")).display !== "none", "Generated styles cannot affect OS chrome");
+  assert(getComputedStyle(document.querySelector("#other p")).color !== "rgb(1, 2, 3)", "Generated styles cannot affect another application");
+  assert(getComputedStyle(surface.querySelector(".test-color")).color === "rgb(1, 2, 3)" && getComputedStyle(surface.querySelector(".inside")).color === "rgb(4, 5, 6)", "Scoped and responsive styles still work inside their app");
+  const fixed = surface.querySelector("#fixed").getBoundingClientRect(), bounds = surface.getBoundingClientRect();
+  assert(Math.abs(fixed.left - bounds.left) < 1 && fixed.width <= bounds.width + 1, "Fixed content stays within its application surface");
+  patch('<main><style>.x::after{content:"\\3c /style>\\3c img src=x onerror=alert(1)>"}</style><p class="x">Safe CSS serialization</p></main>');
+  assert(!surface.querySelector("img,[onerror]"), "CSS escape serialization cannot reintroduce HTML after sanitization");
+  patch('<main><style>@keyframes pulse{from{opacity:.5}to{opacity:1}}.motion{animation:pulse 1s infinite}</style><p class="motion">CSS animation</p><p style="animation:pulse 2s infinite">Inline animation</p></main>');
+  assert([...surface.querySelectorAll("p")].every(el => getComputedStyle(el).animationName === "vibeos-regression-pulse"), "Generated animations retain window-specific keyframe names");
+  flushSync(() => root.unmount());
+
+  let socket; const frames = [];
+  class FakeWebSocket {
+    static OPEN = 1; static CONNECTING = 0; readyState = 0;
+    constructor() { socket = this; }
+    send(frame) { frames.push(JSON.parse(frame)); }
+    close() { this.readyState = 3; this.onclose?.(); }
+  }
+  window.WebSocket = FakeWebSocket; wsClient.send = realSend; wsClient.connect();
+  const rejected = await requestApplication({ action: "create", name: "Offline mutation", prompt: "Test" }).then(() => "success", e => e.message);
+  assert(rejected === "error.disconnected", "Offline mutation fails immediately");
+  socket.close(); await wait(850); socket.readyState = 1; socket.onopen();
+  assert(!frames.some(f => f.type === "c2s.application.command"), "A rejected mutation is never replayed on reconnect");
+  const file = requestFiles({ action: "write", path: "Documents/test.txt", content: "one attempt" }).then(() => "success", e => e.message);
+  const skin = sendSkinCommand({ action: "create", name: "Test" }).then(() => "success", e => e.message);
+  socket.close();
+  assert(await file === "disconnected" && await skin === "communication.disconnected", "Pending native writes fail on disconnect");
+  const sent = frames.length; await wait(850); socket.readyState = 1; socket.onopen();
+  assert(frames.length === sent, "In-flight native writes are not retried after an uncertain disconnect");
+  const activity = useActivityStore.getState(); activity.setFilter({ query: "old" }); const oldRequest = useActivityStore.getState().requestId;
+  activity.setFilter({ query: "new" }); const newRequest = useActivityStore.getState().requestId;
+  activity.appendPage([{ id: "wrong" }], false, oldRequest);
+  assert(useActivityStore.getState().runs.length === 0 && useActivityStore.getState().loading, "A stale filter response cannot replace newer results");
+  activity.appendPage([], false, newRequest);
+  assert(!useActivityStore.getState().loading, "Current filter response completes loading");
+
+  await import("/apps/frontend/src/styles/globals.css");
+  const run = { id: "popup-run", traceId: "popup-trace", role: "ui-generation", status: "ok", appName: "Popup test", startedAt: Date.now(), endedAt: Date.now(), summary: "Saved real output" };
+  activity.setFilter({}); activity.appendPage([run], false, useActivityStore.getState().requestId);
+  const host = document.getElementById("surface"); host.style.cssText = "position:relative;width:720px;height:480px;margin:20px";
+  const monitor = createRoot(host);
+  flushSync(() => monitor.render(React.createElement(ActivityMonitorApp)));
+  const row = host.querySelector("button[aria-label]");
+  host.style.width = "360px"; host.style.height = "230px";
+  const contentScroll = host.querySelector(".vibe-activity").firstElementChild;
+  const tableScroll = row.closest(".overflow-auto");
+  contentScroll.scrollTop = contentScroll.scrollHeight;
+  const rowBounds = row.getBoundingClientRect(), hostBounds = host.getBoundingClientRect();
+  assert(tableScroll.clientHeight >= rowBounds.height && rowBounds.top >= hostBounds.top && rowBounds.bottom <= hostBounds.bottom, "A small Activity window keeps its list reachable by scrolling past the dashboard");
+  host.style.width = "720px"; host.style.height = "480px"; contentScroll.scrollTop = 0;
+  const open = () => {
+    row.focus(); flushSync(() => row.click());
+    const request = frames.findLast(f => f.type === "c2s.activity.details");
+    flushSync(() => socket.onmessage({ data: JSON.stringify({ type: "s2c.activity.details", payload: { requestId: request.payload.requestId, details: { run, relatedRuns: [run], logs: Array.from({ length: 20 }, (_, i) => ({ id: String(i), runId: run.id, ts: Date.now(), level: "info", message: "files.write", data: { path: "Documents/output.txt", version: "actual-version" } })), truncated: false } } }) }));
+    return host.querySelector("dialog[open]");
+  };
+  const contained = () => {
+    const popup = host.querySelector("dialog").getBoundingClientRect(), app = host.getBoundingClientRect();
+    return popup.width > 0 && popup.height > 0 && popup.left >= app.left && popup.top >= app.top && popup.right <= app.right && popup.bottom <= app.bottom;
+  };
+  let popup = open();
+  assert(popup && !popup.matches(":modal") && contained(), "Activity details stay inside their app instead of the browser top layer");
+  assert(popup.querySelector("header").getBoundingClientRect().height <= 40 && popup.querySelector("h2").getBoundingClientRect().height < 24, "The detail header keeps its title, status and close button on one compact line");
+  const technical = popup.querySelector("ol details");
+  assert(!technical.open && technical.textContent.includes("actual-version"), "Long file versions remain available in collapsed technical details");
+  technical.querySelector("summary").click();
+  assert(technical.open && technical.textContent.includes("actual-version"), "Technical details expand without leaving the operation timeline");
+  assert(host.querySelector(".vibe-activity").firstElementChild.inert, "The covered activity list cannot receive input while its popup is open");
+  const outside = document.createElement("button"); outside.textContent = "Another OS window"; document.body.append(outside); outside.focus();
+  assert(document.activeElement === outside, "Other VibeOS windows remain interactive while details are open");
+  host.style.transform = "translate(45px, 25px)";
+  assert(contained(), "The details popup moves with its app");
+  host.style.width = "360px"; host.style.height = "230px";
+  assert(contained() && popup.querySelector(".overflow-auto").scrollHeight > popup.querySelector(".overflow-auto").clientHeight, "A resized app keeps details contained and scrollable");
+  host.hidden = true;
+  assert(!popup.getClientRects().length && !document.querySelector(":modal"), "Minimizing the app also hides its popup");
+  host.hidden = false;
+  host.style.width = "720px"; host.style.height = "480px";
+  popup.querySelector("button").focus();
+  flushSync(() => popup.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+  assert(!host.querySelector("dialog") && document.activeElement === row && !host.querySelector(".vibe-activity").firstElementChild.inert, "Escape dismisses local details and restores the selected row");
+  popup = open();
+  flushSync(() => host.querySelector(".vibe-activity-popup").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })));
+  assert(!host.querySelector("dialog"), "Clicking the popup's local backdrop dismisses it");
+  open(); flushSync(() => monitor.unmount()); outside.remove();
+  assert(!document.querySelector("dialog"), "Closing Activity Monitor leaves no detached popup");
+  document.getElementById("result").textContent = JSON.stringify({ status: "PASS", count: checks.length, checks }, null, 2);
+} catch (error) {
+  document.getElementById("result").textContent = JSON.stringify({ status: "FAIL", error: error.stack, checks }, null, 2);
+  console.error(error);
+}
+</script>

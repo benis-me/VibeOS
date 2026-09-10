@@ -6,6 +6,7 @@ import type { AiOp, DragPayload, DropTarget } from "@vibeos/shared/protocol";
 import type { AgentRole } from "@vibeos/shared/domain";
 
 export interface BusEvents {
+  "disk.changed": { paths: string[]; trace?: MessageTrace };
   "app.delivery": { delivery: AppDelivery };
   "app.delivery.cancel": {
     id?: string;

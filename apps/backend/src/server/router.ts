@@ -68,7 +68,7 @@ import {
   markRead,
   get as getNotification,
 } from "../db/repositories/NotificationRepo.ts";
-import { recentRuns } from "../db/repositories/AgentRepo.ts";
+import { recentRuns, runDetails } from "../db/repositories/AgentRepo.ts";
 import { stopRun } from "../ai/SdkManager.ts";
 import { logger } from "../util/log.ts";
 
@@ -409,12 +409,28 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
 
     case "c2s.activity.fetch": {
       const limit = Math.min(Math.max(msg.payload.limit ?? 40, 1), 100);
-      const rows = recentRuns(limit + 1, msg.payload.before);
+      const rows = recentRuns(
+        limit + 1,
+        msg.payload.before,
+        msg.payload.filter,
+        msg.payload.beforeId,
+      );
       const hasMore = rows.length > limit;
-      sendTo(ws, "s2c.activity.page", { runs: rows.slice(0, limit), hasMore });
+      sendTo(ws, "s2c.activity.page", {
+        runs: rows.slice(0, limit),
+        hasMore,
+        requestId: msg.payload.requestId,
+      });
       return;
     }
 
+    case "c2s.activity.details": {
+      sendTo(ws, "s2c.activity.details", {
+        requestId: msg.payload.requestId,
+        details: runDetails(msg.payload.runId),
+      });
+      return;
+    }
     case "c2s.activity.stop": {
       stopRun(msg.payload.runId);
       return;

@@ -11,6 +11,7 @@ import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 import * as AgentRepo from "../db/repositories/AgentRepo.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { logger } from "../util/log.ts";
+import { messageContext } from "../events/bus.ts";
 
 const log = logger("sdk");
 
@@ -44,6 +45,32 @@ export interface RunOptions {
   systemPromptOverride?: string;
   /** App/window this run is for, recorded for the Activity Monitor. */
   appName?: string;
+  traceId?: string;
+  windowId?: string;
+  appId?: string;
+}
+
+/** Structured outcomes only; never persist prompts, form values or file contents in activity logs. */
+export async function recordStep(
+  message: string,
+  data: Record<string, unknown>,
+  trace: { id: string; runId?: string } | undefined = messageContext.getStore(),
+  level: "info" | "warn" | "error" = "info",
+) {
+  if (!trace) return;
+  await AgentRepo.log(trace.runId, level, message, data, trace.id);
+  if (
+    trace.runId &&
+    (message === "ui.cancelled" || (level === "error" && !message.startsWith("model.")))
+  ) {
+    const updated = await AgentRepo.setOutcome(
+      trace.runId,
+      message === "ui.cancelled" ? "aborted" : "error",
+      typeof data.error === "string" ? data.error : undefined,
+    );
+    if (updated) broadcast("s2c.agent.run", { run: updated });
+  }
+  broadcast("s2c.activity.changed", { traceId: trace.id });
 }
 
 /** Attach a one-line summary of what a run produced, and re-broadcast it. */
@@ -66,10 +93,16 @@ export async function run(opts: RunOptions): Promise<RunResult> {
     trigger: opts.trigger,
     model: cfg.model,
     appName: opts.appName,
+    traceId: opts.traceId ?? messageContext.getStore()?.id,
+    windowId: opts.windowId,
+    appId: opts.appId,
   });
   broadcast("s2c.agent.run", { run });
+  const trace = { id: run.traceId!, runId: run.id };
 
   const finish = async (result: RunResult): Promise<RunResult> => {
+    if (opts.abort?.signal.aborted || stoppedRuns.has(run.id))
+      result = { ...result, ok: false, error: "aborted" };
     // Fill in cost when the provider reported tokens but no dollar figure
     // (codebuddy / codex / openrouter) using an estimate from the model price.
     const usage = result.usage
@@ -81,9 +114,20 @@ export async function run(opts: RunOptions): Promise<RunResult> {
         }
       : undefined;
     runRegistry.delete(run.id);
-    const status = stoppedRuns.has(run.id) ? "aborted" : result.ok ? "ok" : "error";
+    const status =
+      stoppedRuns.has(run.id) || opts.abort?.signal.aborted
+        ? "aborted"
+        : result.ok
+          ? "ok"
+          : "error";
     stoppedRuns.delete(run.id);
     const finished = await AgentRepo.endRun(run.id, status, result.error, usage);
+    await recordStep(
+      "model.completed",
+      { status, error: result.error, ...usage },
+      trace,
+      status === "error" ? "error" : "info",
+    );
     if (finished) broadcast("s2c.agent.run", { run: finished });
     return { ...result, runId: run.id };
   };
@@ -139,6 +183,11 @@ export async function run(opts: RunOptions): Promise<RunResult> {
     };
     arm();
     try {
+      await recordStep(
+        "model.started",
+        { provider: provider.id, model: model ?? "default" },
+        trace,
+      );
       const r = await provider.run({
         prompt: opts.prompt,
         systemPrompt,
@@ -156,41 +205,64 @@ export async function run(opts: RunOptions): Promise<RunResult> {
               }
             : undefined,
       });
+      if (!r.ok || timedOut)
+        await recordStep(
+          "model.failed",
+          {
+            provider: provider.id,
+            model: model ?? "default",
+            error: timedOut ? "timeout" : r.error,
+          },
+          trace,
+          "error",
+        );
       return {
         result: timedOut ? { ...r, ok: false, error: `timed out after ${env.genTimeoutMs}ms` } : r,
         timedOut,
       };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await recordStep("model.failed", { provider: provider.id, error: message }, trace, "error");
+      return { result: { text: "", ok: false, error: message }, timedOut };
     } finally {
       clearTimeout(timer);
       preempt?.removeEventListener("abort", onPreempt);
     }
   };
 
-  const provider = await getProvider(cfg.providerId ?? activeProviderId());
-  log.debug(
-    `query ${opts.role} via ${provider.id} model=${cfg.model ?? "(default)"} effort=${cfg.effort} thinking=${cfg.thinking?.type} locale=${locale}${opts.sessionId ? " resume" : ""}`,
-  );
+  try {
+    const provider = await getProvider(cfg.providerId ?? activeProviderId());
+    log.debug(
+      `query ${opts.role} via ${provider.id} model=${cfg.model ?? "(default)"} effort=${cfg.effort} thinking=${cfg.thinking?.type} locale=${locale}${opts.sessionId ? " resume" : ""}`,
+    );
 
-  let { result, timedOut } = await attempt(provider, cfg.model, true);
+    let { result, timedOut } = await attempt(provider, cfg.model, true);
 
-  // Recover from a genuine provider failure (not preemption, not a hang/timeout):
-  // retry once on the same provider, then fall back to another available backend.
-  // Recovery attempts don't stream — they yield a final result patched in one go.
-  const recoverable = () => !result.ok && !timedOut && !preempt?.aborted;
-  if (recoverable()) {
-    log.warn(`${provider.id} failed (${result.error}); retrying once`);
-    ({ result, timedOut } = await attempt(provider, cfg.model, false));
-  }
-  if (recoverable()) {
-    const fallbackId = availableProviderIds().find((id) => id !== provider.id);
-    if (fallbackId) {
-      log.warn(`${provider.id} still failing; falling back to ${fallbackId}`);
-      ({ result, timedOut } = await attempt(await getProvider(fallbackId), undefined, false));
+    // Recover from a genuine provider failure (not preemption, not a hang/timeout):
+    // retry once on the same provider, then fall back to another available backend.
+    // Recovery attempts don't stream — they yield a final result patched in one go.
+    const recoverable = () => !result.ok && !timedOut && !preempt?.aborted;
+    if (recoverable()) {
+      log.warn(`${provider.id} failed (${result.error}); retrying once`);
+      ({ result, timedOut } = await attempt(provider, cfg.model, false));
     }
-  }
+    if (recoverable()) {
+      const fallbackId = availableProviderIds().find((id) => id !== provider.id);
+      if (fallbackId) {
+        log.warn(`${provider.id} still failing; falling back to ${fallbackId}`);
+        ({ result, timedOut } = await attempt(await getProvider(fallbackId), undefined, false));
+      }
+    }
 
-  if (!result.ok) log.error(`run failed (${opts.role}): ${result.error ?? "unknown"}`);
-  return finish(result);
+    if (!result.ok) log.error(`run failed (${opts.role}): ${result.error ?? "unknown"}`);
+    return finish(result);
+  } catch (error) {
+    return finish({
+      text: "",
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 /** Deterministic offline stub so the OS is usable without any provider. */

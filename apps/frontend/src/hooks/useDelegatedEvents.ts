@@ -1,8 +1,10 @@
 import { useEffect, type RefObject } from "react";
 import type { AiOp } from "@vibeos/shared/protocol";
+import { ulid } from "@vibeos/shared/util";
+import { fieldKey, fieldValue, type Field, type createDrafts } from "@/lib/fields";
 
 function collectDataset(el: HTMLElement): Record<string, string> {
-  const out: Record<string, string> = {};
+  const out: Record<string, string> = Object.create(null);
   for (const [k, v] of Object.entries(el.dataset)) {
     if (v !== undefined) out[k] = v;
   }
@@ -17,7 +19,7 @@ function collectDataset(el: HTMLElement): Record<string, string> {
  * typed. `primary` is the first non-empty text value, surfaced explicitly.
  */
 function collectFields(scope: HTMLElement): { fields: Record<string, string>; primary: string } {
-  const fields: Record<string, string> = {};
+  const fields: Record<string, string> = Object.create(null);
   let primary = "";
   const els = scope.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
     "input, textarea, select",
@@ -27,14 +29,8 @@ function collectFields(scope: HTMLElement): { fields: Record<string, string>; pr
     if (/^(button|submit|reset|image|file)$/.test(type)) continue;
     const val =
       type === "checkbox" || type === "radio" ? String((f as HTMLInputElement).checked) : f.value;
-    if (!val) continue;
-    const key =
-      f.getAttribute("name") ||
-      (f as HTMLElement).dataset.vibeosAction ||
-      f.getAttribute("placeholder") ||
-      f.getAttribute("aria-label") ||
-      (f.id ? `#${f.id}` : "");
-    if (key && fields[key] === undefined) fields[key] = val.slice(0, 2000);
+    const key = fieldKey(f);
+    if (key && fields[key] === undefined) fields[key] = val;
     if (
       !primary &&
       (f.tagName === "TEXTAREA" || /^(text|search|email|tel|url|number|password|)$/.test(type))
@@ -97,7 +93,8 @@ function describe(el: HTMLElement): string {
  */
 export function useDelegatedEvents(
   ref: RefObject<HTMLElement | null>,
-  onOp: (op: AiOp) => void,
+  onOp: (op: AiOp, scope: HTMLElement) => void,
+  drafts?: ReturnType<typeof createDrafts>,
 ): void {
   useEffect(() => {
     const root = ref.current;
@@ -108,11 +105,22 @@ export function useDelegatedEvents(
       for (let cur: HTMLElement | null = el; cur && cur !== root; cur = cur.parentElement) {
         if (cur.dataset.vibeosRegion) regionPath.push(cur.dataset.vibeosRegion);
       }
-      onOp({ ...op, regionPath });
+      const scope = el.closest("form") ?? nearestFieldScope(el, root) ?? root;
+      const fields = collectFields(scope).fields;
+      onOp(
+        {
+          ...op,
+          id: ulid(),
+          formData: op.formData ?? fields,
+          userInput: drafts?.input(scope),
+          regionPath,
+        },
+        scope,
+      );
     };
 
     const submitForm = (form: HTMLFormElement, action?: string, origin: HTMLElement = form) => {
-      const fd: Record<string, string> = {};
+      const fd: Record<string, string> = Object.create(null);
       // 1) named fields via FormData
       new FormData(form).forEach((v, k) => {
         if (typeof v === "string") fd[k] = v;
@@ -124,9 +132,8 @@ export function useDelegatedEvents(
       >("input, textarea, select");
       let primary = "";
       for (const f of fields) {
-        const key =
-          f.getAttribute("name") || f.dataset.vibeosAction || f.getAttribute("placeholder") || "";
-        if (key && fd[key] === undefined) fd[key] = f.value;
+        const key = fieldKey(f);
+        if (key && fd[key] === undefined) fd[key] = fieldValue(f);
         // remember the first non-empty text value as the "primary" input
         if (!primary && f.value && /^(INPUT|TEXTAREA)$/.test(f.tagName)) primary = f.value;
       }
@@ -156,10 +163,28 @@ export function useDelegatedEvents(
             (tgt as HTMLInputElement).type || "text",
           ));
       if (editable) return;
+      // Let the browser update toggles and open native pickers; change emits once.
+      if (
+        tgt.matches(
+          "input[type=checkbox],input[type=radio],input[type=range],input[type=color],input[type=file],select,option",
+        )
+      )
+        return;
+
+      // Use the actual submitter, even when only its surrounding form has an action.
+      const submitter = tgt.closest<HTMLButtonElement | HTMLInputElement>(
+        "button,input[type=submit],input[type=image]",
+      );
+      if (submitter?.form && /^(submit|image)$/.test(submitter.type)) {
+        if (submitter.disabled || submitter.getAttribute("aria-disabled") === "true") return;
+        e.preventDefault();
+        submitForm(submitter.form, submitter.dataset.vibeosAction, submitter);
+        return;
+      }
 
       // Otherwise, the nearest element carrying an explicit action wins.
       const actionEl = tgt.closest<HTMLElement>(
-        "[data-vibeos-action],[data-vibeos-command]:not(form)",
+        "[data-vibeos-action]:not(form),[data-vibeos-command]:not(form)",
       );
       const el = actionEl ?? findInteractive(e.target, root);
       if (!el) return;
@@ -172,17 +197,6 @@ export function useDelegatedEvents(
       )
         return;
       e.preventDefault();
-
-      // A real submit button inside a form → submit so typed values are sent.
-      const btn = el as HTMLButtonElement;
-      const form = btn.form ?? el.closest("form");
-      const isSubmit =
-        btn.type === "submit" ||
-        ((btn.tagName === "BUTTON" || (btn as HTMLInputElement).type === "submit") && !btn.type);
-      if (form && isSubmit) {
-        submitForm(form, el.dataset.vibeosAction, el);
-        return;
-      }
 
       const ds = collectDataset(el);
       // A click that isn't a form submit may still be "submitting" an input the
@@ -233,6 +247,7 @@ export function useDelegatedEvents(
 
     const onChange = (e: Event) => {
       const target = e.target as HTMLInputElement;
+      if (target.matches("input,textarea,select")) drafts?.edit(target);
       const tag = target.tagName;
       if (
         target.closest("form[data-vibeos-command]") &&
@@ -252,7 +267,7 @@ export function useDelegatedEvents(
 
       emit(target, {
         kind: "change",
-        action: target.dataset.vibeosAction ?? target.name ?? "change",
+        action: target.dataset.vibeosAction || fieldKey(target) || "change",
         dataset: collectDataset(target),
         value:
           target.type === "checkbox" || target.type === "radio"
@@ -269,7 +284,7 @@ export function useDelegatedEvents(
       e.preventDefault();
       emit(target, {
         kind: "key",
-        action: target.dataset.vibeosAction ?? target.name ?? "enter",
+        action: target.dataset.vibeosAction || fieldKey(target) || "enter",
         dataset: collectDataset(target),
         value: target.value,
       });
@@ -313,6 +328,11 @@ export function useDelegatedEvents(
       e.dataTransfer.effectAllowed = "copy";
     };
 
+    const onInput = (event: Event) => {
+      const field = event.target as Field;
+      if (field.matches("input,textarea,select")) drafts?.edit(field);
+    };
+    root.addEventListener("input", onInput);
     root.addEventListener("click", onClick);
     root.addEventListener("dblclick", onDblClick);
     // Capture phase so the native submit is intercepted before the browser can
@@ -322,6 +342,7 @@ export function useDelegatedEvents(
     root.addEventListener("keydown", onKey);
     root.addEventListener("dragstart", onDragStart);
     return () => {
+      root.removeEventListener("input", onInput);
       root.removeEventListener("click", onClick);
       root.removeEventListener("dblclick", onDblClick);
       root.removeEventListener("submit", onSubmit, true);
@@ -329,5 +350,5 @@ export function useDelegatedEvents(
       root.removeEventListener("keydown", onKey);
       root.removeEventListener("dragstart", onDragStart);
     };
-  }, [ref, onOp]);
+  }, [ref, onOp, drafts]);
 }

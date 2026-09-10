@@ -6,9 +6,11 @@ import type { ProfileChange, ProviderId, Settings } from "../domain/settings.ts"
 import type { VfsLocation } from "../domain/vfs.ts";
 import type { WindowSize } from "../domain/window.ts";
 import type { FileRequestCommand } from "../domain/files.ts";
+import type { ActivityFilter } from "../domain/agent.ts";
 
 /** A delegated event from inside an AI-generated window surface. */
 export interface AiOp {
+  id?: string;
   kind: "click" | "input" | "submit" | "change" | "key" | "custom";
   /** The data-vibeos-action value of the target element. */
   action?: string;
@@ -20,6 +22,8 @@ export interface AiOp {
   value?: string;
   /** Serialized form fields for submit. */
   formData?: Record<string, string>;
+  /** Values edited by the user, collected by the runtime, never from generated attributes. */
+  userInput?: Array<{ key: string; type: string; value: string }>;
   /** Region containing the control, followed by its ancestor regions. */
   regionPath?: string[];
 }
@@ -109,7 +113,17 @@ export type ClientToServer =
   | { type: "c2s.app.export"; payload: { appId: string } }
   /** Import an app from a .vibeapp JSON string. */
   | { type: "c2s.app.import"; payload: { json: string } }
-  | { type: "c2s.activity.fetch"; payload: { before?: number; limit?: number } }
+  | {
+      type: "c2s.activity.fetch";
+      payload: {
+        before?: number;
+        beforeId?: string;
+        limit?: number;
+        filter?: ActivityFilter;
+        requestId?: string;
+      };
+    }
+  | { type: "c2s.activity.details"; payload: { runId: string; requestId: string } }
   | { type: "c2s.activity.stop"; payload: { runId: string } }
   | { type: "c2s.vfs.delete"; payload: { nodeId: string } }
   | { type: "c2s.vfs.empty"; payload: Record<string, never> }

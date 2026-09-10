@@ -1,4 +1,5 @@
 import type { AgentRole } from "./settings.ts";
+import { z } from "zod";
 
 export type { AgentRole };
 
@@ -7,6 +8,9 @@ export type AgentRunStatus = "running" | "ok" | "error" | "aborted";
 
 export interface AgentRun {
   id: string;
+  traceId?: string;
+  windowId?: string;
+  appId?: string;
   role: AgentRole;
   trigger: AgentTrigger;
   model?: string;
@@ -26,9 +30,23 @@ export interface AgentRun {
 
 export interface AgentLog {
   id: string;
-  runId: string;
+  runId?: string;
+  traceId?: string;
   level: "debug" | "info" | "warn" | "error";
   message: string;
   data?: unknown;
   ts: number;
+}
+
+export const activityFilterSchema = z.object({
+  query: z.string().max(200).optional(),
+  status: z.enum(["running", "ok", "error", "aborted"]).optional(),
+  role: z.enum(["ui-generation", "maintenance", "system-event", "image-generation"]).optional(),
+});
+export type ActivityFilter = z.infer<typeof activityFilterSchema>;
+export interface ActivityDetails {
+  run: AgentRun;
+  relatedRuns: AgentRun[];
+  logs: AgentLog[];
+  truncated: boolean;
 }

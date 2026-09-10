@@ -35,6 +35,7 @@ export interface AnthropicCliConfig {
 
 interface MapState {
   text: string;
+  succeeded?: boolean;
   streamed: boolean;
   sessionId?: string;
   error?: string;
@@ -104,13 +105,12 @@ export class AnthropicCliProvider implements AiProvider {
 
     if (opts.abort?.signal.aborted)
       return { text: state.text, sessionId: state.sessionId, ok: false };
-    // Salvage: any usable text → ok, even if the run also reported an error
-    // (e.g. max-turns) or a non-zero exit.
-    if (state.text.trim()) {
+    if (state.text.trim() && state.succeeded && !state.error && res.code === 0) {
       return { text: state.text, sessionId: state.sessionId, ok: true, usage: state.usage };
     }
 
-    const error = state.error ?? res.stderr ?? `${this.bin} exited ${res.code}`;
+    const error =
+      state.error || res.stderr || `${this.bin} did not complete successfully (exit ${res.code})`;
     this.log.error(`run failed: ${error}`);
     return { text: "", sessionId: state.sessionId, ok: false, error, usage: state.usage };
   }
@@ -188,6 +188,7 @@ function mapAnthropic(
       }
     }
   } else if (m.type === "result") {
+    state.succeeded = m.subtype === "success" && m.is_error !== true;
     if (m.subtype === "success" && typeof m.result === "string" && !state.text) {
       state.text = m.result;
       onDelta?.(m.result);
