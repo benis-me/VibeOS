@@ -12,3 +12,4 @@ export * from "./communication.ts";
 
 export * from "./applications.ts";
 export * from "./systemMemory.ts";
+export * from "./runtime.ts";

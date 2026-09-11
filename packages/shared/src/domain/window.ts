@@ -14,6 +14,9 @@ export interface Rect extends WindowSize {
 }
 
 export interface WindowState {
+  runtime?: import("./runtime.ts").AppRuntime;
+  viewState?: import("./runtime.ts").ViewState;
+  snapshotDataVersion?: string;
   /** Runtime-owned relationship; closing an opener does not close its child windows. */
   openerWindowId?: string;
   launchContext?: { purpose: string; data?: MessageData };

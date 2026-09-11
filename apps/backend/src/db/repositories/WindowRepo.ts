@@ -1,4 +1,11 @@
-import type { WindowState, WindowDisplayState, WindowSize } from "@vibeos/shared/domain";
+import {
+  viewStateSchema,
+  type ViewState,
+  type AppRuntime,
+  type WindowState,
+  type WindowDisplayState,
+  type WindowSize,
+} from "@vibeos/shared/domain";
 import { ulid } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
 import { enqueue } from "./writeQueue.ts";
@@ -7,6 +14,7 @@ interface WindowRow {
   id: string;
   app_id: string;
   app_version_id: string | null;
+  view_state_json: string;
   opener_window_id: string | null;
   launch_context_json: string | null;
   file_path: string | null;
@@ -27,6 +35,19 @@ interface WindowRow {
 
 function toWindow(row: WindowRow): WindowState {
   return {
+    runtime: row.app_version_id
+      ? (getDb()
+          .query<{ runtime: AppRuntime }, [string]>("SELECT runtime FROM app_versions WHERE id=?")
+          .get(row.app_version_id)?.runtime ?? "html")
+      : "html",
+    viewState: viewStateSchema.parse(JSON.parse(row.view_state_json ?? "{}")),
+    snapshotDataVersion:
+      getDb()
+        .query<
+          { data_version: string | null },
+          [string]
+        >("SELECT data_version FROM app_memory WHERE window_id=?")
+        .get(row.id)?.data_version ?? undefined,
     id: row.id,
     appId: row.app_id,
     appVersionId: row.app_version_id ?? undefined,
@@ -44,6 +65,15 @@ function toWindow(row: WindowRow): WindowState {
     openedAt: row.opened_at,
     updatedAt: row.updated_at,
   };
+}
+
+export function saveViewState(id: string, versionId: string | undefined, state: ViewState) {
+  const json = JSON.stringify(viewStateSchema.parse(state));
+  return enqueue(() => {
+    const win = getWindow(id);
+    if (!win?.isOpen || win.appVersionId !== versionId) return;
+    getDb().query("UPDATE windows SET view_state_json=? WHERE id=?").run(json, id);
+  });
 }
 
 export function listOpenWindows(): WindowState[] {

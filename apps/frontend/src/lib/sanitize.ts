@@ -28,6 +28,10 @@ function scopedStyles(sheet: CSSStyleSheet, scope: string, names: Map<string, st
       .map((rule) => {
         if (rule instanceof CSSStyleRule) {
           renameAnimation(rule.style, names);
+          // Pseudo-elements cannot appear inside :is(). Native scope retains
+          // their selectors while preventing any rule from escaping this surface.
+          if (/::|:(?:before|after|first-line|first-letter)\b/.test(rule.selectorText))
+            return `@scope (${scope}) { ${rule.selectorText} { ${rule.style.cssText} } }`;
           return `${scope} :is(${rule.selectorText}) { ${rule.style.cssText} }`;
         }
         if (rule instanceof CSSKeyframesRule) {

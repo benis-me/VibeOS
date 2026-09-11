@@ -10,6 +10,7 @@ import type { ActivityFilter } from "../domain/agent.ts";
 
 /** A delegated event from inside an AI-generated window surface. */
 export interface AiOp {
+  viewState?: import("../domain/runtime.ts").ViewState;
   id?: string;
   kind: "click" | "input" | "submit" | "change" | "key" | "custom";
   /** The data-vibeos-action value of the target element. */
@@ -45,6 +46,7 @@ export interface DropTarget {
 }
 
 export type ClientToServer =
+  | { type: "c2s.window.view-state"; payload: { windowId: string; appVersionId?: string; state: import("../domain/runtime.ts").ViewState } }
   | { type: "c2s.application.command"; payload: { requestId: string; command: ApplicationCommand } }
   | { type: "c2s.memory.command"; payload: { requestId: string; command: MemoryCommand } }
   | {

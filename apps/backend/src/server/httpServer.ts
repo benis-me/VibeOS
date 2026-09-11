@@ -7,6 +7,7 @@ import { getImageForServe } from "../ai/imageCache.ts";
 import { watchDisk } from "../files/disk.ts";
 import { serveDiskFile, broadcastDiskChanges } from "./filesHandlers.ts";
 import { allowedOrigin } from "./requestOrigin.ts";
+import { serveRuntimeBundle } from "./runtimeBundle.ts";
 
 export function startHttpServer(): Server<WsData> {
   const server = Bun.serve<WsData>({
@@ -18,6 +19,7 @@ export function startHttpServer(): Server<WsData> {
     idleTimeout: 255,
     async fetch(req, srv) {
       const url = new URL(req.url);
+      if (url.pathname === "/api/app-runtime.js") return serveRuntimeBundle();
       if (url.pathname === "/ws") {
         if (!allowedOrigin(req)) return new Response("Forbidden", { status: 403 });
         const ok = srv.upgrade(req, { data: { clientId: ulid() } });

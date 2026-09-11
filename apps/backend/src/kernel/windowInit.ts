@@ -21,9 +21,12 @@ export async function renderInitialWindow(windowId: string, app: AppDescriptor):
 
   const seed = typeof app.manifest.seedHtml === "string" ? app.manifest.seedHtml : "";
   if (seed.trim()) {
-    await saveSnapshot(windowId, seed);
-    broadcast("s2c.ui.patch", { windowId, mode: "full", html: seed, done: true });
-    if (app.kind === "virtual" && JSON.stringify(getAppData(app.id).data) !== "{}")
+    const currentData = getAppData(app.id);
+    const empty = JSON.stringify(currentData.data) === "{}";
+    const dataVersion = empty ? currentData.version : undefined;
+    await saveSnapshot(windowId, seed, undefined, dataVersion);
+    broadcast("s2c.ui.patch", { windowId, dataVersion, mode: "full", html: seed, done: true });
+    if (app.kind === "virtual" && !empty)
       bus.emit("window.firstRender", { windowId });
     return;
   }

@@ -36,8 +36,8 @@ Use only the three parts below. OUTPUT ORDER: summary FIRST, syscall block SECON
 
 HTML: An HTML fragment wrapped in <vibeos-html mode="full">…</vibeos-html> for a complete window body, or <vibeos-html mode="regions">…</vibeos-html> for region replacements. Always declare the mode explicitly.
    - When only requesting data, replying to a message or performing another system action, OMIT this entire HTML part if the UI does not need changing. Never emit an empty regions wrapper. The existing UI stays intact.
-   - It is the BODY of an application window. Do NOT include <html>, <head>, <body>, <script>, or <style> tags.
-   - Style ONLY with inline style="" attributes, using the VibeOS design system variables above. Do NOT invent your own color palette — reuse the OS tokens so every app looks consistent.
+   - It is the BODY of an application window. Do NOT include <html>, <head>, or <body>. Follow the runtime contract for inert scripts; ordinary scripts and inline event handlers are never allowed.
+   - Style with inline attributes and small scoped <style> blocks for local selectors, transitions and keyframes. Honor prefers-reduced-motion. Reuse the OS design variables; no external fonts/styles or global shell overrides.
    - You MAY use <form>, <input>, <button>, <select>, <textarea>, <ul>/<li>, <table>, etc.
    - CRITICAL: EVERY interactive element (buttons, links, clickable list items, file/folder icons, tabs, menu items, inputs, forms) MUST carry data-vibeos-action="<verb>" describing what it does (e.g. data-vibeos-action="open-email" data-id="3"). Add extra data-* attributes for context. When MANY controls share one action (calculator keys, list rows, grid cells, color swatches), give each a DISTINGUISHING data attribute (e.g. data-value="7") so the OS can tell them apart — never make them ambiguous. If the user can interact with it, it MUST have data-vibeos-action — otherwise it will do nothing.
    - Actions trigger on a SINGLE click. Do NOT rely on double-click, hover, or right-click to open things — make a single click open files, folders, list rows, etc. (a double-click is also accepted, but single click must work).

@@ -1,3 +1,4 @@
+import { validateRuntimeScripts } from "./ApplicationPackageRepo.ts";
 import { initializeApplication, readApplicationVersion } from "./ApplicationRepo.ts";
 import type { AppDescriptor, AppManifest, PresetAppId } from "@vibeos/shared/domain";
 import { ulid, stripEmoji } from "@vibeos/shared/util";
@@ -234,12 +235,14 @@ function persistPackage(id: string): void {
   initializeApplication(app);
 }
 
-export function installApp(input: {
+export async function installApp(input: {
   name: string;
   icon?: string;
   manifest?: AppManifest;
   isInstalled?: boolean;
 }): Promise<AppDescriptor> {
+  if (input.manifest?.runtime === "interactive")
+    await validateRuntimeScripts(input.manifest.seedHtml ?? "", "interactive");
   return enqueue(() => {
     const db = getDb();
     const now = Date.now();

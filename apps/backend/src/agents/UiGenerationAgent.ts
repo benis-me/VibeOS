@@ -1,5 +1,7 @@
 import { ulid } from "@vibeos/shared/util";
 import { getAppData, readApplicationVersion } from "../db/repositories/ApplicationRepo.ts";
+import { validateRuntimeScripts } from "../db/repositories/ApplicationPackageRepo.ts";
+import { isDeepStrictEqual } from "node:util";
 import { learnFromUser } from "../ai/systemMemory.ts";
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import { NATIVE_PRESET_APPS, type AppDelivery } from "@vibeos/shared/domain";
@@ -68,7 +70,10 @@ function drainDeliveries(windowId: string) {
   while (message && !deliveryAlive(message)) message = queue?.shift();
   if (!queue?.length) deliveries.delete(windowId);
   if (message)
-    dispatch(windowId, { message, firstRender: !getMemory(windowId)?.htmlSnapshot.trim() });
+    dispatch(windowId, {
+      message,
+      firstRender: !getMemory(windowId)?.htmlSnapshot.trim(),
+    });
 }
 
 function dispatch(windowId: string, trigger: Trigger): void {
@@ -103,7 +108,12 @@ function dispatch(windowId: string, trigger: Trigger): void {
       if (genCounter.get(windowId) !== gen) return;
       log.error(`generate threw [${windowId.slice(-6)}]`, e instanceof Error ? e.message : e);
       if (!getMemory(windowId)?.htmlSnapshot) {
-        broadcast("s2c.ui.patch", { windowId, mode: "full", html: "", done: true });
+        broadcast("s2c.ui.patch", {
+          windowId,
+          mode: "full",
+          html: "",
+          done: true,
+        });
       }
       broadcast("s2c.ui.busy", { windowId, busy: false });
       broadcast("s2c.error", {
@@ -274,7 +284,10 @@ async function generate(
     memory,
     recent: recentInteractions(windowId),
     globalState: kernelState.snapshotForPrompt(),
-    windowSize: { w: win.rect.w, h: win.rect.h - (win.kind === "widget" ? 0 : 36) },
+    windowSize: {
+      w: win.rect.w,
+      h: win.rect.h - (win.kind === "widget" ? 0 : 36),
+    },
     op: trigger.op,
     drag: trigger.drag,
     seedPrompt: trigger.seedPrompt,
@@ -334,7 +347,12 @@ async function generate(
         const body = extractStreamingHtml(buffer);
         if (body !== null && body.length > lastStreamed.length) {
           lastStreamed = body;
-          broadcast("s2c.ui.patch", { windowId, mode: "full", html: body, streaming: true });
+          broadcast("s2c.ui.patch", {
+            windowId,
+            mode: "full",
+            html: body,
+            streaming: true,
+          });
         }
       },
     });
@@ -393,9 +411,15 @@ async function generate(
             "Use one state write: app-state or app-data set, never both in one response.",
           );
       }
-      if (html !== undefined) await parseSubscriptions(html);
+      if (html !== undefined) {
+        await validateRuntimeScripts(html, app.manifest.runtime ?? "html");
+        await parseSubscriptions(html);
+      }
     } catch (error) {
-      repairReason = error instanceof Error ? error.message : String(error);
+      repairReason =
+        error instanceof Error
+          ? `${error.message}${error.cause ? `: ${String(error.cause)}` : ""}`
+          : String(error);
       await recordSummary(result.runId, `Rejected output: ${repairReason}`);
       await recordStep(
         parsed.syscallError ? "syscall.rejected" : "ui.rejected",
@@ -435,7 +459,10 @@ async function generate(
             canCommit: current,
             appDataVersion: sharedData.version,
             launchData: trigger.op
-              ? { action: trigger.op.action ?? "", dataset: trigger.op.dataset ?? {} }
+              ? {
+                  action: trigger.op.action ?? "",
+                  dataset: trigger.op.dataset ?? {},
+                }
               : undefined,
           },
         ),
@@ -465,11 +492,34 @@ async function generate(
     );
     const acknowledged = continues ? undefined : operationId;
     if (html !== undefined) {
+      const currentData = getAppData(app.id);
+      const write = parsed.syscalls.find((c) => c.type === "app-state" && c.data !== undefined);
+      const explicitWrite = parsed.syscalls.find(
+        (c) =>
+          c.type === "communication" &&
+          c.command.action === "request" &&
+          "system" in c.command.target &&
+          c.command.target.system === "app-data" &&
+          c.command.topic === "set",
+      );
+      const commandData =
+        explicitWrite?.type === "communication" && "data" in explicitWrite.command
+          ? explicitWrite.command.data
+          : undefined;
+      const expected =
+        write?.type === "app-state"
+          ? write.data
+          : commandData && typeof commandData === "object" && !Array.isArray(commandData)
+            ? commandData.data
+            : sharedData.data;
+      if (!isDeepStrictEqual(currentData.data, expected))
+        throw new Error("applications.error.dataConflict");
       // Image generation starts only after the output has passed validation.
       html = rewriteImages(html);
       regions = regions?.map((r) => ({ ...r, html: rewriteImages(r.html) }));
       // Evaluate the guard INSIDE the single-writer queue, not just before awaiting it.
-      if (!(await saveSnapshot(windowId, html, canPublish)) || !canPublish()) return;
+      if (!(await saveSnapshot(windowId, html, canPublish, currentData.version)) || !canPublish())
+        return;
       await recordStep(
         "ui.committed",
         {
@@ -483,17 +533,47 @@ async function generate(
       broadcast(
         "s2c.ui.patch",
         regions?.length
-          ? { windowId, operationId: acknowledged, mode: "regions", regions, done: true }
-          : { windowId, operationId: acknowledged, mode: "full", html, done: true },
+          ? {
+              windowId,
+              dataVersion: currentData.version,
+              operationId: acknowledged,
+              mode: "regions",
+              regions,
+              done: true,
+            }
+          : {
+              windowId,
+              dataVersion: currentData.version,
+              operationId: acknowledged,
+              mode: "full",
+              html,
+              done: true,
+            },
       );
     } else {
+      // A read-only refresh can confirm the existing view without replacing its DOM.
+      const confirmedVersion =
+        readOnlyRefresh && parsed.summary.trim() && snapshot.trim()
+          ? sharedData.version
+          : undefined;
+      if (
+        confirmedVersion &&
+        (!(await saveSnapshot(windowId, snapshot, canPublish, confirmedVersion)) || !canPublish())
+      )
+        return;
       // Clear any first-paint preview when a successful response has only syscalls.
       if (!snapshot.trim() && lastStreamed) {
-        broadcast("s2c.ui.patch", { windowId, mode: "full", html: snapshot, done: true });
-      }
-      if (acknowledged)
         broadcast("s2c.ui.patch", {
           windowId,
+          mode: "full",
+          html: snapshot,
+          done: true,
+        });
+      }
+      if (acknowledged || confirmedVersion)
+        broadcast("s2c.ui.patch", {
+          windowId,
+          dataVersion: confirmedVersion,
           mode: "regions",
           regions: [],
           operationId: acknowledged,

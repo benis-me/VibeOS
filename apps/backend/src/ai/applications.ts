@@ -2,8 +2,9 @@ import {
   applicationCommandSchema,
   applicationOutputSchema,
   type ApplicationCommand,
+  type AppRuntime,
 } from "@vibeos/shared/domain";
-import { run, recordSummary } from "./SdkManager.ts";
+import { run, recordSummary, recordStep } from "./SdkManager.ts";
 import { getImageForServe, rewriteImages } from "./imageCache.ts";
 import { getApp, installApp, listApps } from "../db/repositories/AppRepo.ts";
 import * as Applications from "../db/repositories/ApplicationRepo.ts";
@@ -13,6 +14,8 @@ import { ensureShortcut, createNode } from "../db/repositories/VfsRepo.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { broadcastDiskChanges } from "../server/filesHandlers.ts";
 import { COMMUNICATION_GUIDE } from "../prompt/PromptAssembler.ts";
+import { runtimeGuide } from "../prompt/runtimeGuide.ts";
+import { parseAiOutput } from "./streamParser.ts";
 import {
   validateApplicationHtml,
   exportApplication,
@@ -70,7 +73,7 @@ export async function handleApplicationCommand(
       await Applications.activateApplicationVersion(command.appId, command.versionId);
       break;
     case "generate":
-      await startGeneration(command.appId, command.prompt, command.sourceWindowId);
+      await startGeneration(command.appId, command.prompt, command.sourceWindowId, command.runtime);
       break;
     case "cancel": {
       jobs.get(command.requestId)?.abort();
@@ -103,8 +106,18 @@ export async function handleApplicationCommand(
   return { appId, path };
 }
 
-async function startGeneration(appId: string, prompt: string, sourceWindowId?: string) {
-  const request = await Applications.startApplicationRequest(appId, prompt, sourceWindowId);
+async function startGeneration(
+  appId: string,
+  prompt: string,
+  sourceWindowId?: string,
+  runtime?: AppRuntime,
+) {
+  const request = await Applications.startApplicationRequest(
+    appId,
+    prompt,
+    sourceWindowId,
+    runtime,
+  );
   const abort = new AbortController();
   jobs.set(request.id, abort);
   learnFromUser(prompt, "Application editor");
@@ -133,10 +146,14 @@ async function generate(requestId: string, abort: AbortController) {
     const data = Applications.getAppData(app.id);
     let prompt = `[VIBEOS_APP_REQUEST]\nAPP: ${app.name}\nBASE DEFINITION: ${JSON.stringify(definition)}\nSHARED DATA: ${JSON.stringify(data)}\n${source ? "REFERENCE WINDOW (preserve its original separately; do not copy private records into the new startup UI):\\n" + source : ""}\nUSER REQUEST: ${request.prompt}`;
     const systemPrompt = `You design a persistent, local AI-hallucination-driven VibeOS application. It continues generating at runtime, not a fixed JavaScript app. Implement the user's change fully, retaining the cumulative purpose and prior requirements in instructions. Think through a distinctive, complete layout, useful controls, empty/error/loading states and real data continuity before output.
-  Return ONLY JSON {"summary":"short user-facing change summary","definition":{"description":"short purpose","instructions":"durable behavior and imaginative intent, including data handling","seedHtml":"complete HTML startup body","defaultSize":{"w":760,"h":520},"fileTypes":[".md"],"operations":[{"topic":"file.open","description":"what to do with the real file"}],"dataSchemaVersion":1,"assets":{}},"migratedData":{}}. migratedData is OPTIONAL: omit for normal edits; supply only when upgrading legacy snapshot records into shared data or changing the schema. Preserve every existing record, including unknown fields. Never replace real records with examples. Retain schema version for compatible changes. If schema changes, provide the complete lossless migrated data with a new schema version.
-  HTML must be script-free: no scripts, event handlers, iframe, external libraries or page reloads. It fills height:100% with a flex column; use native semantic HTML, aria labels, inline SVG icons, no emoji. Use VibeOS CSS variables (--background, --foreground, --card, --muted, --muted-foreground, --border, --brand, --brand-foreground); remain skin-neutral. Do not draw window chrome. Give separate sections stable data-vibeos-region IDs. Controls use data-vibeos-action; the runtime AI interprets them. Optional data-vibeos-command uses the documented protocol for deterministic operations. Bind plain data using data-vibeos-bind="appData.data.field"; collection layouts can subscribe to app.data.changed with source {"appId":"self"}, mode:"ai" and rebuild only the affected region. The startup HTML must be an EMPTY reusable template, never contain personal records, private file paths or the reference window's input values. Durable data belongs to the app-data service. Describe the data structure and runtime behavior in instructions. Only claim actual file success after real service replies. Include fileTypes and file.open if the application can process files, with meaningful semantic processing instructions. Keep fictional world data explicitly fictional; persist its evolving discoveries as app data.
+  Return TWO blocks, in this order:
+  1. A fenced block tagged vibeos-application with JSON {"summary":"short user-facing change summary","definition":{"runtime":"${request.runtime}","description":"short purpose","instructions":"concise durable behavior and imaginative intent, data structure and AI actions","defaultSize":{"w":760,"h":520},"fileTypes":[],"operations":[],"dataSchemaVersion":1,"assets":{}}}. Keep instructions concise; describe semantics and data, do not repeat markup/CSS. operations is an array of objects {"topic":"file.open","description":"semantic handling of an incoming file"}, NEVER strings or permissions. Use [] when no incoming app topic is handled. Close every JSON object. Do NOT put seedHtml or escaped HTML in this JSON.
+  2. <vibeos-html mode="full">your complete startup HTML fragment, CSS and permitted inert scripts, as raw text</vibeos-html>. No outer html/head/body, no extra code fence, no syscall block at authoring time.
+  The first block MAY additionally contain migratedData, but ONLY for an actual schema change or lossless legacy record extraction. For a new app or ordinary edit OMIT migratedData entirely. It is the plain application data, NOT the {appId,version,schemaVersion,data} service envelope. Preserve every existing record and unknown field; never add example records. Retain schema version for compatible changes. If schema changes, provide complete lossless migrated data with a new schema version.
+  Use declarative local controls for tabs/details and ordinary data-vibeos-action buttons for all AI business work. Do not implement your own plan/list renderer, shared-data synchronization or file exporter in JavaScript. Bind scalar values and let runtime AI render collections from canonical data. Usually only the timer/Canvas needs a script; aim for one small readable block, below 80 lines, with no unnecessary wrappers.
+  HTML follows the selected runtime below; no ordinary scripts, inline event handlers, iframe, external libraries or page reloads. It fills height:100% with a flex column; use native semantic HTML, aria labels, inline SVG icons, no emoji. Use VibeOS CSS variables (--background, --foreground, --card, --muted, --muted-foreground, --border, --brand, --brand-foreground); remain skin-neutral. Do not draw window chrome. Give separate sections stable data-vibeos-region IDs. Controls use data-vibeos-action; the runtime AI interprets them. Optional data-vibeos-command uses the documented protocol for deterministic operations. Bind plain data using data-vibeos-bind="appData.data.field"; collection layouts can subscribe to app.data.changed with source {"appId":"self"}, mode:"ai" and rebuild only the affected region. The startup HTML must be an EMPTY reusable template, never contain personal records, private file paths or the reference window's input values. Durable data belongs to the app-data service. Describe the data structure and runtime behavior in instructions. Only claim actual file success after real service replies. Include fileTypes and file.open if the application can process files, with meaningful semantic processing instructions. Keep fictional world data explicitly fictional; persist its evolving discoveries as app data.
   Existing image IDs may be retained; assets maps a stable name to its actual existing /api/img ID. Never invent image IDs. All references must be self-contained local /api/img/<id> resources or inline SVG.
-  The following documents RUNTIME behavior, not the output format for this authoring request:\n${COMMUNICATION_GUIDE}`;
+  Selected definition.runtime MUST be ${request.runtime}. ${runtimeGuide(request.runtime)}\nThe following documents RUNTIME behavior, not the output format for this authoring request:\n${COMMUNICATION_GUIDE}`;
     for (let attempt = 0; attempt < 2; attempt++) {
       abort.signal.throwIfAborted();
       await progress("generating");
@@ -144,6 +161,8 @@ async function generate(requestId: string, abort: AbortController) {
         role: "ui-generation",
         trigger: "user",
         appName: app.name,
+        appId: app.id,
+        traceId: request.id,
         systemPromptOverride: systemPrompt,
         prompt,
         abort,
@@ -159,15 +178,9 @@ async function generate(requestId: string, abort: AbortController) {
       if (!result.ok) throw new Error(result.error ?? "applications.error.generation");
       await progress("validating");
       try {
-        const output = applicationOutputSchema.parse(
-          JSON.parse(
-            result.text
-              .trim()
-              .replace(/^```(?:json)?\s*/i, "")
-              .replace(/\s*```$/, ""),
-          ),
-        );
-        await validateApplicationHtml(output.definition.seedHtml);
+        const output = parseApplicationOutput(result.text);
+        output.definition.runtime = request.runtime;
+        await validateApplicationHtml(output.definition.seedHtml, request.runtime);
         await parseSubscriptions(output.definition.seedHtml);
         output.definition.seedHtml = rewriteImages(output.definition.seedHtml);
         for (const match of output.definition.seedHtml.matchAll(/\/api\/img\/([a-zA-Z0-9_-]+)/g)) {
@@ -189,8 +202,18 @@ async function generate(requestId: string, abort: AbortController) {
         }
         break;
       } catch (error) {
+        const reason =
+          error instanceof Error
+            ? `${error.message}${error.cause ? `: ${String(error.cause)}` : ""}`
+            : "invalid output";
+        await recordStep(
+          "application.rejected",
+          { appId: app.id, error: reason },
+          { id: request.id, runId: result.runId },
+          "error",
+        );
         if (attempt === 1 || abort.signal.aborted) throw error;
-        prompt += `\nThe candidate did not validate and was not saved. Fix this error and return the complete JSON: ${error instanceof Error ? error.message : "invalid output"}`;
+        prompt += `\nThe candidate did not validate and was not saved. Fix this error and return both complete blocks: ${reason}\nREJECTED CANDIDATE:\n${result.text}`;
       }
     }
   } catch (error) {
@@ -203,4 +226,27 @@ async function generate(requestId: string, abort: AbortController) {
   } finally {
     broadcastApplications();
   }
+}
+
+/** Raw HTML avoids an extra JSON escaping layer for generated CSS and JS. */
+export function parseApplicationOutput(text: string) {
+  const raw = text.trim();
+  const metadata = /(?:^|\n)[ \t]*```vibeos-application\s*\n([\s\S]*?)\n[ \t]*```/.exec(raw);
+  if (!metadata)
+    return applicationOutputSchema.parse(
+      JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")),
+    );
+  const meta = JSON.parse(metadata[1]!);
+  const markup = raw
+    .slice(metadata.index + metadata[0].length)
+    .trim()
+    .replace(/^```(?:html)?\s*\n/i, "")
+    .replace(/\n```\s*$/, "");
+  const parsed = parseAiOutput(markup, "full");
+  if (!parsed.html || parsed.renderError || parsed.syscallError || parsed.syscalls.length)
+    throw new Error("applications.error.html");
+  return applicationOutputSchema.parse({
+    ...meta,
+    definition: { ...meta.definition, seedHtml: parsed.html },
+  });
 }

@@ -27,6 +27,7 @@ export const NATIVE_PRESET_APPS: PresetAppId[] = [
 ];
 
 export interface AppManifest {
+  runtime?: import("./runtime.ts").AppRuntime;
   instructions?: string;
   fileTypes?: string[];
   operations?: { topic: string; description: string }[];

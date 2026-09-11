@@ -31,6 +31,7 @@ interface AppIndex {
   origin_app_id: string | null;
 }
 interface VersionRow {
+  runtime: import("@vibeos/shared").AppRuntime;
   id: string;
   app_id: string;
   path: string;
@@ -41,6 +42,7 @@ interface VersionRow {
   created_at: number;
 }
 interface RequestRow {
+  runtime: import("@vibeos/shared").AppRuntime;
   id: string;
   app_id: string;
   prompt: string;
@@ -57,13 +59,15 @@ interface RequestRow {
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 const index = (id: string) =>
   getDb()
-    .query<AppIndex, [string]>(
-      "SELECT id, content_path, active_version_id, origin_app_id FROM apps WHERE id = ?",
-    )
+    .query<
+      AppIndex,
+      [string]
+    >("SELECT id, content_path, active_version_id, origin_app_id FROM apps WHERE id = ?")
     .get(id);
 const dataPath = (id: string) => `System/AppData/${encodeURIComponent(id)}/state.json`;
 const safeDefinition = (app: AppDescriptor): ApplicationDefinition => ({
   ...applicationDefinitionSchema.parse({
+    runtime: app.manifest.runtime ?? "html",
     description: app.manifest.description ?? "",
     instructions: app.manifest.instructions ?? app.manifest.description ?? "",
     seedHtml: "",
@@ -111,9 +115,10 @@ function writeVersion(
   const row = index(app.id)!;
   const id = ulid();
   const number = db
-    .query<{ n: number }, [number, string]>(
-      "SELECT COALESCE(MAX(number), ?) + 1 n FROM app_versions WHERE app_id = ?",
-    )
+    .query<
+      { n: number },
+      [number, string]
+    >("SELECT COALESCE(MAX(number), ?) + 1 n FROM app_versions WHERE app_id = ?")
     .get(definition.seedHtml ? 0 : -1, app.id)!.n;
   const path = `${dirname(row.content_path)}/Versions/${id}/definition.json`;
   const { seedHtml, ...meta } = definition;
@@ -121,7 +126,7 @@ function writeVersion(
   writeContent(path, JSON.stringify(meta, null, 2), true);
   persistApplicationAssets(definition, dirname(path), !legacy);
   db.query(
-    "INSERT INTO app_versions (id,app_id,number,path,summary,schema_version,legacy,created_at) VALUES (?,?,?,?,?,?,?,?)",
+    "INSERT INTO app_versions (id,app_id,number,path,summary,schema_version,legacy,created_at,runtime) VALUES (?,?,?,?,?,?,?,?,?)",
   ).run(
     id,
     app.id,
@@ -131,6 +136,7 @@ function writeVersion(
     definition.dataSchemaVersion,
     Number(legacy),
     Date.now(),
+    definition.runtime,
   );
   writeContent(
     row.content_path,
@@ -167,7 +173,10 @@ export function getAppData(appId: string): AppDataSnapshot {
   const path = dataPath(appId);
   const raw = existsSync(diskPath(path, true))
     ? readFileSync(diskPath(path, true), "utf8")
-    : JSON.stringify({ schemaVersion: app.manifest.dataSchemaVersion ?? 1, data: {} });
+    : JSON.stringify({
+        schemaVersion: app.manifest.dataSchemaVersion ?? 1,
+        data: {},
+      });
   const stored = JSON.parse(raw);
   return {
     appId,
@@ -222,11 +231,13 @@ export function applicationState(): ApplicationState {
               createdAt: v.created_at,
               dataSchemaVersion: v.schema_version,
               legacy: !!v.legacy,
+              runtime: v.runtime,
             })),
           requests: db
-            .query<RequestRow, [string]>(
-              "SELECT * FROM app_requests WHERE app_id = ? ORDER BY created_at DESC LIMIT 30",
-            )
+            .query<
+              RequestRow,
+              [string]
+            >("SELECT * FROM app_requests WHERE app_id = ? ORDER BY created_at DESC LIMIT 30")
             .all(app.id)
             .map(requestFromRow),
         };
@@ -250,7 +261,12 @@ export function getApplicationRequest(id: string) {
   return getDb().query<RequestRow, [string]>("SELECT * FROM app_requests WHERE id = ?").get(id);
 }
 
-export function startApplicationRequest(appId: string, prompt: string, sourceWindowId?: string) {
+export function startApplicationRequest(
+  appId: string,
+  prompt: string,
+  sourceWindowId?: string,
+  runtime?: import("@vibeos/shared").AppRuntime,
+) {
   return enqueue(() => {
     const app = getApp(appId);
     if (!app || app.kind !== "virtual") throw new Error("applications.error.readOnly");
@@ -261,7 +277,7 @@ export function startApplicationRequest(appId: string, prompt: string, sourceWin
       now = Date.now();
     getDb()
       .query(
-        "INSERT INTO app_requests (id,app_id,prompt,base_version_id,source_window_id,data_version,status,created_at,updated_at) VALUES (?,?,?,?,?,?,'generating',?,?)",
+        "INSERT INTO app_requests (id,app_id,prompt,base_version_id,source_window_id,data_version,status,created_at,updated_at,runtime) VALUES (?,?,?,?,?,?,'generating',?,?,?)",
       )
       .run(
         id,
@@ -272,6 +288,7 @@ export function startApplicationRequest(appId: string, prompt: string, sourceWin
         getAppData(appId).version,
         now,
         now,
+        runtime ?? app.manifest.runtime ?? "html",
       );
     return getApplicationRequest(id)!;
   });
@@ -397,7 +414,10 @@ export async function duplicateApplication(appId: string, name?: string) {
   const app = await installApp({
     name: name ?? `${original.name} Copy`,
     icon: original.icon,
-    manifest: { ...definition, seedHtml: version?.legacy ? "" : definition.seedHtml },
+    manifest: {
+      ...definition,
+      seedHtml: version?.legacy ? "" : definition.seedHtml,
+    },
   });
   await enqueue(() => {
     getDb().query("UPDATE apps SET origin_app_id=? WHERE id=?").run(appId, app.id);
@@ -430,7 +450,7 @@ export async function saveWindowAsApplication(windowId: string, name?: string, i
       writeVersion(
         app,
         {
-          ...safeDefinition(app),
+          ...(readApplicationVersion(app.id, window.appVersionId) ?? safeDefinition(app)),
           defaultSize: { w: window.rect.w, h: window.rect.h },
           seedHtml: snapshot,
         },
@@ -468,9 +488,14 @@ export async function migrateApplications() {
   const db = getDb();
   if (!db.query("SELECT version FROM storage_version WHERE version >= 3").get()) {
     const windows = db
-      .query<{ window_id: string; snapshot_path: string | null; html_snapshot: string }, []>(
-        "SELECT window_id,snapshot_path,html_snapshot FROM app_memory",
-      )
+      .query<
+        {
+          window_id: string;
+          snapshot_path: string | null;
+          html_snapshot: string;
+        },
+        []
+      >("SELECT window_id,snapshot_path,html_snapshot FROM app_memory")
       .all();
     await enqueue(() => {
       for (const row of windows) {
@@ -514,9 +539,10 @@ export async function migrateApplications() {
     }
     // Each old temporary experience receives its own identity; window IDs and bytes stay intact.
     for (const w of db
-      .query<{ id: string; title: string; w: number; h: number }, []>(
-        "SELECT id,title,w,h FROM windows WHERE app_id='__transient__'",
-      )
+      .query<
+        { id: string; title: string; w: number; h: number },
+        []
+      >("SELECT id,title,w,h FROM windows WHERE app_id='__transient__'")
       .all()) {
       const app = await installApp({
         name: w.title,

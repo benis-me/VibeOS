@@ -45,6 +45,7 @@
           windowId: payload.windowId,
         }),
       );
+    return true;
   };
   const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
   const delivery = (data, overrides = {}) => ({

@@ -58,6 +58,7 @@ export interface UiRegion {
 }
 
 export interface UiPatchPayload {
+  dataVersion?: string;
   windowId: string;
   /** Only this successful operation may acknowledge its submitted draft values. */
   operationId?: string;

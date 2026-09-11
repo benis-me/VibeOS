@@ -253,7 +253,11 @@ await until(() =>
 );
 assert.equal(refreshes, 3);
 assert.equal(calls, 6, "an already-current view needs no repair");
-assert(!frames.slice(beforeRefresh).some((f) => f.type === "s2c.ui.patch"));
+const confirmed = frames.slice(beforeRefresh).filter((f) => f.type === "s2c.ui.patch");
+assert.equal(confirmed.length, 1);
+assert.deepEqual(confirmed[0]!.payload.regions, []);
+assert.equal(confirmed[0]!.payload.dataVersion, getAppData(app.id).version);
+assert.equal(getWindow(parent.id)?.snapshotDataVersion, getAppData(app.id).version);
 
 bus.emit("op.received", { windowId: childId, op: { kind: "click", action: "close-details" } });
 await until(() => !getWindow(childId)?.isOpen);

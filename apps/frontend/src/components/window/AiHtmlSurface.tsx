@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { communicationCommandSchema, type AppDelivery } from "@vibeos/shared";
+import {
+  communicationCommandSchema,
+  viewStateSchema,
+  type AppDelivery,
+  type ViewState,
+} from "@vibeos/shared";
 import { bindCommunication, sendCommunication } from "@/lib/communication";
 import { useT } from "@/lib/i18n";
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
@@ -10,6 +15,8 @@ import { wsClient, API_BASE } from "@/lib/ws";
 import { useDelegatedEvents } from "@/hooks/useDelegatedEvents";
 import { useWindowStore } from "@/stores/windowStore";
 import { createDrafts, fieldKey, type Field } from "@/lib/fields";
+import { installImageRetries } from "@/lib/imageRetry";
+import { runPrepared, restorePrepared } from "@/lib/preparedInteractions";
 
 interface Props {
   windowId: string;
@@ -31,6 +38,25 @@ export function AiHtmlSurface({ windowId }: Props) {
   const [communicationError, setCommunicationError] = useState("");
   const [requests, setRequests] = useState(0);
   const data = useRef(new Map<string, AppDelivery>());
+  const initial = useWindowStore.getState().windows[windowId];
+  const view = useRef<ViewState>(initial?.viewState ?? {});
+  const dataVersion = useRef(initial?.snapshotDataVersion);
+  const currentDataVersion = useRef<string | undefined>(undefined);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saveView = useCallback(() => {
+    wsClient.send("c2s.window.view-state", {
+      windowId,
+      appVersionId: useWindowStore.getState().windows[windowId]?.appVersionId,
+      state: view.current,
+    });
+  }, [windowId]);
+  useEffect(
+    () => () => {
+      clearTimeout(saveTimer.current);
+      saveView();
+    },
+    [saveView],
+  );
   const translate = useRef(t);
   translate.current = t;
   const showError = useCallback((e: unknown) => {
@@ -43,6 +69,13 @@ export function AiHtmlSurface({ windowId }: Props) {
   useEffect(() => {
     const off = wsClient.on("s2c.communication.delivery", ({ delivery }) => {
       if (delivery.windowId !== windowId || delivery.mode !== "data") return;
+      if (
+        delivery.channel === "appData" &&
+        delivery.data &&
+        typeof delivery.data === "object" &&
+        !Array.isArray(delivery.data)
+      )
+        currentDataVersion.current = String(delivery.data.version);
       if (delivery.channel) {
         data.current.delete(delivery.channel);
         data.current.set(delivery.channel, delivery);
@@ -86,7 +119,12 @@ export function AiHtmlSurface({ windowId }: Props) {
         }
         return;
       }
-      if (wsClient.send("c2s.op", { windowId, op })) {
+      if (
+        wsClient.send("c2s.op", {
+          windowId,
+          op: { ...op, viewState: view.current },
+        })
+      ) {
         if (op.id) drafts.submit(op.id, op.formData ?? {}, scope);
         useWindowStore.getState().setBusy(windowId, true);
       } else showError(new Error("communication.disconnected"));
@@ -94,7 +132,29 @@ export function AiHtmlSurface({ windowId }: Props) {
     [windowId, showError, drafts],
   );
 
-  useDelegatedEvents(ref, onOp, drafts);
+  const onLocal = useCallback(
+    (el: HTMLElement, op: AiOp) => {
+      if (!ref.current) return false;
+      const next = runPrepared(
+        ref.current,
+        el,
+        op.value,
+        view.current,
+        !useWindowStore.getState().busy[windowId] &&
+          !!dataVersion.current &&
+          dataVersion.current === currentDataVersion.current,
+      );
+      if (!next) return false;
+      const parsed = viewStateSchema.safeParse(next);
+      if (!parsed.success) return false;
+      view.current = parsed.data;
+      clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(saveView, 150);
+      return true;
+    },
+    [windowId, saveView],
+  );
+  useDelegatedEvents(ref, onOp, drafts, onLocal);
 
   // Subscribe synchronously: React may batch renders, but no region patch may be skipped.
   useLayoutEffect(() => {
@@ -108,7 +168,11 @@ export function AiHtmlSurface({ windowId }: Props) {
       const active = document.activeElement;
       const focused =
         active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement
-          ? { key: fieldKey(active), start: active.selectionStart, end: active.selectionEnd }
+          ? {
+              key: fieldKey(active),
+              start: active.selectionStart,
+              end: active.selectionEnd,
+            }
           : null;
       const scroll = el.scrollTop || scrollMemory.get(windowId) || 0;
       if (patch?.mode === "regions") {
@@ -131,11 +195,18 @@ export function AiHtmlSurface({ windowId }: Props) {
         el.innerHTML = out;
       }
       el.scrollTop = scroll;
+      if (!patch) dataVersion.current = state.windows[windowId]?.snapshotDataVersion;
+      else if (
+        !patch.streaming &&
+        (patch.dataVersion !== undefined || patch.mode === "full" || patch.regions?.length)
+      )
+        dataVersion.current = patch.dataVersion;
       for (const delivery of data.current.values())
         bindCommunication(el, delivery, translate.current);
       if (!state.patches[windowId]?.streaming)
         void sendCommunication(windowId, { action: "refresh" }).catch(() => {});
       drafts.restore(el, patch?.done ? patch.operationId : undefined);
+      restorePrepared(el, view.current);
       if (!focused || active?.isConnected) return;
       for (const f of el.querySelectorAll<Field>("input, textarea")) {
         if (fieldKey(f) !== focused.key) continue;
@@ -164,29 +235,8 @@ export function AiHtmlSurface({ windowId }: Props) {
     });
   }, [windowId, showError, drafts]);
 
-  // Retry generated images that fail to load (e.g. the held request was cut
-  // short, or a transient error) instead of leaving a broken image. The image
-  // streams once generation finishes, so a backed-off retry recovers it.
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const onErr = (e: Event) => {
-      const img = e.target as HTMLImageElement;
-      if (img?.tagName !== "IMG" || !/\/api\/img\//.test(img.src)) return;
-      const n = Number(img.dataset.vibeRetry ?? "0");
-      if (n >= 6) return;
-      img.dataset.vibeRetry = String(n + 1);
-      const base = img.src.replace(/[?&]r=\d+$/, "");
-      const sep = base.includes("?") ? "&" : "?";
-      setTimeout(
-        () => {
-          img.src = `${base}${sep}r=${n + 1}`;
-        },
-        1000 + n * 1500,
-      );
-    };
-    el.addEventListener("error", onErr, true); // capture — error doesn't bubble
-    return () => el.removeEventListener("error", onErr, true);
+    if (ref.current) return installImageRetries(ref.current);
   }, []);
 
   // Remember the scroll position as the user scrolls.
@@ -223,7 +273,13 @@ export function AiHtmlSurface({ windowId }: Props) {
         if (val) source = { kind: "text", ref: val, label: val.slice(0, 80) };
       }
       if (!source?.ref) return;
-      if (wsClient.send("c2s.op.dragdrop", { windowId, source, target: { windowId } }))
+      if (
+        wsClient.send("c2s.op.dragdrop", {
+          windowId,
+          source,
+          target: { windowId },
+        })
+      )
         useWindowStore.getState().setBusy(windowId, true);
       else showError(new Error("communication.disconnected"));
     },

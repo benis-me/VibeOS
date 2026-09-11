@@ -6,6 +6,7 @@ import { wsClient } from "@/lib/ws";
 import { useAppStore } from "@/stores/appStore";
 import { useWindowDrag } from "@/hooks/useWindowDrag";
 import { AiHtmlSurface } from "./AiHtmlSurface";
+import { InteractiveSurface } from "./InteractiveSurface";
 import { NATIVE_APPS } from "./nativeApps";
 import { CHROMES } from "./chromes";
 import { AppIcon } from "@/components/AppIcon";
@@ -80,7 +81,12 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
         minimized
           ? reduced
             ? { opacity: 0 }
-            : { opacity: 0, scale: 0.15, x: minTarget?.x ?? 0, y: minTarget?.y ?? 240 }
+            : {
+                opacity: 0,
+                scale: 0.15,
+                x: minTarget?.x ?? 0,
+                y: minTarget?.y ?? 240,
+              }
           : reduced
             ? { opacity: 1 }
             : { opacity: 1, scale: 1, x: 0, y: 0 }
@@ -210,8 +216,14 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
           native(win.id)
         ) : Chrome ? (
           <Chrome windowId={win.id}>
-            <AiHtmlSurface windowId={win.id} />
+            {win.runtime === "interactive" ? (
+              <InteractiveSurface key={win.appVersionId} windowId={win.id} />
+            ) : (
+              <AiHtmlSurface windowId={win.id} />
+            )}
           </Chrome>
+        ) : win.runtime === "interactive" ? (
+          <InteractiveSurface key={win.appVersionId} windowId={win.id} />
         ) : (
           <AiHtmlSurface windowId={win.id} />
         )}

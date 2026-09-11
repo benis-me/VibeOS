@@ -127,3 +127,5 @@ application's records or fictional world, the other is remembered user context.
 - `NODE_OPTIONS= bun run typecheck` and `NODE_OPTIONS= bun run build`.
 - Browser regression commands are in `test/regions.browser.html` and
   `test/communication.browser.html`.
+
+Application versions also select Classic or Interactive rendering. See [Interactive runtime](interactive-runtime.md) for prepared navigation, CSS motion, isolated scripts, per-window view state and format 3 exports. Runtime selection only affects the newly generated version; old windows retain their pinned behavior.

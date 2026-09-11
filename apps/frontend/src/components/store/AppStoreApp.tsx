@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus, Send, Square } from "lucide-react";
-import type { ApplicationCommand } from "@vibeos/shared";
+import type { ApplicationCommand, AppRuntime } from "@vibeos/shared";
 import { useAppStore } from "@/stores/appStore";
 import { useApplicationStore } from "@/stores/applicationStore";
 import { useWindowStore } from "@/stores/windowStore";
@@ -24,7 +24,15 @@ export function AppStoreApp() {
   const app = apps.find((a) => a.id === state.selectedId) ?? apps[0];
   const detail = state.applications.find((a) => a.appId === app?.id);
   const [prompt, setPrompt] = useState("");
-  const [draft, setDraft] = useState<{ action: "create" | "rename"; name: string } | null>(null);
+  const [runtime, setRuntime] = useState<AppRuntime>("html");
+  const activeVersion = detail?.versions.find((v) => v.id === detail.activeVersionId);
+  useEffect(() => {
+    setRuntime(activeVersion?.number === 0 ? "interactive" : (activeVersion?.runtime ?? "html"));
+  }, [app?.id, activeVersion?.id, activeVersion?.runtime]);
+  const [draft, setDraft] = useState<{
+    action: "create" | "rename";
+    name: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -88,7 +96,12 @@ export function AppStoreApp() {
             disabled={!detail || busy || !!running}
             value={detail?.activeVersionId ?? ""}
             onChange={(e) =>
-              app && void run({ action: "activate", appId: app.id, versionId: e.target.value })
+              app &&
+              void run({
+                action: "activate",
+                appId: app.id,
+                versionId: e.target.value,
+              })
             }
             className="vibe-input max-w-44 rounded-md border bg-card px-2 text-xs"
           >
@@ -96,7 +109,7 @@ export function AppStoreApp() {
             {detail?.versions.map((v) => (
               <option value={v.id} key={v.id}>
                 {v.number === 0 ? t("applications.draft") : `v${v.number}`} ·{" "}
-                {new Date(v.createdAt).toLocaleDateString()}
+                {t(`runtime.${v.runtime}`)}
               </option>
             ))}
           </select>
@@ -149,9 +162,10 @@ export function AppStoreApp() {
                 disabled={!detail}
                 onClick={() =>
                   detail &&
-                  void requestFiles({ action: "reveal", path: detail.path }).catch((e) =>
-                    setError(t(e.message)),
-                  )
+                  void requestFiles({
+                    action: "reveal",
+                    path: detail.path,
+                  }).catch((e) => setError(t(e.message)))
                 }
               >
                 {t("applications.contents")}
@@ -297,6 +311,7 @@ export function AppStoreApp() {
                 action: "generate",
                 appId: app.id,
                 prompt,
+                runtime,
                 sourceWindowId:
                   state.sourceWindowId && windows[state.sourceWindowId]?.appId === app.id
                     ? state.sourceWindowId
@@ -324,6 +339,19 @@ export function AppStoreApp() {
                 </button>
               </div>
             ))}
+          <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+            {t("runtime.nextVersion")}
+            <select
+              aria-label={t("runtime.nextVersion")}
+              value={runtime}
+              disabled={busy || !!running}
+              onChange={(e) => setRuntime(e.target.value as AppRuntime)}
+              className="vibe-input rounded-md border bg-card px-2 py-1 text-foreground"
+            >
+              <option value="html">{t("runtime.html")}</option>
+              <option value="interactive">{t("runtime.interactive")}</option>
+            </select>
+          </label>
           <div className="flex items-end gap-2">
             <textarea
               aria-label={t("applications.prompt")}

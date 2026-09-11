@@ -53,6 +53,7 @@ import {
   rememberGeometry,
   findOpenWindowByApp,
   getWindow,
+  saveViewState,
 } from "../db/repositories/WindowRepo.ts";
 import { ensureMemory, getSnapshot, getMemory } from "../db/repositories/AppMemoryRepo.ts";
 import {
@@ -176,7 +177,14 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
     case "c2s.boot.hello":
       return sendBootState(ws);
 
+    case "c2s.window.view-state":
+      await saveViewState(msg.payload.windowId, msg.payload.appVersionId, msg.payload.state);
+      return;
     case "c2s.op":
+      if (msg.payload.op.viewState) {
+        const win = getWindow(msg.payload.windowId);
+        await saveViewState(msg.payload.windowId, win?.appVersionId, msg.payload.op.viewState);
+      }
       bus.emit("op.received", msg.payload);
       return;
 

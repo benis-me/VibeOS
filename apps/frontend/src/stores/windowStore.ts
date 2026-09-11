@@ -72,6 +72,21 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
     }),
   applyPatch: (patch) =>
     set((s) => ({
+      // Keep the committed revision with the snapshot across no-op acknowledgements
+      // and iframe reloads, not only in the most recent patch envelope.
+      ...(!patch.streaming &&
+      s.windows[patch.windowId] &&
+      (patch.dataVersion !== undefined || patch.mode === "full" || patch.regions?.length)
+        ? {
+            windows: {
+              ...s.windows,
+              [patch.windowId]: {
+                ...s.windows[patch.windowId]!,
+                snapshotDataVersion: patch.dataVersion,
+              },
+            },
+          }
+        : {}),
       snapshots: {
         ...s.snapshots,
         [patch.windowId]:

@@ -1229,3 +1229,13 @@ button:not(:disabled),
 [data-skin="aqua"] .vibe-menu-item[data-danger="true"][data-active="true"] {
   background: linear-gradient(to bottom, #ff6b64, #e23b34);
 }
+
+/* Prepared panels and motion share the same contract in both app runtimes. */
+.ai-surface [hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .ai-surface *, .ai-surface *::before, .ai-surface *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

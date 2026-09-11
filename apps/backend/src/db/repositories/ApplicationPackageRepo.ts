@@ -9,6 +9,10 @@ import {
   messageDataSchema,
   communicationCommandSchema,
   type ApplicationDefinition,
+  type AppRuntime,
+  RUNTIME_SCRIPT_TYPE,
+  MAX_RUNTIME_SCRIPT,
+  localActionSchema,
 } from "@vibeos/shared/domain";
 import { stripEmoji } from "@vibeos/shared/util";
 import { getApp, installApp } from "./AppRepo.ts";
@@ -26,7 +30,7 @@ const imageSchema = z
   .strict();
 const packageSchema = z
   .object({
-    vibeapp: z.literal(2),
+    vibeapp: z.union([z.literal(2), z.literal(3)]),
     name: z.string().trim().min(1).max(100),
     icon: z.string().max(100),
     definition: applicationDefinitionSchema,
@@ -35,15 +39,71 @@ const packageSchema = z
   })
   .strict();
 
-export async function validateApplicationHtml(html: string): Promise<void> {
+export async function validateRuntimeScripts(html: string, runtime: AppRuntime = "html") {
+  const ids = new Set<string>();
+  let total = 0,
+    closed = 0,
+    body = "";
+  await new HTMLRewriter()
+    .on("script", {
+      element(element) {
+        const id = element.getAttribute("data-vibeos-script") ?? "";
+        if (
+          runtime !== "interactive" ||
+          element.getAttribute("type") !== RUNTIME_SCRIPT_TYPE ||
+          element.hasAttribute("src") ||
+          !/^[a-zA-Z][\w-]{0,79}$/.test(id) ||
+          ids.has(id) ||
+          ids.size >= 8
+        )
+          throw new Error("runtime.error.script", {
+            cause: `Expected <script type="${RUNTIME_SCRIPT_TYPE}" data-vibeos-script="unique-stable-id"> with no src; received type=${element.getAttribute("type")}, id=${id}, runtime=${runtime}`,
+          });
+        ids.add(id);
+        body = "";
+        element.onEndTag(() => {
+          closed++;
+          // Compile for syntax validation ONLY. Generated code never runs in Bun.
+          try {
+            new Function("vibe", "root", body);
+          } catch (cause) {
+            throw new Error("runtime.error.script", { cause });
+          }
+        });
+      },
+      text(chunk) {
+        body += chunk.text;
+        total += Buffer.byteLength(chunk.text);
+        if (total > MAX_RUNTIME_SCRIPT) throw new Error("runtime.error.script");
+      },
+    })
+    .transform(new Response(html))
+    .text();
+  if (closed !== ids.size)
+    throw new Error("runtime.error.script", {
+      cause: "Missing closing script tag",
+    });
+}
+
+export async function validateApplicationHtml(
+  html: string,
+  runtime: AppRuntime = "html",
+): Promise<void> {
+  await validateRuntimeScripts(html, runtime);
   let invalid = false;
   const rewriter = new HTMLRewriter().on("*", {
     element(element) {
-      if (["script", "iframe", "object", "embed", "base", "link", "meta"].includes(element.tagName))
+      if (
+        ["iframe", "object", "embed", "base", "link"].includes(element.tagName) ||
+        (element.tagName === "meta" &&
+          (!/^utf-?8$/i.test(element.getAttribute("charset") ?? "") ||
+            [...element.attributes].some(([name]) => name !== "charset")))
+      )
         invalid = true;
       for (const [name, value] of element.attributes) {
         if (name.startsWith("on") || /(?:javascript|vbscript):/i.test(value)) invalid = true;
         if (name === "data-vibeos-command") communicationCommandSchema.parse(JSON.parse(value));
+        if (name === "data-vibeos-local") localActionSchema.parse(JSON.parse(value));
       }
     },
   });
@@ -85,9 +145,10 @@ export function exportApplication(appId: string, includeData = false): string {
   if (!app || app.kind !== "virtual") throw new Error("applications.error.readOnly");
   const definition = readApplicationVersion(appId)!;
   const row = getDb()
-    .query<{ legacy: number }, [string]>(
-      "SELECT legacy FROM app_versions WHERE id=(SELECT active_version_id FROM apps WHERE id=?)",
-    )
+    .query<
+      { legacy: number },
+      [string]
+    >("SELECT legacy FROM app_versions WHERE id=(SELECT active_version_id FROM apps WHERE id=?)")
     .get(appId);
   // Old snapshots may literally contain a user's records. Export the generation
   // intent; an imported legacy application generates a fresh UI on first open.
@@ -104,10 +165,13 @@ export function exportApplication(appId: string, includeData = false): string {
   }
   const json = JSON.stringify(
     {
-      vibeapp: 2,
+      vibeapp: definition.runtime === "interactive" ? 3 : 2,
       name: app.name,
       icon: app.icon,
-      definition,
+      definition:
+        definition.runtime === "html"
+          ? Object.fromEntries(Object.entries(definition).filter(([key]) => key !== "runtime"))
+          : definition,
       images,
       ...(includeData ? { data: getAppData(appId).data } : {}),
     },
@@ -144,7 +208,7 @@ export async function importApplication(json: string) {
   if (Buffer.byteLength(json) > MAX_APP_PACKAGE_BYTES)
     throw new Error("applications.error.packageSize");
   const raw = JSON.parse(json);
-  if (raw?.vibeapp !== 2) {
+  if (raw?.vibeapp !== 2 && raw?.vibeapp !== 3) {
     const legacy = z
       .object({
         vibeapp: z.literal(1).optional(),
@@ -163,12 +227,18 @@ export async function importApplication(json: string) {
       operations: manifest.operations ?? [],
     });
     await validateApplicationHtml(definition.seedHtml);
-    const app = await installApp({ name: legacy.name, icon: legacy.icon, manifest: definition });
+    const app = await installApp({
+      name: legacy.name,
+      icon: legacy.icon,
+      manifest: definition,
+    });
     await ensureShortcut(app.id, app.name, app.icon);
     return app;
   }
   const input = packageSchema.parse(raw);
-  await validateApplicationHtml(input.definition.seedHtml);
+  if (input.vibeapp === 2 && input.definition.runtime !== "html")
+    throw new Error("applications.error.package");
+  await validateApplicationHtml(input.definition.seedHtml, input.definition.runtime);
   if (imageIds(input.definition).some((id) => !Object.hasOwn(input.images, id)))
     throw new Error("applications.error.asset");
   const decoded = Object.entries(input.images).map(([id, image]) => ({
@@ -240,9 +310,18 @@ export async function importApplicationDirectory(path: string) {
     const asset = assets[id];
     if (!asset || !/^Assets\/[a-zA-Z0-9_.-]+$/.test(asset.file))
       throw new Error("applications.error.asset");
-    images[id] = { mime: asset.mime, data: read(`${root}/${asset.file}`).toString("base64") };
+    images[id] = {
+      mime: asset.mime,
+      data: read(`${root}/${asset.file}`).toString("base64"),
+    };
   }
   return importApplication(
-    JSON.stringify({ vibeapp: 2, name: manifest.name, icon: manifest.icon, definition, images }),
+    JSON.stringify({
+      vibeapp: definition.runtime === "interactive" ? 3 : 2,
+      name: manifest.name,
+      icon: manifest.icon,
+      definition,
+      images,
+    }),
   );
 }

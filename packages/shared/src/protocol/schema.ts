@@ -1,4 +1,5 @@
 import { applicationCommandSchema } from "../domain/applications.ts";
+import { viewStateSchema } from "../domain/runtime.ts";
 import { memoryCommandSchema } from "../domain/systemMemory.ts";
 import { skinCommandSchema } from "../domain/skins.ts";
 import { communicationCommandSchema } from "../domain/communication.ts";
@@ -13,7 +14,8 @@ import { activityFilterSchema } from "../domain/agent.ts";
  * before dispatch; malformed payloads are rejected instead of crashing a handler.
  */
 
-const aiOp = z.object({
+export const aiOpSchema = z.object({
+  viewState: viewStateSchema.optional(),
   id: z.string().max(100).optional(),
   kind: z.enum(["click", "input", "submit", "change", "key", "custom"]),
   action: z.string().optional(),
@@ -81,6 +83,7 @@ const msg = <T extends string, P extends z.ZodTypeAny>(type: T, payload: P) =>
   z.object({ type: z.literal(type), payload });
 
 export const clientToServerSchema = z.discriminatedUnion("type", [
+  msg("c2s.window.view-state", z.object({ windowId: z.string().min(1).max(100), appVersionId: z.string().max(100).optional(), state: viewStateSchema }).strict()),
   msg(
     "c2s.application.command",
     z.object({ requestId: z.string().min(1).max(100), command: applicationCommandSchema }),
@@ -106,7 +109,7 @@ export const clientToServerSchema = z.discriminatedUnion("type", [
     z.object({ requestId: z.string().min(1).max(100), command: diskCommandSchema }),
   ),
   msg("c2s.boot.hello", z.object({ clientId: z.string().optional() })),
-  msg("c2s.op", z.object({ windowId: z.string(), op: aiOp })),
+  msg("c2s.op", z.object({ windowId: z.string(), op: aiOpSchema })),
   msg(
     "c2s.op.dragdrop",
     z.object({ windowId: z.string().optional(), source: dragPayload, target: dropTarget }),

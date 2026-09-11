@@ -6,6 +6,7 @@ import { diskPath } from "../../files/disk.ts";
 import { writeContent } from "../../files/content.ts";
 import { enqueue } from "./writeQueue.ts";
 import { parseSubscriptions, storeDeclaredSubscriptions } from "./CommunicationRepo.ts";
+import { getAppData } from "./ApplicationRepo.ts";
 
 interface MemoryRow {
   window_id: string;
@@ -68,6 +69,7 @@ export async function saveSnapshot(
   windowId: string,
   html: string,
   canWrite = () => true,
+  dataVersion?: string,
 ): Promise<boolean> {
   const subscriptions = await parseSubscriptions(html);
   return enqueue(() => {
@@ -90,11 +92,12 @@ export async function saveSnapshot(
       )
       .get(windowId);
     if (!row) return false;
+    if (dataVersion && getAppData(row.app_id).version !== dataVersion) return false;
     const path = row.snapshot_path ?? `System/Sessions/${encodeURIComponent(windowId)}/index.html`;
     writeContent(path, html);
     db.query(
-      "UPDATE app_memory SET snapshot_path = ?, html_snapshot = '', updated_at = ? WHERE window_id = ?",
-    ).run(path, Date.now(), windowId);
+      "UPDATE app_memory SET snapshot_path = ?, html_snapshot = '', updated_at = ?, data_version=? WHERE window_id = ?",
+    ).run(path, Date.now(), dataVersion ?? null, windowId);
     storeDeclaredSubscriptions(windowId, subscriptions);
     return true;
   });

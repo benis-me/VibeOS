@@ -9,6 +9,14 @@ import { useSettingsStore } from "@/stores/settingsStore";
 type Dict = Record<string, string>;
 
 const zh: Dict = {
+  "runtime.html": "经典",
+  "runtime.interactive": "交互增强",
+  "runtime.nextVersion": "下一版本",
+  "runtime.content": "应用内容",
+  "runtime.repair": "让 AI 修复",
+  "runtime.reload": "重新加载",
+  "runtime.error.start": "应用运行时未能启动。请重新加载。",
+  "runtime.error.script": "应用脚本格式或语法无效，原版本已保留。",
   "memory.title": "记忆",
   "memory.edit": "编辑记忆",
   "memory.remove": "删除记忆",
@@ -509,6 +517,14 @@ const zh: Dict = {
 };
 
 const en: Dict = {
+  "runtime.html": "Classic",
+  "runtime.interactive": "Interactive",
+  "runtime.nextVersion": "Next version",
+  "runtime.content": "app content",
+  "runtime.repair": "Repair with AI",
+  "runtime.reload": "Reload",
+  "runtime.error.start": "The app runtime could not start. Please reload.",
+  "runtime.error.script": "Invalid app script format or syntax. The previous version is preserved.",
   "memory.title": "Memory",
   "memory.edit": "Edit memory",
   "memory.remove": "Delete memory",

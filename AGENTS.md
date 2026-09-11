@@ -121,13 +121,24 @@ This environment injects a broken `NODE_OPTIONS` preload that crashes any
   run in parallel; within one window a new action **preempts** (aborts) the
   in-flight one ("latest wins"). Generation is stateless, so a preempt just
   aborts — there's no session to resume.
-- **Event delegation** (`hooks/useDelegatedEvents.ts`): AI HTML never runs code.
-  Clicks/submits/changes on `[data-vibeos-action]` become `c2s.op`. Clicks on
+- **Event delegation** (`hooks/useDelegatedEvents.ts`): Classic AI HTML never runs code; interactive versions execute validated inert scripts only inside an opaque-origin iframe.
+  Clicks/submits/changes on `[data-vibeos-action]` become `c2s.op`; prepared local controls and explicitly registered isolated handlers consume their own interactions. Clicks on
   editable inputs are passed through natively (never trigger generation). Forms
   are intercepted in the capture phase so they never reload the page. A click that
   isn't a form submit still collects nearby field values (the AI often omits a
   `<form>`), so submits carry what was typed. Operations include `regionPath`
   (the control's region followed by its ancestors) as model context.
+- **Interactive versions**: see `docs/interactive-runtime.md`. Existing/unspecified definitions
+  remain `runtime: html`; only a new `interactive` app version enables inert
+  `application/vibeos` scripts. Preserve window version pinning and the real AI/data/services
+  paths. `data-vibeos-local` prepares navigation/filtering in the same generation; prepared
+  record content uses `data-vibeos-prefetch` and falls back to AI if its data revision is stale.
+  Script scopes follow regions: dispose changed owners, preserve unaffected ones, never mount
+  during streaming. Keep local view state separate from app data and pass it to subsequent AI
+  turns. The frame has no host credentials, WebSocket client or store; use the validated
+  MessageChannel bridge with host-supplied identity. Respect minimized/reduced-motion state,
+  fonts, live skins, focus, shortcuts and context menus. Authoring outputs a metadata JSON fence
+  plus raw HTML to avoid nesting executable source in a JSON string; legacy JSON remains valid.
 - **Context menus** (`components/contextmenu/`): OS right-click. `openContextMenu`
   feeds a per-location menu (`menus.tsx`); panels are skin-styled via `.vibe-menu*`
   and submenus use a safety-triangle hover. Don't trigger native browser menus.
@@ -151,7 +162,7 @@ This environment injects a broken `NODE_OPTIONS` preload that crashes any
   completing a task does not force closure. Old visible records initialize shared data
   on interaction without discarding other records or their stable IDs.
   Data deliveries bind literal text without model calls; never insert message data
-  as HTML or run generated scripts. Declared subscriptions persist with validated
+  as HTML. Interactive versions may observe plain deliveries through the isolated runtime API. Declared subscriptions persist with validated
   snapshots; closing windows removes subscriptions and cancels related requests.
 - **App instancing**: `AppManifest.singleInstance` → Settings is single-instance;
   Browser/Files/Terminal and virtual apps are multi-instance (new window each open).

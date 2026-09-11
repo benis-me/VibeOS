@@ -47,7 +47,7 @@ export function createDrafts() {
       return Array.from(root.querySelectorAll<Field>("input,textarea,select")).flatMap((field) => {
         const key = fieldKey(field),
           draft = drafts.get(draftKey(field));
-        return draft?.edited ? [{ key, type: field.type, value: fieldValue(field) }] : [];
+        return draft?.edited ? [{ key, type: field.type, value: draft.value }] : [];
       });
     },
     submit(id: string, fields: Record<string, string>, scope: HTMLElement) {
