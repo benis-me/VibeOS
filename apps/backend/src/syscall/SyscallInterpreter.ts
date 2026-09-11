@@ -12,6 +12,8 @@ import {
   closeWindow,
   resizeGeneratedWindow,
   getWindow,
+  listOpenWindows,
+  setWindowState,
 } from "../db/repositories/WindowRepo.ts";
 import { ensureMemory } from "../db/repositories/AppMemoryRepo.ts";
 import { renderInitialWindow } from "../kernel/windowInit.ts";
@@ -95,6 +97,28 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
       if (!ctx.windowId || !ctx.resizeFrom) return;
       const window = await resizeGeneratedWindow(ctx.windowId, call.size, ctx.resizeFrom);
       if (window) broadcast("s2c.window.moved", { window });
+      return;
+    }
+    case "window-state": {
+      const ids =
+        call.windowIds === "all"
+          ? listOpenWindows()
+              .filter((w) => w.kind !== "widget")
+              .map((w) => w.id)
+          : [...new Set(call.windowIds)];
+      const windows = ids.map(getWindow);
+      if (windows.some((w) => !w?.isOpen)) throw new Error("communication.closed");
+      for (const current of windows) {
+        if (ctx.canCommit && !ctx.canCommit()) return;
+        if (current!.state === call.state) continue;
+        const window = await setWindowState(current!.id, call.state, ctx.canCommit);
+        if (!window) {
+          if (ctx.canCommit && !ctx.canCommit()) return;
+          throw new Error("communication.closed");
+        }
+        broadcast("s2c.window.stateChanged", { window });
+        await recordStep("window.stateChanged", { windowId: window.id, state: window.state });
+      }
       return;
     }
     case "notify": {

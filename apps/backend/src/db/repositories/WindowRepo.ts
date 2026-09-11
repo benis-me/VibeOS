@@ -232,14 +232,17 @@ export function focusWindow(id: string): Promise<WindowState | null> {
   });
 }
 
-export function setWindowState(id: string, state: WindowDisplayState): Promise<WindowState | null> {
+export function setWindowState(
+  id: string,
+  state: WindowDisplayState,
+  canCommit?: () => boolean,
+): Promise<WindowState | null> {
   return enqueue(() => {
+    if ((canCommit && !canCommit()) || !getWindow(id)?.isOpen) return null;
     const db = getDb();
-    db.query("UPDATE windows SET state = ?, updated_at = ? WHERE id = ?").run(
-      state,
-      Date.now(),
-      id,
-    );
+    db.query(
+      "UPDATE windows SET state = ?, focused = CASE WHEN ? = 'minimized' THEN 0 ELSE focused END, updated_at = ? WHERE id = ?",
+    ).run(state, state, Date.now(), id);
     return getWindow(id);
   });
 }

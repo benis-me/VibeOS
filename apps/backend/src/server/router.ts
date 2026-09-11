@@ -380,7 +380,8 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
       try {
         const calls = await runCommand(msg.payload.text, ctrl);
         if (ctrl.signal.aborted) return; // superseded
-        await Syscalls.execute(calls, { source: "syscall" });
+        await Syscalls.execute(calls, { source: "syscall", canCommit: () => !ctrl.signal.aborted });
+        if (ctrl.signal.aborted) return;
         sendTo(ws, "s2c.command.result", { requestId: msg.payload.requestId, count: calls.length });
       } catch (e) {
         if (ctrl.signal.aborted) return;

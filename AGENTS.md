@@ -132,7 +132,10 @@ This environment injects a broken `NODE_OPTIONS` preload that crashes any
   feeds a per-location menu (`menus.tsx`); panels are skin-styled via `.vibe-menu*`
   and submenus use a safety-triangle hover. Don't trigger native browser menus.
 - **Syscalls** (`syscall/SyscallInterpreter.ts`): `app-state`, `notify`, `open`,
-  `spawn-window`, `install`, `create-file`, `focus`, `close`.
+  `spawn-window`, `install`, `create-file`, `focus`, `close`, `window-state`.
+  `window-state` applies normal/minimized/maximized to explicit window IDs or all
+  app/system windows, preserving content/geometry and leaving desktop widgets visible.
+  The command palette uses the same syscall; native controls share its repository writer.
   `communication` routes validated send/request/reply and event subscriptions through
   `events/communication.ts`; see `docs/communication.md`. App identity and causal
   traces come from the runtime. Keep FIFO message handling separate from interactive

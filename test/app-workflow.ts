@@ -28,6 +28,8 @@ import { bus } from "../apps/backend/src/events/bus.ts";
 import * as Agents from "../apps/backend/src/db/repositories/AgentRepo.ts";
 import type { ServerToClient } from "@vibeos/shared/protocol";
 import type { ProviderRunOptions, RunResult } from "../apps/backend/src/ai/providers/types.ts";
+import { runCommand } from "../apps/backend/src/ai/commandPalette.ts";
+import * as Syscalls from "../apps/backend/src/syscall/SyscallInterpreter.ts";
 
 async function until(predicate: () => unknown) {
   for (let n = 0; n < 400 && !predicate(); n++) await Bun.sleep(5);
@@ -334,6 +336,69 @@ for (const scenario of ["missing-state", "conflict"] as const) {
 }
 assert.deepEqual(getAppData(invalidApp.id).data, { saved: "newer" });
 assert.equal(listOpenWindows().filter((w) => w.appId === app.id).length, 1);
+// The command palette must reach the same real window state as native controls,
+// including more windows than the eight-syscall response limit allows individually.
+const widget = await openWindow({ appId: app.id, title: "Desktop widget", kind: "widget" });
+await Syscalls.execute([{ type: "focus", windowId: parent.id }], { source: "system" });
+const ordinary = listOpenWindows().filter((window) => window.kind !== "widget");
+assert(ordinary.length > 8);
+const savedHtml = getMemory(parent.id)?.htmlSnapshot;
+const originalRect = getWindow(parent.id)!.rect;
+const command = async (text: string, calls: unknown[]) => {
+  fake = async ({ systemPrompt }) => {
+    assert(systemPrompt?.includes("window-state"), "the model must be told the real capability");
+    assert(systemPrompt?.includes('"state":'), "window state is available to command planning");
+    return { ok: true, text: block(calls) };
+  };
+  await Syscalls.execute(await runCommand(text), { source: "syscall" });
+};
+const changedAt = frames.length;
+await command("最小化所有窗口", [{ type: "window-state", state: "minimized", windowIds: "all" }]);
+assert(ordinary.every((window) => getWindow(window.id)?.state === "minimized"));
+assert(ordinary.every((window) => !getWindow(window.id)?.focused));
+assert.equal(getWindow(widget.id)?.state, "normal", "desktop widgets stay visible");
+assert.equal(
+  frames.slice(changedAt).filter((f) => f.type === "s2c.window.stateChanged").length,
+  ordinary.length,
+);
+const noChangeAt = frames.length;
+await command("最小化所有窗口", [{ type: "window-state", state: "minimized", windowIds: "all" }]);
+assert(
+  !frames.slice(noChangeAt).some((f) => f.type === "s2c.window.stateChanged"),
+  "repeating a window command sends no redundant updates",
+);
+await command("还原所有窗口", [{ type: "window-state", state: "normal", windowIds: "all" }]);
+assert(ordinary.every((window) => getWindow(window.id)?.state === "normal"));
+await command("最大化日程", [{ type: "window-state", state: "maximized", windowIds: [parent.id] }]);
+assert.equal(getWindow(parent.id)?.state, "maximized");
+const rejectedAt = frames.length;
+await assert.rejects(
+  command("还原窗口", [
+    { type: "window-state", state: "normal", windowIds: [parent.id, "missing-window"] },
+    { type: "notify", title: "Must not run" },
+  ]),
+  /communication.closed/,
+);
+assert.equal(
+  getWindow(parent.id)?.state,
+  "maximized",
+  "invalid targets reject before partial changes",
+);
+assert(
+  !frames
+    .slice(rejectedAt)
+    .some((f) => f.type === "s2c.window.stateChanged" || f.type === "s2c.syscall.notify"),
+  "failed commands do not announce success",
+);
+await command("还原日程", [{ type: "window-state", state: "normal", windowIds: [parent.id] }]);
+assert.deepEqual(getWindow(parent.id)?.rect, originalRect);
+assert.equal(
+  getMemory(parent.id)?.htmlSnapshot,
+  savedHtml,
+  "window commands never regenerate app content",
+);
+closeDb();
+assert.equal(getWindow(parent.id)?.state, "normal", "window state survives reopening the database");
 console.log(
   "App workflow passed: legacy initialization, automatic propagation, preserved identity, optional close, no-op writes and conflict guards",
 );

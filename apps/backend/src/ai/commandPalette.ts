@@ -15,15 +15,17 @@ Reply with ONLY a fenced code block tagged vibeos-syscall containing JSON, nothi
 \`\`\`
 
 Available calls:
-- open (appId) — open/focus an EXISTING app. Use an id from installedApps.
+- open (appId) — launch an EXISTING app. Multi-instance apps open a new window; use focus(windowId) to return to an existing window. Use an id from installedApps.
 - spawn-window (title, prompt, width?, height?) — create + generate a NEW app/window live. Use for "open/make/create a <thing>" when no installed app matches. "prompt" describes what the window should show.
 - install (name, icon, manifest?) — add a NEW app + desktop shortcut. icon = a lucide-react icon name in kebab-case (e.g. "calculator", "music", "calendar"). Use only when the user wants it permanently added.
 - create-file (name, mime?, content?, location?) — create a file (location defaults to "desktop").
 - close (windowId) / focus (windowId) — act on a window from openWindows.
+- window-state (windowIds, state) — minimize, maximize or restore existing windows WITHOUT regenerating their content. state is "minimized", "maximized" or "normal" (restore). windowIds is an array of real window IDs, or "all" for all open app/system windows (desktop widgets remain visible). Use one call for a batch, even if there are many windows. Example: "最小化所有窗口" → {"type":"window-state","windowIds":"all","state":"minimized"}. "还原所有窗口" uses state:"normal". For "other windows" or named apps, select the matching IDs from openWindows; focused/kind/state are provided.
 - notify (title, body?, kind?) — show a notification.
 
 Rules:
 - Choose the SMALLEST set of calls that fulfills the command. Prefer 'open' for an existing app; 'spawn-window' to create something new; 'install' only to add permanently.
+- At most 8 calls total. These are VibeOS operations, not host shell commands. Do not invent unsupported actions or substitute closing windows for minimizing them.
 - ALWAYS end with a 'notify' call briefly confirming what you did, written in the user's language.
 - If the command is unclear or impossible, emit ONLY a single 'notify' explaining that.
 - Output nothing outside the vibeos-syscall block.`;
@@ -39,6 +41,9 @@ function systemContext(): string {
     windowId: w.id,
     title: w.title,
     appId: w.appId,
+    state: w.state,
+    focused: w.focused,
+    kind: w.kind,
   }));
   return JSON.stringify({ installedApps, openWindows });
 }

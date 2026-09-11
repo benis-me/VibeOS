@@ -4,7 +4,22 @@
 生成的 HTML 仍不执行 JavaScript。原生应用通过前端的 `sendCommunication` 调用，
 AI 通过 `communication` syscall 调用；身份和请求链由系统填写。
 
-## 命令
+## Spotlight 系统命令
+
+搜索框输入 `>` 进入“让 AI 执行命令”。这个入口将自然语言翻译成 VibeOS syscall，
+支持打开应用、生成新窗口、安装本地应用、创建文件、关闭或聚焦窗口、发送通知，
+以及单个或批量最小化、最大化、还原窗口。它尚未接入应用通信的多轮读写流程，
+也不执行宿主机的任意 Shell 命令。
+
+例如“最小化所有窗口”对应一个 `window-state` 调用：
+
+    {"calls":[{"type":"window-state","windowIds":"all","state":"minimized"}]}
+
+`state` 支持 `minimized`、`maximized`、`normal`（还原）。`windowIds` 可以是具体 ID
+数组，或 `all`（所有应用／系统窗口，保留桌面小组件）。批量操作不占用每窗口一条
+syscall，不重生成应用内容，不改变保存的窗口尺寸；无效目标会在变更前拒绝。
+
+## 应用通信命令
 
 `c2s.communication.command` 的 payload 是 `{windowId, requestId, command}`。
 共享校验和类型在 `packages/shared/src/domain/communication.ts`。

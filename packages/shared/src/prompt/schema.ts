@@ -12,6 +12,13 @@ export const syscallSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("app-state"), data: messageDataSchema.optional() }).strict(),
   z.object({ type: z.literal("communication"), command: communicationCommandSchema }),
   z.object({ type: z.literal("resize-window"), size: windowSizeSchema }),
+  z
+    .object({
+      type: z.literal("window-state"),
+      state: z.enum(["normal", "minimized", "maximized"]),
+      windowIds: z.union([z.literal("all"), z.array(z.string().min(1)).min(1).max(128)]),
+    })
+    .strict(),
   z.object({
     type: z.literal("notify"),
     title: z.string().min(1).max(120),
