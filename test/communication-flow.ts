@@ -40,7 +40,7 @@ const calls = (command: object) =>
 const region = (text: string) =>
   '<vibeos-html mode="regions"><section data-vibeos-region="result">' +
   text +
-  "</section></vibeos-html>";
+  '</section></vibeos-html>\n```vibeos-syscall\n{"calls":[{"type":"app-state"}]}\n```';
 const server = Bun.serve({
   port: 0,
   hostname: "127.0.0.1",

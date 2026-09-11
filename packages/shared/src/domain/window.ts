@@ -1,3 +1,5 @@
+import type { MessageData } from "./communication.ts";
+
 export type WindowKind = "app" | "system" | "widget";
 export type WindowDisplayState = "normal" | "minimized" | "maximized";
 
@@ -12,6 +14,9 @@ export interface Rect extends WindowSize {
 }
 
 export interface WindowState {
+  /** Runtime-owned relationship; closing an opener does not close its child windows. */
+  openerWindowId?: string;
+  launchContext?: { purpose: string; data?: MessageData };
   /** Open file on the system disk; persisted across reconnects and restarts. */
   filePath?: string;
   id: string;

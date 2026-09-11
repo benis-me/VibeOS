@@ -172,7 +172,7 @@ test("AI read/write continuations retain complete original fields and system mem
           if(step===1)return {ok:true,text:syscall({action:"request",target:{system:"app-data"},topic:"get",responseMode:"ai"})};
           assert(options.prompt.includes("[WORKFLOW INPUT]"));assert(options.prompt.includes(body));
           if(step===2)return {ok:true,text:syscall({action:"request",target:{system:"app-data"},topic:"set",data:{version:getAppData(app.id).version,data:{body}},responseMode:"ai"})};
-          return {ok:true,text:'<vibeos-html mode="full"><main data-vibeos-region="root">Saved</main></vibeos-html>'};
+          return {ok:true,text:'<vibeos-html mode="full"><main data-vibeos-region="root">Saved</main></vibeos-html>\\n\x60\x60\x60vibeos-syscall\\n{"calls":[{"type":"app-state"}]}\\n\x60\x60\x60'};
         } catch(e) {error=e;return {ok:false,text:"",error:"fixture assertion"};}
       };
       bus.emit("op.received",{windowId:win.id,op:{id:"submitted",kind:"submit",action:"save",formData:{title:"Input",body},userInput:[{key:"body",type:"textarea",value:body}]}});

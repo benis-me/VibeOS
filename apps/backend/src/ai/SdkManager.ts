@@ -317,6 +317,9 @@ function stubResponse(role: AgentRole, prompt: string): string {
   <button data-vibeos-action="ping" style="align-self:flex-start;padding:6px 12px;border:1px solid #555;border-radius:8px;background:transparent;color:inherit">Ping</button>
 </div>
 </vibeos-html>
+\`\`\`vibeos-syscall
+{"calls":[{"type":"app-state"}]}
+\`\`\`
 <vibeos-summary>The app launched in stub mode.</vibeos-summary>`;
     }
     return `<vibeos-html>
@@ -325,6 +328,9 @@ function stubResponse(role: AgentRole, prompt: string): string {
   <button data-vibeos-action="ping" style="margin-top:8px;padding:6px 12px;border:1px solid #555;border-radius:8px;background:transparent;color:inherit">Ping again</button>
 </div>
 </vibeos-html>
+\`\`\`vibeos-syscall
+{"calls":[{"type":"app-state"}]}
+\`\`\`
 <vibeos-summary>The user pinged the stub app.</vibeos-summary>`;
   }
   if (role === "system-event") {

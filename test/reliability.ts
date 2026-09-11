@@ -68,7 +68,11 @@ await ensureMemory(win.id, app.id); await saveSnapshot(win.id, '<main data-vibeo
 await registerCommunication(); registerUiGenerationAgent(); setActiveProvider("codex");
 let generations = 0, completed = 0;
 let fake: (options: ProviderRunOptions) => Promise<RunResult> = async () => ({ ok: true, text: '<vibeos-html mode="full"><main data-vibeos-region="root">' + (++generations) + '</main></vibeos-html>' });
-for (const id of new Set([...availableProviderIds(), "codex"] as const)) (await getProvider(id)).run = (options) => fake(options);
+for (const id of new Set([...availableProviderIds(), "codex"] as const)) (await getProvider(id)).run = async (options) => {
+  const result = await fake(options);
+  if (result.text.includes("<vibeos-html")) result.text += '\n```vibeos-syscall\n{"calls":[{"type":"app-state"}]}\n```';
+  return result;
+};
 bus.on("system.broadcast", ({ message }) => { if (message.type === "s2c.ui.patch" && message.payload.done) completed++; });
 const events: string[][] = [];
 bus.on("app.delivery", ({ delivery }) => { if (delivery.topic === "files.changed") events.push((delivery.data as { paths: string[] }).paths); });

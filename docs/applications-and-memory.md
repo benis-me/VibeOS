@@ -48,20 +48,31 @@ There is no publication workflow or new application permission system.
 Startup storage migration v3 backs up before SQL changes, preserves window IDs,
 shortcuts, geometry and exact snapshots, materializes versioned bundles, and gives
 old temporary windows separate identities. Subsequent boots reuse the migration.
-Original app records embedded in old HTML remain intact; AI can explicitly migrate
-these records into shared data when the app is edited.
+Original app records embedded in old HTML remain intact. When shared data is empty,
+the next interaction instructs AI to retain all visible records and stable IDs in
+shared state before applying changes or opening related windows.
 
 ## Shared data and real file processing
 
-`communication` requests to `{"system":"app-data"}` use `get` and `set`.
+Ordinary generated interactions include one `app-state` syscall: `{type:"app-state",
+data:<complete updated JSON>}` for changed records, or `{type:"app-state"}` to keep
+them unchanged. The runtime supplies the captured revision and commits before
+other syscalls or final UI publication, so ordinary changes need no extra model
+read/write turns. Conflicts preserve the newer records and the previous UI.
+The low-level `communication` requests to `{"system":"app-data"}` still use `get` and `set`.
 `get` returns `{appId,version,schemaVersion,data}` for the sending application.
 `set` takes `{version,data}` and rejects stale writes. Read, reconcile and retry
 on a conflict. The source app ID comes from the window runtime.
 
 `data-vibeos-bind="appData.data.someField"` receives text updates across that
-application's windows without calling the model. Semantic collection rendering
-can declare a subscription to `app.data.changed` with `source:{"appId":"self"}`
-and `mode:"ai"`. Window selection and unsaved edits remain local. A newly opened
+application's windows without calling the model. Other open generated views also
+receive `app.data.changed` automatically for semantic AI updates, without clicking
+notifications. Explicit subscriptions to that topic with `source:{"appId":"self"}`
+override the default: use `mode:"data"` when bindings alone suffice. Unchanged
+writes do not create revisions or refreshes. Window selection and unsaved edits
+remain local. Spawned windows retain their opener, purpose, record context and
+same-app version. Optional `close` with no windowId dismisses the current window;
+completing a business action does not inherently close it. A newly opened
 window with shared data invokes AI to populate the reusable interface.
 
 Definitions declare `fileTypes` (extensions or MIME patterns) and `operations`

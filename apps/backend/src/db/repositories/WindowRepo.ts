@@ -7,6 +7,8 @@ interface WindowRow {
   id: string;
   app_id: string;
   app_version_id: string | null;
+  opener_window_id: string | null;
+  launch_context_json: string | null;
   file_path: string | null;
   title: string;
   kind: string;
@@ -28,6 +30,8 @@ function toWindow(row: WindowRow): WindowState {
     id: row.id,
     appId: row.app_id,
     appVersionId: row.app_version_id ?? undefined,
+    openerWindowId: row.opener_window_id ?? undefined,
+    launchContext: row.launch_context_json ? JSON.parse(row.launch_context_json) : undefined,
     filePath: row.file_path ?? undefined,
     title: row.title,
     kind: row.kind === "system" ? "system" : row.kind === "widget" ? "widget" : "app",
@@ -127,6 +131,9 @@ export function reorderWindows(ids: string[]): Promise<void> {
 
 export function openWindow(input: {
   appId: string;
+  appVersionId?: string;
+  openerWindowId?: string;
+  launchContext?: WindowState["launchContext"];
   filePath?: string;
   title: string;
   kind?: "app" | "system" | "widget";
@@ -154,8 +161,8 @@ export function openWindow(input: {
       };
     db.query("UPDATE windows SET focused = 0 WHERE is_open = 1").run();
     db.query(
-      `INSERT INTO windows (id, app_id, title, kind, x, y, w, h, z, sort_order, state, is_open, focused, opened_at, updated_at, file_path)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 1, 1, ?, ?, ?)`,
+      `INSERT INTO windows (id, app_id, title, kind, x, y, w, h, z, sort_order, state, is_open, focused, opened_at, updated_at, file_path, opener_window_id, launch_context_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'normal', 1, 1, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       input.appId,
@@ -170,10 +177,12 @@ export function openWindow(input: {
       now,
       now,
       input.filePath ?? null,
+      input.openerWindowId ?? null,
+      input.launchContext ? JSON.stringify(input.launchContext) : null,
     );
     db.query(
-      "UPDATE windows SET app_version_id=(SELECT active_version_id FROM apps WHERE id=?) WHERE id=?",
-    ).run(input.appId, id);
+      "UPDATE windows SET app_version_id=COALESCE(?, (SELECT active_version_id FROM apps WHERE id=?)) WHERE id=?",
+    ).run(input.appVersionId ?? null, input.appId, id);
     return getWindow(id)!;
   });
 }

@@ -1,4 +1,4 @@
-import type { Syscall, WindowSize } from "@vibeos/shared/domain";
+import type { Syscall, WindowSize, MessageData } from "@vibeos/shared/domain";
 import { broadcast } from "../server/wsGateway.ts";
 import { bus } from "../events/bus.ts";
 import { communicate } from "../events/communication.ts";
@@ -11,6 +11,7 @@ import {
   focusWindow,
   closeWindow,
   resizeGeneratedWindow,
+  getWindow,
 } from "../db/repositories/WindowRepo.ts";
 import { ensureMemory } from "../db/repositories/AppMemoryRepo.ts";
 import { renderInitialWindow } from "../kernel/windowInit.ts";
@@ -28,6 +29,8 @@ export interface SyscallContext {
   /** Present only on first generation; subsequent interactions keep the user's geometry. */
   resizeFrom?: WindowSize;
   canCommit?: () => boolean;
+  appDataVersion?: string;
+  launchData?: MessageData;
 }
 
 export async function execute(calls: Syscall[], ctx: SyscallContext): Promise<void> {
@@ -36,7 +39,11 @@ export async function execute(calls: Syscall[], ctx: SyscallContext): Promise<vo
     try {
       log.info(
         `exec ${call.type}`,
-        call.type === "communication" ? { action: call.command.action } : call,
+        call.type === "communication"
+          ? { action: call.command.action }
+          : call.type === "app-state"
+            ? { writesData: call.data !== undefined }
+            : call,
       );
       await one(call, ctx);
     } catch (e) {
@@ -55,6 +62,23 @@ export async function execute(calls: Syscall[], ctx: SyscallContext): Promise<vo
 
 async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
   switch (call.type) {
+    case "app-state": {
+      if (call.data === undefined) return;
+      if (!ctx.appDataVersion) throw new Error("communication.invalid");
+      return one(
+        {
+          type: "communication",
+          command: {
+            action: "request",
+            target: { system: "app-data" },
+            topic: "set",
+            data: { version: ctx.appDataVersion, data: call.data },
+            responseMode: "data",
+          },
+        },
+        ctx,
+      );
+    }
     case "communication": {
       if (!ctx.windowId) throw new Error("communication.closed");
       const outcome = await communicate(
@@ -98,6 +122,7 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
       }
       const w = await openWindow({
         appId: app.id,
+        openerWindowId: ctx.windowId,
         title: app.name,
         kind: app.presetId ? "system" : "app",
         size: app.manifest.defaultSize,
@@ -121,8 +146,12 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
         appId = app.id;
         broadcast("s2c.syscall.appInstalled", { app });
       }
+      const opener = ctx.windowId ? getWindow(ctx.windowId) : null;
       const w = await openWindow({
         appId,
+        openerWindowId: opener?.id,
+        appVersionId: opener?.appId === appId ? opener.appVersionId : undefined,
+        launchContext: { purpose: call.prompt, data: call.context ?? ctx.launchData },
         title: call.title,
         kind: "app",
         rect: {
@@ -133,6 +162,7 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
         },
       });
       await ensureMemory(w.id, appId);
+      await recordStep("window.opened", { windowId: w.id, openerWindowId: opener?.id, appId });
       broadcast("s2c.window.opened", { window: w });
       bus.emit("window.spawnRender", { windowId: w.id, seedPrompt: call.prompt });
       log.info(`spawned window "${call.title}" [${w.id.slice(-6)}]`);
@@ -181,9 +211,12 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
     }
 
     case "close": {
-      bus.emit("window.closed", { windowId: call.windowId });
-      await closeWindow(call.windowId);
-      broadcast("s2c.window.closed", { windowId: call.windowId });
+      const windowId = call.windowId ?? ctx.windowId;
+      if (!windowId || !getWindow(windowId)?.isOpen) throw new Error("communication.closed");
+      bus.emit("window.closed", { windowId });
+      await closeWindow(windowId);
+      broadcast("s2c.window.closed", { windowId });
+      await recordStep("window.closed", { windowId });
       return;
     }
 

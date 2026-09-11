@@ -2,10 +2,12 @@ import type { NotificationKind } from "./notification.ts";
 import type { AppManifest } from "./app.ts";
 import type { VfsLocation } from "./vfs.ts";
 import type { WindowSize } from "./window.ts";
-import type { CommunicationCommand } from "./communication.ts";
+import type { CommunicationCommand, MessageData } from "./communication.ts";
 
 /** Calls the AI may request, interpreted by the backend SyscallInterpreter. */
 export type Syscall =
+  /** Omit data to explicitly retain shared state; supplied data replaces it at the render's revision. */
+  | { type: "app-state"; data?: MessageData }
   | { type: "communication"; command: CommunicationCommand }
   | { type: "resize-window"; size: WindowSize }
   | {
@@ -25,6 +27,7 @@ export type Syscall =
       title: string;
       /** What this window should show — fed to the AI as its first render. */
       prompt: string;
+      context?: MessageData;
       /** Optional: attribute it to an existing app; otherwise a transient one. */
       appId?: string;
       /** Optional preferred size. */
@@ -50,7 +53,8 @@ export type Syscall =
     }
   | {
       type: "close";
-      windowId: string;
+      /** Omit to close the window producing this call. */
+      windowId?: string;
     }
   | {
       /**

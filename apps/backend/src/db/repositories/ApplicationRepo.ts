@@ -2,6 +2,7 @@ import { persistApplicationAssets } from "./ApplicationPackageRepo.ts";
 import { existsSync, readFileSync, renameSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { createHash } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import {
   applicationDefinitionSchema,
   appDataWriteSchema,
@@ -191,6 +192,7 @@ export function setAppData(
     beforeWrite();
     const current = getAppData(appId);
     if (current.version !== next.version) throw new Error("applications.error.dataConflict");
+    if (isDeepStrictEqual(current.data, next.data)) return current;
     putData(appId, next.data, current.schemaVersion);
     return getAppData(appId);
   });

@@ -146,8 +146,9 @@ export function registerUiGenerationAgent(): void {
     const queue = deliveries.get(delivery.windowId) ?? [];
     if (
       delivery.kind === "event" &&
-      "system" in delivery.source &&
-      ["files.changed", "settings.changed", "apps.changed"].includes(delivery.topic)
+      (delivery.topic === "app.data.changed" ||
+        ("system" in delivery.source &&
+          ["files.changed", "settings.changed", "apps.changed"].includes(delivery.topic)))
     ) {
       const previous = queue.findIndex(
         (d) => d.kind === "event" && d.topic === delivery.topic && d.channel === delivery.channel,
@@ -209,6 +210,7 @@ async function generate(
   const definition = readApplicationVersion(app.id, win.appVersionId);
   if (definition) app = { ...app, manifest: { ...app.manifest, ...definition } };
   const sharedData = getAppData(app.id);
+  const opener = win.openerWindowId ? getWindow(win.openerWindowId) : null;
   if (definition && sharedData.schemaVersion !== definition.dataSchemaVersion)
     throw new Error("applications.error.schema");
   await ensureMemory(windowId, app.id);
@@ -254,8 +256,21 @@ async function generate(
   });
 
   const prompt = assemblePrompt({
+    stateChange:
+      trigger.message?.topic === "app.data.changed" && trace.interaction
+        ? {
+            windowId: trace.interaction.windowId,
+            operation: interactionInput(trace.interaction.windowId, trace.interaction.id),
+          }
+        : undefined,
     app,
     appData: sharedData,
+    window: win,
+    opener,
+    legacySourceHtml:
+      opener?.appId === app.id && Object.keys(Object(sharedData.data)).length === 0
+        ? getMemory(opener.id)?.htmlSnapshot
+        : undefined,
     memory,
     recent: recentInteractions(windowId),
     globalState: kernelState.snapshotForPrompt(),
@@ -280,9 +295,11 @@ async function generate(
     ? "first-render"
     : trigger.op
       ? `op:${trigger.op.kind}/${trigger.op.action ?? "?"}`
-      : trigger.drag
-        ? `drop:${trigger.drag.kind}`
-        : "?";
+      : trigger.message
+        ? `message:${trigger.message.topic}`
+        : trigger.drag
+          ? `drop:${trigger.drag.kind}`
+          : "?";
   log.info(
     `▶ ${app.name} [${windowId.slice(-6)}] ${reason} mode=${renderMode} (prompt ${prompt.length} chars)`,
   );
@@ -331,6 +348,11 @@ async function generate(
     const parsed = parseAiOutput(result.text, fullRequired ? "full" : undefined);
     let html: string | undefined;
     let regions = parsed.regions;
+    const readOnlyRefresh =
+      trigger.message?.kind === "event" &&
+      trigger.message.topic === "app.data.changed" &&
+      "appId" in trigger.message.source &&
+      trigger.message.source.appId === app.id;
     try {
       if (parsed.syscallError) throw new Error(parsed.syscallError);
       if (parsed.renderError) throw new Error(parsed.renderError);
@@ -339,8 +361,37 @@ async function generate(
         html = applyRegionsServer(snapshot, regions);
       } else if (parsed.html !== undefined) {
         html = parsed.html;
-      } else if (!parsed.syscalls.length) {
+      } else if (!parsed.syscalls.length && !(readOnlyRefresh && parsed.summary.trim())) {
         throw new Error("The model returned no UI or system action");
+      }
+      const stateCalls = parsed.syscalls.filter((call) => call.type === "app-state");
+      const needsState =
+        (!readOnlyRefresh && html !== undefined) ||
+        parsed.syscalls.some((call) => call.type === "notify" || call.type === "spawn-window");
+      if (stateCalls.length > 1 || (needsState && stateCalls.length !== 1))
+        throw new Error(
+          "Declare exactly one app-state call: provide the complete shared data for record changes, or omit data for a view-only change. A notification or completed-looking HTML does not persist application state.",
+        );
+      const explicitStateWrite = parsed.syscalls.some(
+        (call) =>
+          call.type === "communication" &&
+          call.command.action === "request" &&
+          "system" in call.command.target &&
+          call.command.target.system === "app-data" &&
+          call.command.topic === "set",
+      );
+      if (
+        readOnlyRefresh &&
+        (stateCalls.some((call) => call.data !== undefined) || explicitStateWrite)
+      )
+        throw new Error(
+          "app.data.changed only refreshes the view; use app-state without data and never repeat the mutation.",
+        );
+      if (stateCalls.some((call) => call.data !== undefined)) {
+        if (explicitStateWrite)
+          throw new Error(
+            "Use one state write: app-state or app-data set, never both in one response.",
+          );
       }
       if (html !== undefined) await parseSubscriptions(html);
     } catch (error) {
@@ -371,14 +422,34 @@ async function generate(
     if (!canCommit()) return;
     if (parsed.syscalls.length) {
       await messageContext.run({ ...trace, runId: result.runId }, () =>
-        Syscalls.execute(parsed.syscalls, {
-          windowId,
-          appId: app.id,
-          source: "syscall",
-          resizeFrom: firstRender ? win.rect : undefined,
-          canCommit: current,
-        }),
+        Syscalls.execute(
+          [
+            ...parsed.syscalls.filter((call) => call.type === "app-state"),
+            ...parsed.syscalls.filter((call) => call.type !== "app-state"),
+          ],
+          {
+            windowId,
+            appId: app.id,
+            source: "syscall",
+            resizeFrom: firstRender ? win.rect : undefined,
+            canCommit: current,
+            appDataVersion: sharedData.version,
+            launchData: trigger.op
+              ? { action: trigger.op.action ?? "", dataset: trigger.op.dataset ?? {} }
+              : undefined,
+          },
+        ),
       );
+    }
+    // A deliberate close succeeds even though closing cancels this window's renderer.
+    if (
+      !getWindow(windowId)?.isOpen &&
+      parsed.syscalls.some(
+        (call) => call.type === "close" && (call.windowId ?? windowId) === windowId,
+      )
+    ) {
+      await recordSummary(result.runId, parsed.summary || "Closed window");
+      return;
     }
     const canPublish = () =>
       current() && (settlesDelivery || !trigger.message || deliveryAlive(trigger.message));

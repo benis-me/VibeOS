@@ -107,6 +107,15 @@ describe("parseAiOutput", () => {
     expect(out.html).toContain("<header>bar</header>");
   });
 
+  test("complete region replacements tolerate orphan closing wrappers without a model repair", () => {
+    const status = '<div data-vibeos-region="status">Done</div>';
+    const actions = '<section data-vibeos-region="actions"><button>Undo</button></section>';
+    const parsed = parseAiOutput(`<vibeos-html mode="regions">${status}</div>\n${actions}</vibeos-html>`);
+    expect(parsed.renderError).toBeUndefined();
+    expect(parsed.regions).toEqual([{ region: "status", html: status }, { region: "actions", html: actions }]);
+    expect(parseAiOutput(`<vibeos-html mode="regions">${status}<div>missing region</div>${actions}</vibeos-html>`).renderError).toBeDefined();
+  });
+
   test("malformed syscall entries reject the entire batch before UI or actions commit", () => {
     const out = parseAiOutput(
       `<vibeos-html><div>z</div></vibeos-html>

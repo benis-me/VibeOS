@@ -179,6 +179,7 @@ function sourceOrSystem(windowId: string): MessageSource {
 async function resolveTarget(
   target: Exclude<MessageTarget, { system: string }>,
   mode: "data" | "ai",
+  openerWindowId?: string,
 ): Promise<string> {
   if ("windowId" in target) {
     sourceFor(target.windowId);
@@ -202,6 +203,7 @@ async function resolveTarget(
   const launch = async () => {
     const window = await openWindow({
       appId: app.id,
+      openerWindowId,
       title: app.name,
       kind: app.presetId ? "system" : "app",
       size: app.manifest.defaultSize,
@@ -246,7 +248,8 @@ async function systemCall(
       version: snapshot.version,
       previousVersion: typeof args.version === "string" ? args.version : undefined,
     });
-    if (topic === "set") broadcast("s2c.appData.changed", snapshot);
+    if (topic === "set" && snapshot.version !== args.version)
+      broadcast("s2c.appData.changed", snapshot);
     return JSON.parse(JSON.stringify(snapshot));
   }
   if (system === "files") {
@@ -435,7 +438,7 @@ export async function communicate(
   }
   try {
     if (!("system" in command.target))
-      targetWindow = await resolveTarget(command.target, command.mode);
+      targetWindow = await resolveTarget(command.target, command.mode, windowId);
     sourceFor(windowId);
     request.windowId = targetWindow;
     request.trace = nextTrace(request.trace, source, targetWindow || undefined);
@@ -552,7 +555,7 @@ function publish(topic: string, data: MessageData, source: MessageSource, trace?
 }
 async function eventDelivery(
   windowId: string,
-  sub: AppSubscription,
+  sub: AppSubscription | undefined,
   topic: string,
   data: MessageData,
   source: MessageSource,
@@ -560,16 +563,17 @@ async function eventDelivery(
 ) {
   if (
     !getWindow(windowId)?.isOpen ||
-    !listSubscriptions().some(
-      (s) =>
-        s.windowId === windowId &&
-        s.subscription.id === sub.id &&
-        JSON.stringify(s.subscription) === JSON.stringify(sub),
-    )
+    (sub &&
+      !listSubscriptions().some(
+        (s) =>
+          s.windowId === windowId &&
+          s.subscription.id === sub.id &&
+          JSON.stringify(s.subscription) === JSON.stringify(sub),
+      ))
   )
     return;
   let error: string | undefined;
-  if (sub.refresh) {
+  if (sub?.refresh) {
     try {
       data = messageDataSchema.parse(await executeFileCommand(sub.refresh));
     } catch (e) {
@@ -582,15 +586,15 @@ async function eventDelivery(
     windowId,
     source,
     kind: "event",
-    subscriptionId: sub.id,
+    subscriptionId: sub?.id,
     topic,
     data,
     error,
-    channel: sub.channel ?? sub.id,
-    mode: sub.mode,
+    channel: sub?.channel ?? sub?.id,
+    mode: sub?.mode ?? "ai",
     expiresAt: Date.now() + MESSAGE_TIMEOUT,
     trace:
-      sub.mode === "ai"
+      sub?.mode !== "data"
         ? nextTrace(trace ? { ...trace, requests: [] } : undefined, source, windowId)
         : (trace ?? { id: ulid(), hops: 0, windows: [] }),
   });
@@ -615,16 +619,51 @@ function refreshAppData(windowId: string) {
 function observe(message: ServerToClient, trace?: MessageTrace) {
   const source: MessageSource = { system: true };
   switch (message.type) {
-    case "s2c.appData.changed":
-      for (const window of listOpenWindows())
-        if (window.appId === message.payload.appId) refreshAppData(window.id);
+    case "s2c.appData.changed": {
+      const appId = message.payload.appId;
+      const app = getApp(appId);
+      const subscriptions = listSubscriptions();
+      // A persisted state refresh is not a request continuation. The upstream
+      // sender also needs the result; only the actual writer is already rendering it.
+      const refreshTrace = trace
+        ? { ...trace, windows: trace.windows.slice(-1), requests: [] }
+        : undefined;
+      for (const window of listOpenWindows()) {
+        if (window.appId !== appId) continue;
+        refreshAppData(window.id);
+        // Shared application state is a runtime relationship. Legacy generated views
+        // participate without needing to have invented their own subscriptions.
+        if (
+          refreshTrace?.windows.includes(window.id) ||
+          (app?.presetId && NATIVE_PRESET_APPS.includes(app.presetId)) ||
+          !getMemory(window.id)?.htmlSnapshot.trim()
+        )
+          continue;
+        const declared = subscriptions.some(
+          ({ windowId, subscription: sub }) =>
+            windowId === window.id &&
+            sub.topic === "app.data.changed" &&
+            "appId" in sub.source &&
+            ["self", appId].includes(sub.source.appId),
+        );
+        if (!declared)
+          void eventDelivery(
+            window.id,
+            undefined,
+            "app.data.changed",
+            JSON.parse(JSON.stringify(message.payload)),
+            { appId, windowId: refreshTrace?.windows[0] ?? "system" },
+            refreshTrace,
+          ).catch((error) => console.warn("[communication] app state refresh failed", error));
+      }
       publish(
         "app.data.changed",
         JSON.parse(JSON.stringify(message.payload)),
-        { appId: message.payload.appId, windowId: "system" },
-        trace,
+        { appId, windowId: refreshTrace?.windows[0] ?? "system" },
+        refreshTrace,
       );
       break;
+    }
     case "s2c.apps.changed":
       publish("apps.changed", {}, source, trace);
       break;

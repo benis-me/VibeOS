@@ -131,12 +131,22 @@ This environment injects a broken `NODE_OPTIONS` preload that crashes any
 - **Context menus** (`components/contextmenu/`): OS right-click. `openContextMenu`
   feeds a per-location menu (`menus.tsx`); panels are skin-styled via `.vibe-menu*`
   and submenus use a safety-triangle hover. Don't trigger native browser menus.
-- **Syscalls** (`syscall/SyscallInterpreter.ts`): `notify`, `open`,
+- **Syscalls** (`syscall/SyscallInterpreter.ts`): `app-state`, `notify`, `open`,
   `spawn-window`, `install`, `create-file`, `focus`, `close`.
   `communication` routes validated send/request/reply and event subscriptions through
   `events/communication.ts`; see `docs/communication.md`. App identity and causal
   traces come from the runtime. Keep FIFO message handling separate from interactive
   latest-wins generation, and propagate cancellation through read/write continuations.
+  Generated HTML/notify/spawn responses declare one `app-state`: complete changed JSON
+  or no data to keep state. Commit with the captured revision before other calls/UI.
+  Read-only `app.data.changed` refreshes may omit it; an already-current view may
+  return only a summary without triggering a full repair.
+  Same-app peers refresh automatically with the initiating action and canonical data;
+  explicit `app.data.changed` subscriptions override this default. Refreshes never
+  repeat state writes; unchanged JSON creates no revision/event. Spawned windows retain
+  opener, purpose and record context. `close` without an ID closes the current window;
+  completing a task does not force closure. Old visible records initialize shared data
+  on interaction without discarding other records or their stable IDs.
   Data deliveries bind literal text without model calls; never insert message data
   as HTML or run generated scripts. Declared subscriptions persist with validated
   snapshots; closing windows removes subscriptions and cancels related requests.

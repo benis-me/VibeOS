@@ -195,7 +195,10 @@ export function extractRegionSpans(
 }
 
 function isOnlyRegions(html: string, regions: { start: number; end: number }[]): boolean {
-  const trivia = (text: string) => !text.replace(/<!--[\s\S]*?-->/g, "").trim();
+  // Replacements are complete, independent elements. Stray closing tags between
+  // them cannot close anything inside a replacement; discard this wrapper noise.
+  const trivia = (text: string) =>
+    !text.replace(/<!--[\s\S]*?-->|<\/[a-z][a-z0-9:-]*\s*>/gi, "").trim();
   let end = 0;
   for (const region of regions) {
     if (!trivia(html.slice(end, region.start))) return false;
