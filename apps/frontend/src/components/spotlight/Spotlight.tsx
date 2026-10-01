@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState, Fragment } from "react";
+import { useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Search, Loader2, LayoutGrid, AppWindow, Sparkles, ChevronRight } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
-import type { AppSearchResult } from "@vibeos/shared";
+import type { AppDescriptor, AppSearchResult, WindowState } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
 import { ulid } from "@vibeos/shared/util";
-import { useT } from "@/lib/i18n";
+import { translate, useLocale, useT } from "@/lib/i18n";
+import { isComposing } from "@/lib/fields";
 import { usePopoverMotion, useOverlayMotion } from "@/lib/motion";
+import { useAppStore } from "@/stores/appStore";
+import { useWindowStore } from "@/stores/windowStore";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -16,17 +19,28 @@ interface Props {
   initialQuery?: string;
 }
 
-/** Mac-Spotlight-style AI app search. */
+interface LocalMatch {
+  app: AppDescriptor;
+  /** Its frontmost open window: switching to it beats opening another. */
+  win: WindowState | undefined;
+}
+
+/**
+ * Mac-Spotlight-style launcher, local first: existing apps match instantly, then
+ * "generate this" launches the description right away; AI ideas load below.
+ */
 export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<AppSearchResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [active, setActive] = useState(0);
+  // AI ideas and the highlighted row remember the query they belong to, so a
+  // keystroke that changes the query drops both within the same render.
+  const [ideas, setIdeas] = useState({ q: "", list: [] as AppSearchResult[], failed: false });
+  const [selected, setSelected] = useState({ q: "", index: 0 });
   const [running, setRunning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const reqId = useRef<string>("");
+  const request = useRef({ id: "", q: "" });
   const cmdReqId = useRef<string>("");
-  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const appMap = useAppStore((s) => s.apps);
+  const locale = useLocale();
   const t = useT();
 
   // A leading ">" switches from app search to AI command mode (Raycast/VS Code
@@ -34,13 +48,44 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
   // executes against the system.
   const isCommand = query.trimStart().startsWith(">");
   const commandText = query.replace(/^\s*>\s*/, "");
+  const q = isCommand ? "" : query.trim();
+
+  // Installed apps (plus unsaved ones still open) whose name contains the query.
+  // Windows are read, not subscribed: dragging a window must not re-render this.
+  const local = useMemo<LocalMatch[]>(() => {
+    const needle = q.toLowerCase();
+    if (!needle) return [];
+    const windows = Object.values(useWindowStore.getState().windows).sort((a, b) => b.z - a.z);
+    return Object.values(appMap)
+      .flatMap((app) => {
+        const win = windows.find((w) => w.appId === app.id);
+        if (app.id === "__transient__" || !(app.isInstalled || win)) return [];
+        const names = [
+          app.name,
+          app.presetId ? translate(locale, `preset.${app.presetId}`) : "",
+        ].map((name) => name.toLowerCase());
+        const rank = names.some((name) => name.startsWith(needle))
+          ? 0
+          : names.some((name) => name.includes(needle))
+            ? 1
+            : -1;
+        return rank < 0 ? [] : [{ app, win, rank }];
+      })
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, 5);
+  }, [q, appMap, locale]);
+  const results = ideas.q === q ? ideas.list : [];
+  const failed = ideas.q === q && ideas.failed;
+  const loading = q.length >= 2 && ideas.q !== q;
+  const active = selected.q === q ? selected.index : 0;
+  const setActive = (index: number) => setSelected({ q, index });
+  // Row order: local matches, the generate row, then AI ideas.
+  const ideasFrom = local.length + 1;
 
   // Focus the box and reset when opened, seeding any prefilled query.
   useEffect(() => {
     if (open) {
       setQuery(initialQuery);
-      setResults([]);
-      setActive(0);
       setRunning(false);
       setTimeout(() => inputRef.current?.focus(), 30);
     }
@@ -58,59 +103,53 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
     [onClose],
   );
 
-  // Receive search results that match our latest request.
+  // AI ideas for our latest request. Rows above them keep their places.
   useEffect(() => {
     return wsClient.on("s2c.app.searchResults", (p) => {
-      if (p.requestId !== reqId.current) return;
+      if (p.requestId !== request.current.id) return;
       // Group by type for sectioned display: apps first, then widgets (sort is
       // stable, so the model's order within each group is preserved).
-      const sorted = [...p.results].sort(
+      const list = [...p.results].sort(
         (a, b) => (a.kind === "widget" ? 1 : 0) - (b.kind === "widget" ? 1 : 0),
       );
-      setResults(sorted);
-      setActive(0);
-      setLoading(false);
+      setIdeas({ q: request.current.q, list, failed: !!p.error });
     });
   }, []);
 
-  // Debounced search as the user types.
+  // Debounced AI ideas for the current query.
   useEffect(() => {
-    if (!open) return;
-    if (debounce.current) clearTimeout(debounce.current);
-    // Command mode does its own thing (run on Enter) — no app search.
-    if (isCommand) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-    const q = query.trim();
-    if (q.length < 2) {
-      setResults([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    debounce.current = setTimeout(() => {
-      const id = ulid();
-      reqId.current = id;
-      wsClient.send("c2s.app.search", { query: q, requestId: id });
+    if (!open || q.length < 2) return;
+    const timer = setTimeout(() => {
+      request.current = { id: ulid(), q };
+      wsClient.send("c2s.app.search", { query: q, requestId: request.current.id });
     }, 350);
-    return () => {
-      if (debounce.current) clearTimeout(debounce.current);
-    };
-  }, [query, open]);
+    return () => clearTimeout(timer);
+  }, [q, open]);
 
   const overlay = useOverlayMotion();
   const panel = usePopoverMotion();
 
-  const launch = (r: AppSearchResult, asWidget = false) => {
-    wsClient.send("c2s.app.launch", {
-      name: r.name,
-      description: r.description,
-      icon: r.icon,
-      widget: asWidget,
-      size: r.defaultSize,
-    });
+  const run = (i: number) => {
+    const match = local[i];
+    const idea = results[i - ideasFrom];
+    if (match?.win) wsClient.send("c2s.window.focus", { windowId: match.win.id });
+    else if (match) wsClient.send("c2s.window.open", { appId: match.app.id });
+    else if (i === local.length)
+      // Generate straight from the description, without waiting for AI ideas.
+      wsClient.send("c2s.app.launch", {
+        name: q.slice(0, 40),
+        description: q.length > 40 ? q : undefined,
+      });
+    else if (idea)
+      // Each idea launches in the form the model assigned it — no toggling.
+      wsClient.send("c2s.app.launch", {
+        name: idea.name,
+        description: idea.description,
+        icon: idea.icon,
+        widget: idea.kind === "widget",
+        size: idea.defaultSize,
+      });
+    else return;
     onClose();
   };
 
@@ -124,6 +163,8 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    // While an IME composes (pinyin), Enter/Escape belong to it.
+    if (isComposing(e.nativeEvent)) return;
     if (e.key === "Escape") return onClose();
     if (isCommand) {
       if (e.key === "Enter") {
@@ -132,17 +173,16 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
       }
       return;
     }
+    if (!q) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((a) => Math.min(a + 1, results.length - 1));
+      setActive(Math.min(active + 1, ideasFrom + results.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((a) => Math.max(a - 1, 0));
+      setActive(Math.max(active - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const r = results[active];
-      // Each result launches in the form the model assigned it — no toggling.
-      if (r) launch(r, r.kind === "widget");
+      run(active);
     }
   };
 
@@ -160,7 +200,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
             onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 px-4">
-              {loading || running ? (
+              {running ? (
                 <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" />
               ) : isCommand ? (
                 <ChevronRight className="size-5 shrink-0 text-brand" />
@@ -206,51 +246,68 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
               </div>
             )}
 
-            {!isCommand && results.length > 0 && (
+            {q && (
               <div className="max-h-80 overflow-auto border-t p-1.5">
-                {results.map((r, i) => {
+                {local.length > 0 && <Heading icon={AppWindow} label={t("spotlight.local")} />}
+                {local.map(({ app, win }, i) => (
+                  <Row
+                    key={app.id}
+                    active={i === active}
+                    onHover={() => setActive(i)}
+                    onClick={() => run(i)}
+                    icon={
+                      <AppIcon
+                        name={app.icon}
+                        presetId={app.presetId}
+                        label={app.name}
+                        className="size-6"
+                      />
+                    }
+                    title={app.name}
+                    detail={app.manifest.description === app.name ? "" : app.manifest.description}
+                    badge={win ? t("spotlight.opened") : ""}
+                  />
+                ))}
+                <Row
+                  active={active === local.length}
+                  onHover={() => setActive(local.length)}
+                  onClick={() => run(local.length)}
+                  icon={
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">
+                      <Sparkles className="size-3.5" />
+                    </span>
+                  }
+                  title={q}
+                  detail={t("spotlight.generate")}
+                />
+                {results.map((r, j) => {
                   const isWidget = r.kind === "widget";
-                  // results are sorted by kind, so a header shows at each boundary.
-                  const showHeader = i === 0 || results[i - 1]?.kind !== r.kind;
                   return (
-                    <Fragment key={`${r.name}-${i}`}>
-                      {showHeader && (
-                        <div className="flex items-center gap-1.5 px-3 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground">
-                          {isWidget ? (
-                            <LayoutGrid className="size-3" />
-                          ) : (
-                            <AppWindow className="size-3" />
-                          )}
-                          {isWidget ? t("spotlight.kindWidget") : t("spotlight.kindApp")}
-                        </div>
+                    <Fragment key={`${r.name}-${j}`}>
+                      {/* results are sorted by kind, so a header shows at each boundary. */}
+                      {results[j - 1]?.kind !== r.kind && (
+                        <Heading
+                          icon={isWidget ? LayoutGrid : AppWindow}
+                          label={isWidget ? t("spotlight.kindWidget") : t("spotlight.kindApp")}
+                        />
                       )}
-                      <button
-                        onPointerEnter={() => setActive(i)}
-                        onClick={() => launch(r, isWidget)}
-                        className={cn(
-                          "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
-                          i === active ? "bg-accent" : "hover:bg-accent/60",
-                        )}
-                      >
-                        <AppIcon name={r.icon} label={r.name} className="size-6" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{r.name}</span>
-                          {r.description && (
-                            <span className="block truncate text-xs text-muted-foreground">
-                              {r.description}
-                            </span>
-                          )}
-                        </span>
-                      </button>
+                      <Row
+                        active={ideasFrom + j === active}
+                        onHover={() => setActive(ideasFrom + j)}
+                        onClick={() => run(ideasFrom + j)}
+                        icon={<AppIcon name={r.icon} label={r.name} className="size-6" />}
+                        title={r.name}
+                        detail={r.description}
+                      />
                     </Fragment>
                   );
                 })}
-              </div>
-            )}
-
-            {!isCommand && query.trim().length >= 2 && !loading && results.length === 0 && (
-              <div className="border-t px-4 py-6 text-center text-sm text-muted-foreground">
-                {t("spotlight.noResults")}
+                {(loading || failed) && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground">
+                    {loading && <Loader2 className="size-3.5 animate-spin" />}
+                    {loading ? t("spotlight.thinking") : t("spotlight.searchFailed")}
+                  </div>
+                )}
               </div>
             )}
 
@@ -264,5 +321,47 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function Heading({ icon: Icon, label }: { icon: typeof AppWindow; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 px-3 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground">
+      <Icon className="size-3" />
+      {label}
+    </div>
+  );
+}
+
+function Row(props: {
+  active: boolean;
+  onHover: () => void;
+  onClick: () => void;
+  icon: ReactNode;
+  title: string;
+  detail?: string;
+  badge?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onPointerEnter={props.onHover}
+      onClick={props.onClick}
+      className={cn(
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+        props.active ? "bg-accent" : "hover:bg-accent/60",
+      )}
+    >
+      {props.icon}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{props.title}</span>
+        {props.detail && (
+          <span className="block truncate text-xs text-muted-foreground">{props.detail}</span>
+        )}
+      </span>
+      {props.badge && (
+        <span className="shrink-0 text-[11px] text-muted-foreground">{props.badge}</span>
+      )}
+    </button>
   );
 }

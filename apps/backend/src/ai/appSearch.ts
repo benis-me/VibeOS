@@ -101,6 +101,7 @@ export async function searchApps(
   });
   // Superseded by a newer query: drop silently (the client already ignores it).
   if (abort?.signal.aborted) return [];
+  if (!result.ok) throw new Error(result.error ?? "Generation failed");
   const parsed = parseAppSearchResults(result.text);
   await recordSummary(result.runId, `"${query}" → ${parsed.length} results`);
   log.info(`"${query}" → ${parsed.length} results in ${(performance.now() - t0).toFixed(0)}ms`);
@@ -133,7 +134,8 @@ export function parseAppSearchResults(text: string): AppSearchResult[] {
       .filter((r): r is AppSearchResult => r !== null)
       .slice(0, 8);
   } catch {
-    log.warn("could not parse search results");
-    return [];
+    // Malformed model output is a failure, not "no results".
+    log.warn("could not parse search results", text.slice(0, 300));
+    throw new Error("app-search.unparseable");
   }
 }

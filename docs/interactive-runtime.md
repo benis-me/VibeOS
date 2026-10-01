@@ -2,7 +2,7 @@
 
 VibeOS still generates application behavior with AI. A small prepared UI layer makes likely navigation immediate; optional isolated JavaScript handles continuous presentation such as clocks, Canvas and animation. Semantic actions continue through the existing AI agent and real system services.
 
-In **Applications**, select **Next version → Interactive** and describe the change. Successful generation creates and activates a new immutable version. Existing windows retain their pinned version; **Open with new version** opens another window alongside them. Classic versions support prepared controls and CSS, but never execute generated scripts. Existing installations default to Classic. Selecting an old version rolls back future launches without changing open windows or shared data.
+In **Applications**, select **Next version → Interactive** and describe the change. Successful generation creates and activates a new immutable version. Existing windows retain their pinned version; **Open with new version** opens another window alongside them. Classic versions support prepared controls and CSS, but never execute generated scripts. Existing installations default to Classic; new experiences launched from Spotlight, the command palette or Welcome start as Interactive. Selecting an old version rolls back future launches without changing open windows or shared data.
 
 Preparation happens in the same generation, with a few useful tabs/details rather than speculative background model calls. Prepared controls never execute system calls or mutate shared application data.
 
@@ -62,7 +62,7 @@ Each block is a function body receiving `vibe` and `root`, where `root` is its c
 | `vibe.interval`, `vibe.timeout`, `vibe.frame` | Tracked resources, paused while minimized/hidden and cleaned on replacement; frame is one-shot |
 | `vibe.onUpdate(handler)` | Reconcile after a DOM patch |
 | `vibe.onData(handler)` | Receive actual data-mode deliveries, including `appData` |
-| `vibe.act(action, data?)` | Ask the existing AI agent to handle an action, with actual fields and view state |
+| `vibe.act(action, data?)` | Ask the existing AI agent to handle an action, with actual fields and view state. Only right after a user action and one request at a time; refused calls report a runtime error |
 | `vibe.command(command)` | Promise of an actual result through the existing communication protocol |
 | `vibe.signal` | Abort signal for manually registered resources |
 | Returned function | Optional cleanup when the script's owning region is replaced or closed |

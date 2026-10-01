@@ -8,6 +8,8 @@ export const fieldKey = (field: Field): string =>
   (field.id ? `#${field.id}` : "");
 export const fieldValue = (field: Field): string =>
   /^(checkbox|radio)$/.test(field.type) ? String((field as HTMLInputElement).checked) : field.value;
+/** An IME (e.g. pinyin) owns this key; Safari reports that only as keyCode 229. */
+export const isComposing = (e: KeyboardEvent): boolean => e.isComposing || e.keyCode === 229;
 
 type Draft = {
   value: string;

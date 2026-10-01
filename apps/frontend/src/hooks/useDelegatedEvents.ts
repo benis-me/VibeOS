@@ -1,7 +1,7 @@
 import { useEffect, type RefObject } from "react";
 import type { AiOp } from "@vibeos/shared/protocol";
 import { ulid } from "@vibeos/shared/util";
-import { fieldKey, fieldValue, type Field, type createDrafts } from "@/lib/fields";
+import { fieldKey, fieldValue, isComposing, type Field, type createDrafts } from "@/lib/fields";
 
 function collectDataset(el: HTMLElement): Record<string, string> {
   const out: Record<string, string> = Object.create(null);
@@ -332,7 +332,7 @@ export function installDelegatedEvents(
     }
     if (target.tagName !== "INPUT") return;
     // Enter on a free-text input = commit (forms handle their own submit).
-    if (e.key !== "Enter" || target.form) return;
+    if (e.key !== "Enter" || target.form || isComposing(e)) return;
     e.preventDefault();
     emit(target, {
       kind: "key",

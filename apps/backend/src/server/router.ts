@@ -373,9 +373,18 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
       appSearchAborts.get(ws)?.abort();
       const ctrl = new AbortController();
       appSearchAborts.set(ws, ctrl);
-      const results = await searchApps(msg.payload.query, ctrl);
-      if (ctrl.signal.aborted) return; // superseded — a newer search took over
-      sendTo(ws, "s2c.app.searchResults", { requestId: msg.payload.requestId, results });
+      try {
+        const results = await searchApps(msg.payload.query, ctrl);
+        if (ctrl.signal.aborted) return; // superseded — a newer search took over
+        sendTo(ws, "s2c.app.searchResults", { requestId: msg.payload.requestId, results });
+      } catch (e) {
+        if (ctrl.signal.aborted) return;
+        sendTo(ws, "s2c.app.searchResults", {
+          requestId: msg.payload.requestId,
+          results: [],
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
       return;
     }
 

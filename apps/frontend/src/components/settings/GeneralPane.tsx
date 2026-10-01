@@ -5,6 +5,7 @@ import type { Locale, Skin } from "@vibeos/shared";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { wsClient, API_BASE } from "@/lib/ws";
 import { fileToWallpaperDataUrl } from "@/lib/image";
+import { isComposing } from "@/lib/fields";
 import { useT, useLocale } from "@/lib/i18n";
 import { Pane, GroupLabel, Group, Row, Select, Segmented, Switch } from "./primitives";
 
@@ -206,7 +207,7 @@ function WallpaperRow() {
             <input
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && onGenerate()}
+              onKeyDown={(e) => e.key === "Enter" && !isComposing(e.nativeEvent) && onGenerate()}
               disabled={!imageOn || !!busy}
               placeholder={t("settings.wallpaper.promptPlaceholder")}
               className="vibe-input min-w-0 flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"

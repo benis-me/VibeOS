@@ -29,6 +29,8 @@ export async function handleAppLaunch(p: ClientToServerPayload<"c2s.app.launch">
     icon: p.icon,
     isInstalled: false,
     manifest: {
+      // New experiences start interactive so local behavior works on first open.
+      runtime: "interactive",
       description: p.description ?? p.name,
       instructions: p.description ?? p.name,
       defaultSize: p.size,

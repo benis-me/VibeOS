@@ -135,7 +135,8 @@ export type ServerToClient =
   | { type: "s2c.provider.models"; payload: { providerId: ProviderId; models: ProviderModel[] } }
   | {
       type: "s2c.app.searchResults";
-      payload: { requestId: string; results: AppSearchResult[] };
+      /** error: the search model failed (empty results are not a failure). */
+      payload: { requestId: string; results: AppSearchResult[]; error?: string };
     }
   /** Result of an AI command-palette command: how many syscalls ran. */
   | {

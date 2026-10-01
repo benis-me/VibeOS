@@ -31,6 +31,7 @@ let currentDataVersion: string | undefined;
 let visible = true;
 let windowId = "";
 let busy = false;
+let lastAct = 0;
 let sequence = 0;
 const drafts = createDrafts();
 const stopImageRetries = installImageRetries(root);
@@ -128,15 +129,23 @@ function api(scope: Scope) {
       if (alive()) setState({ ...state, ...viewStateSchema.parse(patch) });
     },
     act: (action: string, data?: MessageData) => {
-      if (alive())
-        act(
-          {
-            kind: "custom",
-            action,
-            value: data === undefined ? undefined : JSON.stringify(data),
-          },
-          scope.node,
+      if (!alive()) return;
+      // Each act is a paid model generation: only right after a user action,
+      // one at a time, so a loop/timer/onUpdate cannot keep regenerating.
+      const now = Date.now();
+      if (!navigator.userActivation?.isActive || busy || now - lastAct < 1000)
+        return report(
+          "vibe.act runs only right after a user action (click, key, submit), one request at a time. Never call it from timers, animation frames, onUpdate, onData or game loops.",
         );
+      lastAct = now;
+      act(
+        {
+          kind: "custom",
+          action,
+          value: data === undefined ? undefined : JSON.stringify(data),
+        },
+        scope.node,
+      );
     },
     command: (input: unknown) => command(input, scope),
     on: (event: string, selector: string, handler: (e: Event, target: Element) => void) => {

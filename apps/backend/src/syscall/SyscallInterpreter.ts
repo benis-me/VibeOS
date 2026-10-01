@@ -165,7 +165,7 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
         const app = await AppRepo.installApp({
           name: call.title,
           isInstalled: false,
-          manifest: { description: call.prompt, instructions: call.prompt },
+          manifest: { runtime: "interactive", description: call.prompt, instructions: call.prompt },
         });
         appId = app.id;
         broadcast("s2c.syscall.appInstalled", { app });

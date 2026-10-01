@@ -102,9 +102,10 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   (the control's region followed by its ancestors) as model context.
 - **Interactive versions**: see `docs/interactive-runtime.md`. Existing/unspecified definitions
   remain `runtime: html`; only a new `interactive` app version enables inert
-  `application/vibeos` scripts. Preserve window version pinning and the real AI/data/services
-  paths. `data-vibeos-local` prepares navigation/filtering in the same generation; prepared
-  record content uses `data-vibeos-prefetch` and falls back to AI if its data revision is stale.
+  `application/vibeos` scripts. Spotlight launches and command-palette `spawn-window` drafts
+  start interactive. Script `vibe.act` requires user activation and no in-flight request.
+  Preserve window version pinning and the real AI/data/services paths. `data-vibeos-local`
+  prepares navigation/filtering in the same generation; prepared record content uses `data-vibeos-prefetch` and falls back to AI if its data revision is stale.
   Script scopes follow regions: dispose changed owners, preserve unaffected ones, never mount
   during streaming. Keep local view state separate from app data and pass it to subsequent AI
   turns. The frame has no host credentials, WebSocket client or store; use the validated
