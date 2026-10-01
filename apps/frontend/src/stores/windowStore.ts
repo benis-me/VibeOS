@@ -10,13 +10,18 @@ interface WindowStoreState {
   patches: Record<string, UiPatchPayload>;
   /** Windows currently waiting on an AI response. */
   busy: Record<string, boolean>;
+  /** The running generation: when it started and its latest progress line. */
+  progress: Record<string, { since: number; status?: string }>;
+  /** Why the last generation left the window unfinished (an i18n key). */
+  failed: Record<string, string>;
   setAll: (windows: WindowState[], snapshots: Record<string, string>) => void;
   upsert: (w: WindowState) => void;
   remove: (id: string) => void;
   reorder: (ids: string[]) => void;
   focus: (id: string) => void;
   applyPatch: (patch: UiPatchPayload) => void;
-  setBusy: (id: string, busy: boolean) => void;
+  setBusy: (id: string, busy: boolean, status?: string) => void;
+  setFailed: (id: string, reason?: string) => void;
 }
 
 export const useWindowStore = create<WindowStoreState>((set) => ({
@@ -24,6 +29,8 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
   snapshots: {},
   patches: {},
   busy: {},
+  progress: {},
+  failed: {},
   setAll: (windows, snapshots) =>
     set(() => {
       const map: Record<string, WindowState> = {};
@@ -45,11 +52,15 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
       const snapshots = { ...s.snapshots };
       const patches = { ...s.patches };
       const busy = { ...s.busy };
+      const progress = { ...s.progress };
+      const failed = { ...s.failed };
       delete windows[id];
       delete snapshots[id];
       delete patches[id];
       delete busy[id];
-      return { windows, snapshots, patches, busy };
+      delete progress[id];
+      delete failed[id];
+      return { windows, snapshots, patches, busy, progress, failed };
     }),
   focus: (id) =>
     set((s) => {
@@ -96,5 +107,23 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
       },
       patches: { ...s.patches, [patch.windowId]: patch },
     })),
-  setBusy: (id, busy) => set((s) => ({ busy: { ...s.busy, [id]: busy } })),
+  setBusy: (id, busy, status) =>
+    set((s) => {
+      const progress = { ...s.progress };
+      const failed = { ...s.failed };
+      if (!busy) delete progress[id];
+      else if (!s.busy[id]) {
+        // A new generation starts: restart the clock and drop the last failure.
+        progress[id] = { since: Date.now(), status };
+        delete failed[id];
+      } else if (status) progress[id] = { since: progress[id]?.since ?? Date.now(), status };
+      return { busy: { ...s.busy, [id]: busy }, progress, failed };
+    }),
+  setFailed: (id, reason) =>
+    set((s) => {
+      const failed = { ...s.failed };
+      if (reason) failed[id] = reason;
+      else delete failed[id];
+      return { failed };
+    }),
 }));

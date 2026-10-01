@@ -134,9 +134,7 @@ function api(scope: Scope) {
       // one at a time, so a loop/timer/onUpdate cannot keep regenerating.
       const now = Date.now();
       if (!navigator.userActivation?.isActive || busy || now - lastAct < 1000)
-        return report(
-          "vibe.act runs only right after a user action (click, key, submit), one request at a time. Never call it from timers, animation frames, onUpdate, onData or game loops.",
-        );
+        return report("runtime.error.act");
       lastAct = now;
       act(
         {

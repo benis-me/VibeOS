@@ -11,6 +11,7 @@ import { useT } from "@/lib/i18n";
 import { requestSpotlight } from "@/lib/uiEvents";
 import { wsClient } from "@/lib/ws";
 import { useWindowStore } from "@/stores/windowStore";
+import { useConnectionStore } from "@/stores/connectionStore";
 
 /** Fixed content column width; the height fits the content (see below). */
 const CONTENT_WIDTH = 460;
@@ -34,6 +35,7 @@ const EXAMPLES = [
 export function WelcomeApp({ windowId }: { windowId: string }) {
   const t = useT();
   const bodyRef = useRef<HTMLDivElement>(null);
+  const noProvider = useConnectionStore((s) => s.availableProviders.length === 0);
 
   // Center on screen and fit the window to its content the moment it opens
   // (useLayoutEffect runs before paint, so there's no resize flash).
@@ -60,30 +62,45 @@ export function WelcomeApp({ windowId }: { windowId: string }) {
       </div>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{t("welcome.subtitle")}</p>
 
-      <div className="mt-7 text-[11px] font-medium text-muted-foreground">
-        {t("welcome.tryThese")}
-      </div>
-      <div className="mt-2 flex flex-col gap-1.5">
-        {EXAMPLES.map(({ key, Icon }) => {
-          const text = t(key);
-          return (
-            <button
-              key={key}
-              onClick={() => requestSpotlight(`> ${text}`)}
-              className="group flex items-center gap-2.5 rounded-lg border bg-card px-3 py-3 text-left text-sm transition-colors hover:bg-accent"
-            >
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">
-                <Icon weight="duotone" className="size-3.5" />
-              </span>
-              <span className="flex-1 truncate">{text}</span>
-              <CaretRight
-                weight="bold"
-                className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-              />
-            </button>
-          );
-        })}
-      </div>
+      {noProvider ? (
+        // Every example needs a model: point a first-time user at Settings instead.
+        <div role="status" className="mt-7 rounded-lg border bg-card px-3 py-3 text-sm">
+          <p className="text-muted-foreground">{t("welcome.noProvider")}</p>
+          <button
+            onClick={() => wsClient.send("c2s.window.open", { appId: "settings" })}
+            className="mt-2.5 rounded-lg border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+          >
+            {t("settings.open")}
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="mt-7 text-[11px] font-medium text-muted-foreground">
+            {t("welcome.tryThese")}
+          </div>
+          <div className="mt-2 flex flex-col gap-1.5">
+            {EXAMPLES.map(({ key, Icon }) => {
+              const text = t(key);
+              return (
+                <button
+                  key={key}
+                  onClick={() => requestSpotlight(`> ${text}`)}
+                  className="group flex items-center gap-2.5 rounded-lg border bg-card px-3 py-3 text-left text-sm transition-colors hover:bg-accent"
+                >
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">
+                    <Icon weight="duotone" className="size-3.5" />
+                  </span>
+                  <span className="flex-1 truncate">{text}</span>
+                  <CaretRight
+                    weight="bold"
+                    className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       <button
         onClick={() => requestSpotlight()}

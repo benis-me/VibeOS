@@ -481,6 +481,13 @@ button:not(:disabled),
 :is([data-skin="devdock"], [data-skin="aqua"]) .vibe-startbtn {
   height: 44px;
 }
+/* Generating: a dot under the icon, like a Dock's running indicator. */
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-taskitem-busy {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  translate: -50% 0;
+}
 /* App name as a hover tooltip above the Dock icon. */
 :is([data-skin="devdock"], [data-skin="aqua"]) .vibe-taskitem-label {
   position: absolute;

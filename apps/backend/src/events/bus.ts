@@ -24,6 +24,8 @@ export interface BusEvents {
   "window.spawnRender": { windowId: string; seedPrompt: string };
   /** A window was closed — any in-flight generation for it must be aborted. */
   "window.closed": { windowId: string };
+  /** The user stopped a window's in-flight generation; the window stays open. */
+  "window.cancel": { windowId: string };
   /** System tick from the scheduler. */
   "agent.tick": { role: AgentRole };
 }

@@ -99,17 +99,24 @@ export function useBoot(): void {
       ),
     );
 
-    // Surface backend errors as an error toast, localized by code (+ raw detail).
+    // A window's failure stays in that window (with a retry); others become a toast,
+    // localized by code. A detail that is an i18n key is shown translated.
     offs.push(
       wsClient.on("s2c.error", (p) => {
         const locale = useSettingsStore.getState().settings?.locale ?? browserLocale();
+        const detail = p.detail && translate(locale, p.detail);
+        const known = !!detail && detail !== p.detail;
+        if (p.windowId) {
+          useWindowStore.getState().setFailed(p.windowId, known ? p.detail : `error.${p.code}`);
+          return;
+        }
         const byCode = translate(locale, `error.${p.code}`);
         const title = byCode === `error.${p.code}` ? translate(locale, "error.generic") : byCode;
         useNotificationStore.getState().push({
           id: ulid(),
           kind: "error",
           title,
-          body: p.detail,
+          body: detail,
           source: "system",
           read: false,
           createdAt: Date.now(),
@@ -131,7 +138,9 @@ export function useBoot(): void {
     );
 
     offs.push(
-      wsClient.on("s2c.ui.busy", (p) => useWindowStore.getState().setBusy(p.windowId, p.busy)),
+      wsClient.on("s2c.ui.busy", (p) =>
+        useWindowStore.getState().setBusy(p.windowId, p.busy, p.status),
+      ),
     );
 
     offs.push(wsClient.on("s2c.window.opened", (p) => win.upsert(p.window)));

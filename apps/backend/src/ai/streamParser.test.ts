@@ -1,5 +1,17 @@
 import { test, expect, describe } from "bun:test";
-import { parseAiOutput, extractStreamingHtml, extractRegions } from "./streamParser.ts";
+import {
+  parseAiOutput,
+  extractStreamingHtml,
+  extractRegions,
+  extractSummary,
+} from "./streamParser.ts";
+
+test("extractSummary yields progress only once the summary block is complete", () => {
+  expect(extractSummary("<vibeos-summary>Marking the ta")).toBe("");
+  expect(extractSummary("<vibeos-summary> Marking the task done </vibeos-summary>\n```vibe")).toBe(
+    "Marking the task done",
+  );
+});
 
 describe("extractStreamingHtml", () => {
   test("returns null before the open tag arrives", () => {

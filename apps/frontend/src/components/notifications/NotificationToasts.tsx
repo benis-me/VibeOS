@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { CheckCircle2, Info, AlertTriangle, XCircle } from "lucide-react";
+import { CheckCircle2, Info, AlertTriangle, XCircle, X } from "lucide-react";
 import type { Notification, NotificationKind } from "@vibeos/shared";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { wsClient } from "@/lib/ws";
+import { useT } from "@/lib/i18n";
 import { EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +18,10 @@ const ICON: Record<NotificationKind, React.ReactNode> = {
 function Toast({ n }: { n: Notification }) {
   const dismiss = useNotificationStore((s) => s.dismissToast);
   const reduced = useReducedMotion();
+  const t = useT();
   useEffect(() => {
-    const t = setTimeout(() => dismiss(n.id), 5200);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => dismiss(n.id), 5200);
+    return () => clearTimeout(timer);
   }, [n.id, dismiss]);
 
   const offset = reduced ? 0 : 16;
@@ -47,6 +49,19 @@ function Toast({ n }: { n: Notification }) {
             <div className="mt-1.5 text-xs font-medium text-brand">{n.action.label}</div>
           )}
         </div>
+        {/* Only dismisses: clicking the card itself opens what it refers to. */}
+        <button
+          type="button"
+          aria-label={t("communication.dismiss")}
+          title={t("communication.dismiss")}
+          onClick={(e) => {
+            e.stopPropagation();
+            dismiss(n.id);
+          }}
+          className="-m-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <X className="size-3.5" />
+        </button>
       </div>
     </motion.div>
   );

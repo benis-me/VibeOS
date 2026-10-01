@@ -92,7 +92,10 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
 - **Per-window scheduling** (`agents/UiGenerationAgent.ts`): different windows
   run in parallel; within one window a new action **preempts** (aborts) the
   in-flight one ("latest wins"). Generation is stateless, so a preempt just
-  aborts — there's no session to resume.
+  aborts — there's no session to resume. The title bar's Stop (`c2s.window.cancel`)
+  aborts only the in-flight run; the previous UI and queued deliveries stay. The
+  `<vibeos-summary>` block streams first and is relayed as `s2c.ui.busy.status`.
+  Window-bound failures (`s2c.error` with `windowId`) show inside the window, not as toasts.
 - **Event delegation** (`hooks/useDelegatedEvents.ts`): Classic AI HTML never runs code; interactive versions execute validated inert scripts only inside an opaque-origin iframe.
   Clicks/submits/changes on `[data-vibeos-action]` become `c2s.op`; prepared local controls and explicitly registered isolated handlers consume their own interactions. Clicks on
   editable inputs are passed through natively (never trigger generation). Forms

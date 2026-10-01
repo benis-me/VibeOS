@@ -202,6 +202,10 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
       return;
     }
 
+    case "c2s.window.cancel":
+      bus.emit("window.cancel", { windowId: msg.payload.windowId });
+      return;
+
     case "c2s.window.focus": {
       const w = await focusWindow(msg.payload.windowId);
       if (w) broadcast("s2c.window.focused", { windowId: w.id });
@@ -344,10 +348,11 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
             },
           });
         }
-      } else {
+      } else if (notif.source !== "syscall") {
         // No associated app (most ambient/system notifications) → pop a fresh
         // window and let the AI generate whatever clicking this notification
-        // should reveal, based on its content.
+        // should reveal, based on its content. A command's own confirmation
+        // ("syscall", no app) is only dismissed: it has nothing to open.
         const appId = await ensureTransientApp();
         const w = await openWindow({
           appId,

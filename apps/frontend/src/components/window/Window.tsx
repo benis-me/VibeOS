@@ -1,9 +1,10 @@
-import { memo, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Minus, Square, X, Copy, Save } from "lucide-react";
+import { Minus, Square, X, Copy, Save, Loader2 } from "lucide-react";
 import type { WindowState } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
 import { useAppStore } from "@/stores/appStore";
+import { useWindowStore } from "@/stores/windowStore";
 import { useWindowDrag } from "@/hooks/useWindowDrag";
 import { AiHtmlSurface } from "./AiHtmlSurface";
 import { InteractiveSurface } from "./InteractiveSurface";
@@ -145,6 +146,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
           >
             {win.title}
           </span>
+          {!native && <GenerationStatus windowId={win.id} />}
           <div className="vibe-winbtns flex items-center gap-1">
             {!native && (
               <TitleButton
@@ -212,6 +214,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
         )}
         onContextMenu={(e) => openContextMenu(e, appContentMenu({ t, win, native: !!native }))}
       >
+        {!native && <GenerationFailure windowId={win.id} />}
         {native ? (
           native(win.id)
         ) : Chrome ? (
@@ -279,6 +282,92 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
     </motion.div>
   );
 });
+
+/** While the AI generates this window: its latest progress, elapsed time and Stop. */
+function GenerationStatus({ windowId }: { windowId: string }) {
+  const t = useT();
+  const progress = useWindowStore((s) => s.progress[windowId]);
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!progress) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [progress]);
+  if (!progress) return null;
+  const stop = () => {
+    wsClient.send("c2s.window.cancel", { windowId });
+    const store = useWindowStore.getState();
+    // Nothing rendered yet: say why the window stays empty and offer a retry.
+    if (!store.snapshots[windowId]?.trim()) store.setFailed(windowId, "win.stopped");
+  };
+  return (
+    <span
+      className="vibe-genstatus flex min-w-0 shrink items-center gap-1.5 text-[11px] text-muted-foreground"
+      title={progress.status}
+    >
+      <Loader2 className="size-3 shrink-0 motion-safe:animate-spin" />
+      <span className="truncate">
+        {progress.status || t("win.generating")} ·{" "}
+        {Math.max(0, Math.floor((now - progress.since) / 1000))}s
+      </span>
+      <button
+        type="button"
+        title={t("win.stop")}
+        aria-label={t("win.stop")}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={stop}
+        className="vibe-genstop flex size-5 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-foreground"
+      >
+        <Square className="size-2.5 fill-current" />
+      </button>
+    </span>
+  );
+}
+
+/** Generation failed or was stopped: say so inside the window, with a retry. */
+function GenerationFailure({ windowId }: { windowId: string }) {
+  const t = useT();
+  const reason = useWindowStore((s) => s.failed[windowId]);
+  if (!reason) return null;
+  const regenerate = () => {
+    if (wsClient.send("c2s.op", { windowId, op: { kind: "custom", action: "reload" } }))
+      useWindowStore.getState().setBusy(windowId, true);
+  };
+  return (
+    <div
+      role="alert"
+      className="vibe-genfailed absolute inset-x-0 top-0 z-30 flex items-center gap-2 border-b bg-background px-3 py-2 text-xs"
+    >
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate",
+          reason === "win.stopped" ? "text-muted-foreground" : "text-destructive",
+        )}
+      >
+        {t(reason)}
+      </span>
+      <button type="button" onClick={regenerate} className="vibe-btn rounded border px-2 py-1">
+        {t("win.regenerate")}
+      </button>
+      <button
+        type="button"
+        onClick={() => wsClient.send("c2s.window.open", { appId: "activity-monitor" })}
+        className="vibe-btn rounded border px-2 py-1"
+      >
+        {t("win.details")}
+      </button>
+      <button
+        type="button"
+        aria-label={t("communication.dismiss")}
+        onClick={() => useWindowStore.getState().setFailed(windowId)}
+        className="vibe-btn rounded border px-2 py-1"
+      >
+        <X className="size-3.5" />
+      </button>
+    </div>
+  );
+}
 
 function TitleButton({
   children,

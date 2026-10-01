@@ -17,6 +17,8 @@ const zh: Dict = {
   "runtime.reload": "重新加载",
   "runtime.error.start": "应用运行时未能启动。请重新加载。",
   "runtime.error.script": "应用脚本格式或语法无效，原版本已保留。",
+  "runtime.error.act":
+    "应用脚本在没有你的操作时请求了 AI（vibe.act 只能在点击、按键或提交时调用，且一次一个），已拦下。可以让 AI 修复脚本。",
   "memory.title": "记忆",
   "memory.edit": "编辑记忆",
   "memory.remove": "删除记忆",
@@ -258,6 +260,9 @@ const zh: Dict = {
   "spotlight.cmdRunning": "正在执行…",
   "spotlight.cmdHint": "例如：打开计算器、新建便签、最小化所有窗口、还原所有窗口",
   "spotlight.cmdMode": "让 AI 执行系统命令（窗口 / 应用 / 新建文件…）",
+  "spotlight.cmdFailed": "命令没有执行成功。可以再试一次，或检查模型服务。",
+  "settings.open": "打开设置",
+  "welcome.noProvider": "还没有可用的模型服务。先在设置里连接一个，再来生成应用。",
   // Notifications
   "notif.title": "通知",
   "notif.markAllRead": "全部标为已读",
@@ -272,6 +277,11 @@ const zh: Dict = {
   "win.restore": "还原",
   "win.close": "关闭",
   "win.saveAsApp": "保存为应用",
+  "win.generating": "生成中",
+  "win.stop": "停止生成",
+  "win.stopped": "已停止生成，窗口还没有内容。",
+  "win.regenerate": "重新生成",
+  "win.details": "查看详情",
   // Browser chrome
   "browser.back": "后退",
   "browser.forward": "前进",
@@ -541,6 +551,8 @@ const en: Dict = {
   "runtime.reload": "Reload",
   "runtime.error.start": "The app runtime could not start. Please reload.",
   "runtime.error.script": "Invalid app script format or syntax. The previous version is preserved.",
+  "runtime.error.act":
+    "The app's script asked the AI without your action (vibe.act only runs from a click, key or submit, one request at a time), so it was blocked. You can ask AI to repair the script.",
   "memory.title": "Memory",
   "memory.edit": "Edit memory",
   "memory.remove": "Delete memory",
@@ -792,6 +804,10 @@ const en: Dict = {
   "spotlight.cmdHint":
     "Try: open a calculator, make a note, minimize all windows, restore all windows",
   "spotlight.cmdMode": "Run an AI system command (windows / apps / new files…)",
+  "spotlight.cmdFailed": "The command didn't run. Try again, or check your model services.",
+  "settings.open": "Open Settings",
+  "welcome.noProvider":
+    "No model service is available yet. Connect one in Settings, then generate apps.",
   "notif.title": "Notifications",
   "notif.markAllRead": "Mark all read",
   "notif.empty": "All caught up",
@@ -803,6 +819,11 @@ const en: Dict = {
   "win.restore": "Restore",
   "win.close": "Close",
   "win.saveAsApp": "Save as app",
+  "win.generating": "Generating",
+  "win.stop": "Stop generating",
+  "win.stopped": "Generation stopped before anything appeared.",
+  "win.regenerate": "Regenerate",
+  "win.details": "Details",
   // Browser chrome
   "browser.back": "Back",
   "browser.forward": "Forward",

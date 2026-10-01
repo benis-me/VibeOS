@@ -1,4 +1,4 @@
-import { ulid } from "@vibeos/shared/util";
+import { ulid, stripEmoji } from "@vibeos/shared/util";
 import { getAppData, readApplicationVersion } from "../db/repositories/ApplicationRepo.ts";
 import { validateRuntimeScripts } from "../db/repositories/ApplicationPackageRepo.ts";
 import { isDeepStrictEqual } from "node:util";
@@ -24,7 +24,7 @@ import { kernelState } from "../kernel/kernelState.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 import { assemblePrompt, decideRenderMode } from "../prompt/PromptAssembler.ts";
 import { run, recordSummary, recordStep } from "../ai/SdkManager.ts";
-import { parseAiOutput, extractStreamingHtml } from "../ai/streamParser.ts";
+import { parseAiOutput, extractStreamingHtml, extractSummary } from "../ai/streamParser.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
 import { applyRegionsServer, extractRegionIds } from "./regionMerge.ts";
 import { rewriteImages } from "../ai/imageCache.ts";
@@ -150,6 +150,15 @@ function abortWindow(windowId: string): void {
   }
 }
 
+/** The user pressed Stop: abort only the in-flight run (it records ui.cancelled). */
+function cancelWindow(windowId: string): void {
+  const cur = inflight.get(windowId);
+  if (!cur) return;
+  cur.abort.abort();
+  if (cur.trigger.message) failDelivery(cur.trigger.message, "communication.interrupted");
+  log.debug(`■ [${windowId.slice(-6)}] generation stopped by the user`);
+}
+
 export function registerUiGenerationAgent(): void {
   bus.on("app.delivery", ({ delivery }) => {
     if (!deliveryAlive(delivery)) return;
@@ -197,6 +206,7 @@ export function registerUiGenerationAgent(): void {
     if (windowId) dispatch(windowId, { drag: source });
   });
   bus.on("window.closed", ({ windowId }) => abortWindow(windowId));
+  bus.on("window.cancel", ({ windowId }) => cancelWindow(windowId));
 }
 
 /** True if this run has been superseded by a newer one for the same window. */
@@ -325,6 +335,7 @@ async function generate(
     if (!canCommit()) return;
     let buffer = "";
     let lastStreamed = "";
+    let status = "";
     const fullRequired = renderMode === "force-full" || attempt > 0;
     const result = await run({
       role: "ui-generation",
@@ -340,10 +351,16 @@ async function generate(
       windowId,
       appId: app.id,
       onDelta: (text) => {
+        if (!canCommit()) return;
+        buffer += text;
+        // Every window gets early progress: the summary block is output first.
+        if (!status && buffer.includes("</vibeos-summary>")) {
+          status = stripEmoji(extractSummary(buffer)).slice(0, 140);
+          if (status) broadcast("s2c.ui.busy", { windowId, busy: true, status });
+        }
         // ponytail: stream only first paint; existing windows commit one validated
         // batch. Streaming edits would need transactional preview + rollback.
-        if (!canCommit() || snapshot.trim() || attempt > 0) return;
-        buffer += text;
+        if (snapshot.trim() || attempt > 0) return;
         const body = extractStreamingHtml(buffer);
         if (body !== null && body.length > lastStreamed.length) {
           lastStreamed = body;

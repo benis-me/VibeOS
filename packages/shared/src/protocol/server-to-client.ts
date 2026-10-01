@@ -96,7 +96,8 @@ export type ServerToClient =
   | { type: "s2c.ui.patch"; payload: UiPatchPayload }
   | {
       type: "s2c.ui.busy";
-      payload: { windowId: string; busy: boolean };
+      /** status: plain-text progress (the model's summary, which streams first). */
+      payload: { windowId: string; busy: boolean; status?: string };
     }
   | { type: "s2c.window.opened"; payload: { window: WindowState } }
   | { type: "s2c.window.closed"; payload: { windowId: string } }

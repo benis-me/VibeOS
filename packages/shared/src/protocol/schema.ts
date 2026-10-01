@@ -116,6 +116,7 @@ export const clientToServerSchema = z.discriminatedUnion("type", [
   ),
   msg("c2s.window.open", z.object({ appId: z.string(), hint: z.string().optional() })),
   msg("c2s.window.close", z.object({ windowId: z.string() })),
+  msg("c2s.window.cancel", z.object({ windowId: z.string() })),
   msg("c2s.window.focus", z.object({ windowId: z.string() })),
   msg("c2s.window.minimize", z.object({ windowId: z.string() })),
   msg("c2s.window.maximize", z.object({ windowId: z.string() })),

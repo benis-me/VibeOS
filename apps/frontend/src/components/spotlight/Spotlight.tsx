@@ -36,6 +36,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
   const [ideas, setIdeas] = useState({ q: "", list: [] as AppSearchResult[], failed: false });
   const [selected, setSelected] = useState({ q: "", index: 0 });
   const [running, setRunning] = useState(false);
+  const [cmdError, setCmdError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const request = useRef({ id: "", q: "" });
   const cmdReqId = useRef<string>("");
@@ -87,18 +88,20 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
     if (open) {
       setQuery(initialQuery);
       setRunning(false);
+      setCmdError("");
       setTimeout(() => inputRef.current?.focus(), 30);
     }
   }, [open, initialQuery]);
 
-  // AI command finished: stop the spinner and close on success (the AI's own
-  // notify syscall surfaces the result to the user).
+  // AI command finished: close on success (the AI's own notify syscall surfaces
+  // the result); on failure stay open and say why.
   useEffect(
     () =>
       wsClient.on("s2c.command.result", (p) => {
         if (p.requestId !== cmdReqId.current) return;
         setRunning(false);
-        if (!p.error) onClose();
+        if (p.error) setCmdError(p.error);
+        else onClose();
       }),
     [onClose],
   );
@@ -159,6 +162,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
     const id = ulid();
     cmdReqId.current = id;
     setRunning(true);
+    setCmdError("");
     wsClient.send("c2s.command.run", { text, requestId: id });
   };
 
@@ -210,7 +214,10 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
               <input
                 ref={inputRef}
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setCmdError("");
+                }}
                 onKeyDown={onKeyDown}
                 placeholder={t("spotlight.placeholder")}
                 className="h-14 flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
@@ -243,6 +250,27 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
                     ↵
                   </kbd>
                 </button>
+                {cmdError && (
+                  <div role="alert" className="flex items-center gap-2 px-3 pb-1 pt-2 text-xs">
+                    {/* A known reason is shown translated; anything else (model or
+                        provider failure) points at the model services. */}
+                    <span className="min-w-0 flex-1 text-destructive">
+                      {t(cmdError) === cmdError ? t("spotlight.cmdFailed") : t(cmdError)}
+                    </span>
+                    {t(cmdError) === cmdError && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          wsClient.send("c2s.window.open", { appId: "settings" });
+                          onClose();
+                        }}
+                        className="vibe-btn shrink-0 rounded border px-2 py-1"
+                      >
+                        {t("settings.open")}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

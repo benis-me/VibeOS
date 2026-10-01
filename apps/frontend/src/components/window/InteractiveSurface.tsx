@@ -171,7 +171,7 @@ export function InteractiveSurface({ windowId }: { windowId: string }) {
             source: message.source,
             target: { windowId },
           });
-        } else if (message.type === "error") setError(message.message);
+        } else if (message.type === "error") setError(translate.current(message.message));
       };
       port.start();
       iframe.contentWindow!.postMessage(

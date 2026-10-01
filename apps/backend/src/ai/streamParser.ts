@@ -50,6 +50,15 @@ export function extractStreamingHtml(buffer: string): string | null {
   return outputBlocks(buffer).find((block) => block.kind === "html")?.body ?? null;
 }
 
+/** The summary once its block is complete; it streams first, so it is early progress. */
+export function extractSummary(buffer: string): string {
+  return (
+    outputBlocks(buffer)
+      .find((b) => b.kind === "summary" && b.complete)
+      ?.body.trim() ?? ""
+  );
+}
+
 /** Parse the complete AI output into its structured parts. */
 export function parseAiOutput(full: string, legacyMode?: "full"): ParsedAiOutput {
   const blocks = outputBlocks(full);

@@ -288,8 +288,8 @@ export function AiHtmlSurface({ windowId }: Props) {
 
   return (
     <div className="relative h-full w-full overflow-hidden" onDragOver={onDragOver} onDrop={onDrop}>
-      {/* OS-style loading bar pinned to the top while the AI is working.
-          No text — the bar alone communicates activity, like a native shell. */}
+      {/* OS-style loading bar pinned to the top while the AI is working; the
+          title bar carries the progress text, elapsed time and Stop. */}
       {(busy || requests > 0) && <ProgressBar />}
       {communicationError && (
         <div

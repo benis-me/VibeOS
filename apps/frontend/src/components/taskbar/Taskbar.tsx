@@ -25,6 +25,7 @@ export function Taskbar({
   const [menuOpen, setMenuOpen] = useState(false);
   const t = useT();
   const windowMap = useWindowStore((s) => s.windows);
+  const busy = useWindowStore((s) => s.busy);
   const windows = useMemo(
     () =>
       Object.values(windowMap)
@@ -87,6 +88,7 @@ export function Taskbar({
                 onContextMenu={(e) => openContextMenu(e, taskbarItemMenu({ t, win: w }))}
                 data-win-id={w.id}
                 data-active={w.focused && w.state !== "minimized" ? "true" : undefined}
+                aria-busy={busy[w.id] || undefined}
                 className={cn(
                   "vibe-taskitem flex h-8 max-w-44 items-center gap-2 rounded-lg px-2.5 text-xs transition-colors",
                   w.focused && w.state !== "minimized"
@@ -101,6 +103,9 @@ export function Taskbar({
                   className="size-4"
                 />
                 <span className="vibe-taskitem-label truncate">{w.title}</span>
+                {busy[w.id] && (
+                  <span className="vibe-taskitem-busy size-1.5 shrink-0 rounded-full bg-brand motion-safe:animate-pulse" />
+                )}
               </Reorder.Item>
             );
           })}
