@@ -15,6 +15,11 @@ export function GeneralPane() {
   const skins = useSkinStore((s) => s.skins);
   const theme = useSettingsStore((s) => s.settings?.theme ?? "dark");
   const skin = useSettingsStore((s) => s.settings?.skin ?? "devdock");
+  // XP and Aqua (and copies without dark tokens) only have a light appearance.
+  const skinRecord = skins.find((s) => s.id === skin);
+  const lightOnly =
+    ["xp", "aqua"].includes(skinRecord?.foundation ?? skin) &&
+    !Object.keys(skinRecord?.definition.dark ?? {}).length;
   const proactive = useSettingsStore((s) => s.settings?.prefs.proactiveAgents !== false);
   const setLocale = (next: Locale) =>
     wsClient.send("c2s.settings.update", { partial: { locale: next } });
@@ -28,10 +33,14 @@ export function GeneralPane() {
     <Pane title={t("settings.cat.general")}>
       <GroupLabel>{t("settings.sec.appearance")}</GroupLabel>
       <Group>
-        <Row label={t("settings.theme")}>
+        <Row
+          label={t("settings.theme")}
+          hint={lightOnly ? t("settings.theme.lightOnly") : undefined}
+        >
           <Segmented
             value={theme}
             onChange={setTheme}
+            disabled={lightOnly}
             options={[
               {
                 value: "light",

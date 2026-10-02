@@ -23,12 +23,12 @@ export function InteractiveSurface({ windowId }: { windowId: string }) {
   const srcDoc = useMemo(() => {
     const nonce = crypto.randomUUID();
     const base = API_BASE || location.origin;
-    const escape = (s: string) =>
+    const escapeAttr = (s: string) =>
       s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
     const baseStyle = runtimeBaseStyle(document.body).replace(/</g, "\\3c ");
     const csp = `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; img-src data: blob: ${base}/api/img/; font-src data:; media-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'; object-src 'none'`;
     // Intersect policies so a script cannot reuse its nonce to load arbitrary URLs.
-    return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escape(csp)}"><meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' ${escape(base)}/api/app-runtime.js"><style id="theme">${baseStyle}</style></head><body><main id="surface" class="ai-surface"></main><script nonce="${nonce}" src="${escape(base)}/api/app-runtime.js"></script></body></html>`;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escapeAttr(csp)}"><meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' ${escapeAttr(base)}/api/app-runtime.js"><style id="theme">${baseStyle}</style></head><body><main id="surface" class="ai-surface"></main><script nonce="${nonce}" src="${escapeAttr(base)}/api/app-runtime.js"></script></body></html>`;
   }, [windowId, win?.appVersionId, reload]);
 
   useEffect(() => {

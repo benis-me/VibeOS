@@ -114,16 +114,24 @@ export function Segmented<T extends string>({
   value,
   onChange,
   options,
+  disabled,
 }: {
   value: T;
   onChange: (v: T) => void;
   options: { value: T; label: string; icon?: React.ReactNode }[];
+  disabled?: boolean;
 }) {
   return (
-    <div className="vibe-segmented inline-flex rounded-lg bg-muted/60 p-0.5 ring-1 ring-border">
+    <div
+      className={cn(
+        "vibe-segmented inline-flex rounded-lg bg-muted/60 p-0.5 ring-1 ring-border",
+        disabled && "opacity-50",
+      )}
+    >
       {options.map((o) => (
         <button
           key={o.value}
+          disabled={disabled}
           onClick={() => onChange(o.value)}
           data-active={value === o.value ? "true" : undefined}
           className={cn(
@@ -402,7 +410,9 @@ export function Combobox({
                           }}
                           className={cn(
                             "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
-                            o.value === value ? "bg-accent" : "hover:bg-accent/60",
+                            o.value === value
+                              ? "bg-accent text-accent-foreground"
+                              : "hover:bg-accent/60",
                           )}
                         >
                           <span className="min-w-0 flex-1">

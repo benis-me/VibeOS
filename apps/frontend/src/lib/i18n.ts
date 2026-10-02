@@ -362,6 +362,7 @@ const zh: Dict = {
   "settings.theme": "主题",
   "settings.theme.light": "浅色",
   "settings.theme.dark": "深色",
+  "settings.theme.lightOnly": "当前皮肤只有浅色外观，切换明暗不会生效。",
   "settings.skin": "皮肤",
   "settings.skin.default": "默认",
   "settings.skin.hint": "整体视觉风格（与明暗独立）。XP / Aqua 为初版，后续会深化窗口外壳与控件。",
@@ -905,6 +906,8 @@ const en: Dict = {
   "settings.theme": "Theme",
   "settings.theme.light": "Light",
   "settings.theme.dark": "Dark",
+  "settings.theme.lightOnly":
+    "This skin only has a light appearance, so the theme switch has no effect.",
   "settings.skin": "Skin",
   "settings.skin.default": "Default",
   "settings.skin.hint":

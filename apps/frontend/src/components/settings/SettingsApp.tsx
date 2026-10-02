@@ -50,7 +50,9 @@ export function SettingsApp() {
               onClick={() => setCategory(c.id)}
               className={cn(
                 "flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors",
-                active ? "bg-accent text-foreground" : "text-foreground/80 hover:bg-accent/50",
+                active
+                  ? "bg-accent text-accent-foreground"
+                  : "text-foreground/80 hover:bg-accent/50",
               )}
             >
               <span

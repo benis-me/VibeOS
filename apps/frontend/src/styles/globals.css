@@ -5,6 +5,8 @@
 
 /* ---------------- Light theme — neutral black / white / gray ---------------- */
 :root {
+  /* Native controls (select, checkbox, date) follow the theme too. */
+  color-scheme: light;
   --radius: 0.625rem;
 
   --background: oklch(1 0 0);
@@ -23,6 +25,8 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  /* Fill under white text (badges, danger items, Stop); text uses --destructive. */
+  --destructive-fill: var(--destructive);
 
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
@@ -58,6 +62,7 @@
 
 /* ---------------- Dark theme — neutral black / white / gray ---------------- */
 .dark {
+  color-scheme: dark;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -74,6 +79,8 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  /* The light red reads as text on dark surfaces; darken it under white text (4.5:1). */
+  --destructive-fill: color-mix(in oklab, var(--destructive) 80%, black);
 
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
@@ -117,6 +124,9 @@
 
 /* Windows XP "Luna" — square, silver-blue, Tahoma. */
 [data-skin="xp"] {
+  /* Light-only: keep native controls and brand text light even under .dark. */
+  color-scheme: light;
+  --brand-foreground: oklch(0.985 0 0);
   --radius: 0rem;
   --font-sans: Tahoma, Verdana, "Segoe UI", sans-serif;
   --taskbar-h: 30px;
@@ -150,6 +160,9 @@
 
 /* Mac OS X "Aqua" — glossy, rounded, Lucida Grande. */
 [data-skin="aqua"] {
+  /* Light-only: keep native controls and brand text light even under .dark. */
+  color-scheme: light;
+  --brand-foreground: oklch(0.985 0 0);
   --radius: 0.7rem;
   --font-sans: "Lucida Grande", "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -196,6 +209,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-fill: var(--destructive-fill);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -261,6 +275,11 @@ button:not(:disabled),
 
 ::selection {
   background: color-mix(in oklab, var(--foreground) 18%, transparent);
+}
+
+/* Secondary text on a selected (accent) fill follows that fill's foreground. */
+.bg-accent .text-muted-foreground {
+  color: color-mix(in oklab, var(--accent-foreground) 75%, transparent);
 }
 
 ::-webkit-scrollbar {
@@ -1154,7 +1173,7 @@ button:not(:disabled),
 }
 .vibe-menu-item[data-danger="true"]:hover,
 .vibe-menu-item[data-danger="true"][data-active="true"] {
-  background: var(--destructive);
+  background: var(--destructive-fill);
   color: #fff;
 }
 .vibe-menu-icon {

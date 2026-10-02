@@ -27,6 +27,7 @@
     "start": "bun run --cwd apps/backend start",
     "typecheck": "bun run --cwd packages/shared typecheck && bun run --cwd apps/backend typecheck && bun run --cwd apps/frontend typecheck",
     "test": "bun test",
+    "verify": "bun run typecheck && biome check . && bun test",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "check": "biome check ."

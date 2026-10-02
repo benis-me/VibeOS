@@ -48,7 +48,11 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   `packages/shared/src/domain/skins.ts` is the own token/target/property contract;
   never accept model-supplied selectors, arbitrary CSS or executable content. Optional
   chrome geometry and named image assets extend v1 compatibly. Color tokens cannot
-  contain gradients in new output. Text generation includes a craft review; asset
+  contain gradients in new output. Body, card, accent and brand text pairs must reach
+  4.5:1 in both modes (`ai/contrast.ts`; dark layers over light, blank skins over
+  DevDock), failing output goes through the repair round. Native selected states pair
+  `bg-accent` with `text-accent-foreground`; white text sits on `--destructive-fill`,
+  never on `--destructive`. Text generation includes a craft review; asset
   requests reuse `imageCache.ts` and await persistence before publishing. Only existing
   unchanged assets may reuse IDs. Preserve request ancestry and intent on refinements;
   generic app HTML image instructions must not be appended to skin JSON prompts.

@@ -394,7 +394,7 @@ export function FilesApp({
         >
           <button
             aria-current={!path ? "page" : undefined}
-            className={`flex items-center gap-2 rounded-md px-2 py-2 text-left ${!path ? "bg-accent" : "hover:bg-accent/50"}`}
+            className={`flex items-center gap-2 rounded-md px-2 py-2 text-left ${!path ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
             onClick={() => navigate("")}
           >
             <HardDrive className="size-4 shrink-0" />
@@ -404,7 +404,7 @@ export function FilesApp({
             <button
               key={folder}
               aria-current={path === folder ? "page" : undefined}
-              className={`flex items-center gap-2 rounded-md px-2 py-2 text-left ${path === folder ? "bg-accent" : "hover:bg-accent/50"}`}
+              className={`flex items-center gap-2 rounded-md px-2 py-2 text-left ${path === folder ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
               onClick={() => navigate(folder)}
             >
               {folder === "Trash" ? (
@@ -831,7 +831,7 @@ export function FilesApp({
                           openEntry(e);
                         }
                       }}
-                      className={`grid w-full grid-cols-[minmax(0,1fr)_68px] items-center gap-3 rounded-md px-2.5 py-2 text-left text-[13px] ${selected === e.path ? "bg-accent" : "hover:bg-accent/40"}`}
+                      className={`grid w-full grid-cols-[minmax(0,1fr)_68px] items-center gap-3 rounded-md px-2.5 py-2 text-left text-[13px] ${selected === e.path ? "bg-accent text-accent-foreground" : "hover:bg-accent/40"}`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         {e.kind === "shortcut" || e.kind === "application" ? (

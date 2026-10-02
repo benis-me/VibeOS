@@ -196,7 +196,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
           <button
             onClick={() => wsClient.send("c2s.window.close", { windowId: win.id })}
             title={t("win.close")}
-            className="absolute right-1.5 top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-background/70 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive hover:text-white group-hover:opacity-100"
+            className="absolute right-1.5 top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-background/70 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive-fill hover:text-white group-hover:opacity-100"
           >
             <X className="size-3" />
           </button>
@@ -390,7 +390,9 @@ function TitleButton({
       className={cn(
         "vibe-winbtn flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors",
         kind && `vibe-winbtn-${kind}`,
-        danger ? "hover:bg-destructive hover:text-white" : "hover:bg-accent hover:text-foreground",
+        danger
+          ? "hover:bg-destructive-fill hover:text-white"
+          : "hover:bg-accent hover:text-foreground",
       )}
     >
       {children}

@@ -284,7 +284,9 @@ export function AppStoreApp() {
               key={r.id}
               className="mx-auto mb-5 max-w-2xl space-y-2 text-[13px] leading-relaxed"
             >
-              <p className="ml-10 whitespace-pre-wrap rounded-xl bg-accent px-3 py-2">{r.prompt}</p>
+              <p className="ml-10 whitespace-pre-wrap rounded-xl bg-accent px-3 py-2 text-accent-foreground">
+                {r.prompt}
+              </p>
               <div className="mr-8 px-1">
                 <p className="whitespace-pre-wrap">
                   {r.summary || t(`applications.status.${r.status}`)}

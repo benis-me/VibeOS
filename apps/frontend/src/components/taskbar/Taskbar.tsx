@@ -55,7 +55,7 @@ export function Taskbar({
           data-popover-trigger="start"
           className={cn(
             "vibe-startbtn flex h-8 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors",
-            menuOpen ? "bg-accent" : "hover:bg-accent",
+            menuOpen ? "bg-accent text-accent-foreground" : "hover:bg-accent",
           )}
         >
           <LayoutGrid className="size-4" />
@@ -92,7 +92,7 @@ export function Taskbar({
                 className={cn(
                   "vibe-taskitem flex h-8 max-w-44 items-center gap-2 rounded-lg px-2.5 text-xs transition-colors",
                   w.focused && w.state !== "minimized"
-                    ? "bg-accent text-foreground"
+                    ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground hover:bg-accent/60",
                 )}
               >
@@ -120,7 +120,7 @@ export function Taskbar({
           >
             <Bell className="size-4" />
             {unread > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[9px] font-semibold text-white">
+              <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive-fill px-1 text-[9px] font-semibold text-white">
                 {unread > 9 ? "9+" : unread}
               </span>
             )}

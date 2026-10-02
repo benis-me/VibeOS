@@ -229,7 +229,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
                 <button
                   onClick={runCommandPalette}
                   disabled={!commandText.trim() || running}
-                  className="flex w-full items-center gap-3 rounded-lg bg-accent px-3 py-2.5 text-left disabled:opacity-60"
+                  className="flex w-full items-center gap-3 rounded-lg bg-accent px-3 py-2.5 text-left text-accent-foreground disabled:opacity-60"
                 >
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">
                     {running ? (
@@ -377,7 +377,7 @@ function Row(props: {
       onClick={props.onClick}
       className={cn(
         "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
-        props.active ? "bg-accent" : "hover:bg-accent/60",
+        props.active ? "bg-accent text-accent-foreground" : "hover:bg-accent/60",
       )}
     >
       {props.icon}

@@ -25,7 +25,7 @@ next — as if it were a real program responding.
 - **Skins / theme system** — switch the whole OS look live in Settings: **DevDock**
   (the native minimal theme), **Windows XP "Luna"**, and **Mac OS X "Aqua"**. Skins
   are pure CSS over design tokens, so the OS chrome *and* the AI-generated content
-  both re-skin instantly — independent of light/dark.
+  both re-skin instantly — independent of light/dark (XP and Aqua are light-only).
 - **AI Skin Studio** — the native **Skins** app manages custom skins with a dropdown
   and a prompt conversation. Create a blank skin from VibeOS primitives, or duplicate
   any skin's current appearance. Built-ins stay read-only. Generation continues when
@@ -34,7 +34,8 @@ next — as if it were a real program responding.
   Failed/cancelled requests preserve the active version; backend restarts mark in-flight
   requests interrupted and retain the prompt for retry. No external theme framework:
   AI uses our [token and chrome contract](packages/shared/src/domain/skins.ts), with a
-  design pass followed by a craft review. The selected version's original brief stays
+  design pass followed by a craft review. Body, card, selected and brand text must reach
+  4.5:1 contrast in both modes. The selected version's original brief stays
   in context. Skins can define chrome proportions, layered materials and generated
   wallpaper/texture/frame images using the configured image model. Images must finish
   before publication; failed image generation preserves the active version.
@@ -53,8 +54,10 @@ next — as if it were a real program responding.
 - **Activity Monitor** — a live dashboard of every AI run: token-usage chart
   (input vs output), by-model distribution, cost, latency, error rate, and a
   scroll-paginated run log.
-- **App Store & freezing** — install template apps, **freeze** a window's current
-  state into a reusable app, and export / import apps as `.vibeapp` JSON.
+- **Applications** — the native app manager: create, rename, duplicate and uninstall
+  local apps, describe changes in a conversation that produces immutable versions
+  (Classic or Interactive), pick the active version, and import / export `.vibeapp`
+  packages. **Save as app** keeps a generated window's identity, windows and shared data.
 - **Native Files** — browse and edit the real system disk, import/download files,
   rename/move/copy folders and files, and restore items from Trash. No model is involved.
 - **Native viewers** — double-click files to open separate Text Viewer or Media Viewer
@@ -72,14 +75,19 @@ next — as if it were a real program responding.
   start menu (split into *system* and *generated* apps), notifications (toasts + center).
 - **Global user profile** — a profile/memory the user writes once; every generated app
   reads it so the OS feels personalized and coherent across windows.
-- **System calls** — the model can emit `notify`, `open`, `spawn-window`, `install`
-  (virtual app + desktop shortcut), `create-file`, `focus` and `close` calls.
-- **Sandboxed rendering** — AI HTML is sanitized (no scripts / inline handlers); all
-  interaction is captured by event delegation and routed back as operations — including
-  the values typed into inputs, so submits carry their content.
+- **System calls** — the model can emit `app-state`, `notify`, `open`, `spawn-window`,
+  `install` (app + desktop shortcut), `create-file`, `focus`, `close`, `window-state`,
+  `resize-window` and `communication` calls.
+- **Sandboxed rendering** — Classic AI HTML is sanitized (no scripts / inline handlers);
+  all interaction is captured by event delegation and routed back as operations —
+  including the values typed into inputs, so submits carry their content. Interactive
+  versions (the default for new experiences) may also run small validated scripts inside
+  an opaque-origin iframe without access to the host page, its storage or the network; see
+  [docs/interactive-runtime.md](docs/interactive-runtime.md).
 - **Pluggable AI backends** — the model layer sits behind one `AiProvider` seam, so the
-  OS runs on **CodeBuddy**, **Claude Code**, or **Codex** (local CLIs) or **OpenRouter**
-  / any OpenAI-compatible API (via the Vercel AI SDK). Switchable live in Settings.
+  OS runs on **CodeBuddy**, **Claude Code** or **Codex** (local CLIs) or an API provider
+  (OpenAI, Anthropic, Gemini, OpenRouter, MiniMax, Zhipu, Kimi, Cerebras) via the
+  Vercel AI SDK. Switchable live in Settings, per role if you like.
 - **Bilingual (zh / en)** — all native UI *and* AI-generated content follow the chosen
   language; the locale is injected into every generation prompt.
 
@@ -164,9 +172,11 @@ switchable live in the **Settings** app.
 bun run dev          # backend + frontend
 bun run dev:backend  # backend only
 bun run dev:frontend # frontend only
-bun run build        # production frontend build → apps/frontend/dist
+bun run build        # static frontend bundle → apps/frontend/dist (not served by the
+                     # backend: host it yourself and allow its origin via VIBEOS_WEB_ORIGIN)
 bun run typecheck    # typecheck all packages
 bun test             # run the test suite
+bun run verify       # typecheck + biome check + tests; the exit code is pass/fail
 ```
 
 ## Persistence
@@ -178,28 +188,28 @@ The data root defaults to `~/.vibeos`, independently of the working directory:
   runtime/vibeos.db       # settings, window state, indexes, interactions and logs
   runtime/backups/        # the original database and disk before migration
   disk/
-    System/               # storage version and built-in app packages
+    System/               # storage version, built-in apps, sessions, app data, skins
     Desktop/              # desktop files and .vibelink app shortcuts
     Documents/            # user documents
     Medias/Images/        # generated image files (existing image URLs still work)
-    Applications/         # installed apps and generated windows, including closed ones
+    Applications/         # installed .vibeapp bundles with immutable versions
     Trash/                # reversible deletion with original paths
-    Cache/                # temporary generation files
+    Cache/Applications/   # temporary (not yet saved) experiences
 ```
 
-App packages contain `app.json` and an optional `index.html`; per-window HTML is
-stored alongside the owning app. SQLite holds references to these files, and all
-subsequent app saves, snapshots and generated images read/write the disk.
+An app bundle holds `manifest.json` and immutable `Versions/<id>/` folders (definition,
+starting `index.html`, assets). Window snapshots live in `System/Sessions/<window-id>/`
+and an app's shared data in `System/AppData/<app-id>/`. SQLite holds references to these
+files; see [docs/applications-and-memory.md](docs/applications-and-memory.md).
 
-Generating a window archives its current HTML, but does not install a reusable app.
-**Save as app** creates a new installed app from that window's current HTML and size,
-plus a desktop shortcut. The original window stays independent; later interactions
-do not rewrite the saved starting page. `.vibeapp` is a JSON export/import format
-for the app manifest and saved starting HTML, not the on-disk package format or a
-full backup: linked files, image payloads and window history are not bundled.
+A generated window starts as a temporary experience. **Save as app** promotes it to an
+installed app with the same identity, windows and shared data, writes a new version from
+the window's current UI and size, and adds a desktop shortcut. `.vibeapp` packages carry
+the selected definition and its images (format 3 for Interactive, 2 for Classic); shared
+data is included only on request. Window history and other versions are not packaged.
 
 Desktop app icons are real `.vibelink` files referencing installed app IDs.
-App Store can create a shortcut; installation and saving also create one. Renaming,
+Installing an app and saving a window create one. Renaming,
 moving, deleting and restoring it in Files updates the desktop. Deleting a shortcut
 does not uninstall its app. `.vibelink` files only work where the target app is installed.
 

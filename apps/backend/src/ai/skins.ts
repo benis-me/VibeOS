@@ -14,6 +14,7 @@ import * as SdkManager from "./SdkManager.ts";
 import * as SkinRepo from "../db/repositories/SkinRepo.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 import { requestSkinImage } from "./imageCache.ts";
+import { DEVDOCK_TOKENS, skinContrastIssues } from "./contrast.ts";
 import { hasImage } from "../db/repositories/ImagesRepo.ts";
 import { createNode } from "../db/repositories/VfsRepo.ts";
 import { broadcast } from "../server/wsGateway.ts";
@@ -31,6 +32,7 @@ Preserve the original intent and constraints through follow-up edits. The curren
 
 CONTRACT
 Token keys (without --): ${SKIN_TOKENS.join(", ")}. Every token except radius, taskbar-h, font-sans and font-title MUST be a CSS COLOR, never a gradient or image. Those color tokens are also used in background-color and color-mix. Put gradients/images in rule background or background-image instead. radius: 0–32px, taskbar-h: 28–72px (chrome calculates its reserved space when supplied). Use hex/rgb/oklch and var(--token); define paired foregrounds whenever changing a background.
+Color roles: background/foreground = desktop surfaces and body text; card/card-foreground = windows and panels; accent/accent-foreground = the SUBTLE hover and selected fill (close to card, never a vivid brand color) and the text on it; muted/muted-foreground = quiet fills and secondary text; brand/brand-foreground = the emphasis color for primary actions and the text on it. In BOTH modes foreground/background, card-foreground/card, accent-foreground/accent and brand-foreground/brand must each reach 4.5:1 contrast; output is checked.
 Fonts bundled: "Geist Variable", "JetBrains Mono Variable". System alternatives: Georgia, Times New Roman, Palatino, Courier New, Arial, Trebuchet MS; for Chinese use Songti SC/serif or PingFang SC/sans-serif. Use a working system fallback. Never invent a font or assume franchise/web fonts are installed. Use font-title for the shared window title, taskbar app names and start button family; font-sans for readable body text. These should form one intentional type system. Do not change only the title rule and forget task names.
 Optional chrome (all sizes in px): {titlebarHeight:28..56,controlSize:16..32,controlGap:2..12,controlsSide:"left"|"right",titleAlign:"left"|"center",taskbarStyle:"bar"|"dock",taskbarHeight:36..64,taskbarInset:0..16,taskSize:28..52}. Controls/tasks must be at least 4px smaller than their bar height. Choose proportions for the design instead of copying these defaults. This changes only chrome geometry, never app layout or window coordinates.
 Rules: {"target":"titlebar","state":"default","mode":"both","styles":{"background":"linear-gradient(to bottom, #24404c, #14252d)","box-shadow":"inset 0 1px 0 #a0b5b2"}}. Targets: ${Object.keys(SKIN_TARGETS).join(", ")}. States: default, hover, active, focus, disabled, unfocused (window or its descendants). Modes: both, light, dark. Properties: ${SKIN_PROPERTIES.join(", ")}. font-size: 10–24px. Multiple backgrounds are supported with matching comma-separated size/position/repeat. CSS FIRST background is the TOP layer: never place an opaque normal-blend gradient in front of an image because it hides the entire texture. For materials use asset FIRST with soft-light/multiply/screen (chosen for the desired material) over a solid color or gradient. Border-image supports image or gradient frames with slice/width/repeat. Use borders and inset shading intentionally; opaque windowBody hides the window background behind it.
@@ -206,6 +208,13 @@ async function generate(
             !output.definition.rules.some((rule) => Object.keys(rule.styles).length)
           )
             throw new Error("The generated skin is empty. Provide a complete visual design.");
+          // A blank skin falls back to DevDock tokens; a packaged foundation's are not known here.
+          const unreadable = skinContrastIssues(
+            output.definition,
+            current.foundation ? undefined : DEVDOCK_TOKENS,
+          );
+          if (unreadable.length)
+            throw new Error(`Low-contrast color tokens: ${unreadable.join("; ")}.`);
         } catch (error) {
           if (attempt === 1 || job.abort.signal.aborted) throw error;
           prompt += `\nYour output could not be validated. Correct it and return the complete JSON. Keep the summary about visible design only; do not mention this validation repair.\nERROR: ${String(error).slice(0, 4000)}\nINVALID OUTPUT:\n${result.text.slice(0, 48000)}`;

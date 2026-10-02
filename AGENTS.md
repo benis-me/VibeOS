@@ -30,6 +30,7 @@ bun run dev:backend  # backend only
 bun run dev:frontend # frontend only
 bun run build        # production frontend build
 bun run typecheck    # typecheck all three packages
+bun run verify       # typecheck + biome check + tests; exit code = pass/fail
 ```
 
 Offline / no-model mode: `VIBEOS_AI_STUB=1 bun run dev` (deterministic stub UI).
