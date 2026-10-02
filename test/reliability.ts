@@ -261,4 +261,10 @@ assert.equal(Agents.recentRuns(10, undefined, { query: "Cursor", status: "error"
 assert.equal(Agents.runDetails("missing"), null);
 await Agents.prune(1);
 assert(Agents.getRun(runs[1]!.id), "pruning never removes a running operation");
+// Boot closes runs a restart cut off and names windows whose UI generation stopped.
+await Agents.startRun({ role: "ui-generation", trigger: "user", windowId: maintenanceWindow.id });
+assert((await Agents.recoverRuns()).includes(maintenanceWindow.id));
+assert.equal(Agents.getRun(runs[1]!.id)?.status, "aborted");
+assert.equal(Agents.getRun(runs[1]!.id)?.error, "interrupted");
+assert.deepEqual(await Agents.recoverRuns(), [], "nothing is left running");
 console.log("reliability regressions passed");

@@ -63,7 +63,7 @@ export function useBoot(): void {
         }
         apps.setAll(p.apps);
         vfs.setAll([...p.desktopNodes, ...p.recycleBinNodes]);
-        win.setAll(p.windows, p.snapshots);
+        win.setAll(p.windows, p.snapshots, p.busyWindowIds);
         notif.setAll(p.notifications);
         useActivityStore.getState().setAll(p.agentRuns);
       }),

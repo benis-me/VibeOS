@@ -150,6 +150,11 @@ function abortWindow(windowId: string): void {
   }
 }
 
+/** Windows with a generation in flight, so a (re)connecting client shows them busy. */
+export function generatingWindowIds(): string[] {
+  return [...inflight.keys()];
+}
+
 /** The user pressed Stop: abort only the in-flight run (it records ui.cancelled). */
 function cancelWindow(windowId: string): void {
   const cur = inflight.get(windowId);

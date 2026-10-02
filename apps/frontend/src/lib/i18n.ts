@@ -269,6 +269,7 @@ const zh: Dict = {
   "notif.empty": "暂无通知",
   // Boot
   "boot.connecting": "正在连接内核…",
+  "boot.reconnecting": "连接已断开，正在重连…",
   "boot.restoring": "正在恢复系统状态…",
   "boot.ready": "就绪",
   // Window controls
@@ -812,6 +813,7 @@ const en: Dict = {
   "notif.markAllRead": "Mark all read",
   "notif.empty": "All caught up",
   "boot.connecting": "Connecting to kernel…",
+  "boot.reconnecting": "Connection lost. Reconnecting…",
   "boot.restoring": "Restoring system state…",
   "boot.ready": "Ready",
   "win.minimize": "Minimize",

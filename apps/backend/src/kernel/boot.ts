@@ -1,5 +1,8 @@
 import { migrateApplications } from "../db/repositories/ApplicationRepo.ts";
 import { recoverSkins } from "../db/repositories/SkinRepo.ts";
+import { recoverRuns } from "../db/repositories/AgentRepo.ts";
+import { getWindow } from "../db/repositories/WindowRepo.ts";
+import { getSnapshot } from "../db/repositories/AppMemoryRepo.ts";
 import { registerCommunication } from "../events/communication.ts";
 import { getDb } from "../db/database.ts";
 import { migrate } from "../db/migrate.ts";
@@ -32,6 +35,11 @@ export async function boot() {
 
   const settings = await ensureSettings();
   await recoverSkins();
+  // Generations the last shutdown cut off never finish: close their runs, and
+  // redo first paints that left a window empty (index.ts, once agents listen).
+  const interrupted = (await recoverRuns()).filter(
+    (id) => getWindow(id)?.isOpen && !getSnapshot(id).trim(),
+  );
   await seedPresets();
   await syncDesktopFiles();
   await registerCommunication();
@@ -82,5 +90,5 @@ export async function boot() {
     console.log("[boot] AI stub mode — skipping model discovery");
   }
 
-  return { server };
+  return { server, interrupted };
 }

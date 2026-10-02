@@ -4,6 +4,8 @@ import type { BootPhase, Settings, ModelInfo, ProviderId, ProviderModel } from "
 interface ConnectionState {
   connected: boolean;
   bootPhase: BootPhase;
+  /** Reached "ready" once: later reconnects keep the desktop (and its drafts) mounted. */
+  hasBooted: boolean;
   bootCount: number;
   version: string;
   settings: Settings | null;
@@ -28,6 +30,7 @@ interface ConnectionState {
 export const useConnectionStore = create<ConnectionState>((set) => ({
   connected: false,
   bootPhase: "connecting",
+  hasBooted: false,
   bootCount: 0,
   version: "",
   settings: null,
@@ -35,7 +38,7 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
   providerModels: {},
   availableProviders: [],
   setConnected: (v) => set({ connected: v }),
-  setBootPhase: (p) => set({ bootPhase: p }),
+  setBootPhase: (p) => set((s) => ({ bootPhase: p, hasBooted: s.hasBooted || p === "ready" })),
   setBootInfo: (info) =>
     set({
       bootCount: info.bootCount,

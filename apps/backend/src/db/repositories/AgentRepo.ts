@@ -130,6 +130,26 @@ export function endRun(
   });
 }
 
+/**
+ * Runs still "running" at boot were cut off by the last shutdown and can never
+ * finish: close them. Returns the windows whose UI generation was cut off.
+ */
+export function recoverRuns(): Promise<string[]> {
+  return enqueue(() => {
+    const db = getDb();
+    const windows = db
+      .query<{ window_id: string }, []>(
+        "SELECT DISTINCT window_id FROM agent_runs WHERE status = 'running' AND role = 'ui-generation' AND window_id IS NOT NULL",
+      )
+      .all()
+      .map((row) => row.window_id);
+    db.query(
+      "UPDATE agent_runs SET status = 'aborted', error = 'interrupted', ended_at = ? WHERE status = 'running'",
+    ).run(Date.now());
+    return windows;
+  });
+}
+
 /** Keep provider usage; validation/execution can fail after the model returned successfully. */
 export function setOutcome(id: string, status: "error" | "aborted", error?: string) {
   return enqueue(() => {

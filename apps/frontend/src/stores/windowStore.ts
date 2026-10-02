@@ -14,7 +14,7 @@ interface WindowStoreState {
   progress: Record<string, { since: number; status?: string }>;
   /** Why the last generation left the window unfinished (an i18n key). */
   failed: Record<string, string>;
-  setAll: (windows: WindowState[], snapshots: Record<string, string>) => void;
+  setAll: (windows: WindowState[], snapshots: Record<string, string>, busyIds?: string[]) => void;
   upsert: (w: WindowState) => void;
   remove: (id: string) => void;
   reorder: (ids: string[]) => void;
@@ -31,11 +31,24 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
   busy: {},
   progress: {},
   failed: {},
-  setAll: (windows, snapshots) =>
-    set(() => {
+  setAll: (windows, snapshots, busyIds = []) =>
+    set((s) => {
       const map: Record<string, WindowState> = {};
       for (const w of windows) map[w.id] = w;
-      return { windows: map, snapshots, patches: {} };
+      // The server's view replaces ours: a restart dropped every other generation.
+      const busy: Record<string, boolean> = {};
+      const progress: WindowStoreState["progress"] = {};
+      for (const id of busyIds) {
+        busy[id] = true;
+        progress[id] = s.progress[id] ?? { since: Date.now() };
+      }
+      const failed = Object.fromEntries(Object.entries(s.failed).filter(([id]) => map[id]));
+      // An unchanged snapshot keeps its last patch, so a reconnect does not
+      // rebuild live surfaces (or restart running interactive scripts).
+      const patches = Object.fromEntries(
+        Object.entries(s.patches).filter(([id]) => map[id] && snapshots[id] === s.snapshots[id]),
+      );
+      return { windows: map, snapshots, patches, busy, progress, failed };
     }),
   upsert: (w) => set((s) => ({ windows: { ...s.windows, [w.id]: w } })),
   reorder: (ids) =>

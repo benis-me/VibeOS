@@ -96,6 +96,9 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   aborts only the in-flight run; the previous UI and queued deliveries stay. The
   `<vibeos-summary>` block streams first and is relayed as `s2c.ui.busy.status`.
   Window-bound failures (`s2c.error` with `windowId`) show inside the window, not as toasts.
+  Boot closes runs a restart left `running` (aborted, `interrupted`) and re-dispatches the
+  first paints it cut off; `s2c.boot.state.busyWindowIds` replaces client busy flags, and a
+  reconnect after the first boot keeps the desktop (and its drafts) mounted.
 - **Event delegation** (`hooks/useDelegatedEvents.ts`): Classic AI HTML never runs code; interactive versions execute validated inert scripts only inside an opaque-origin iframe.
   Clicks/submits/changes on `[data-vibeos-action]` become `c2s.op`; prepared local controls and explicitly registered isolated handlers consume their own interactions. Clicks on
   editable inputs are passed through natively (never trigger generation). Forms

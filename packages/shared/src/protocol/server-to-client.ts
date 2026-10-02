@@ -49,6 +49,8 @@ export interface BootStatePayload {
   availableProviders: ProviderId[];
   /** Recent agent runs for the Activity Monitor. */
   agentRuns: AgentRun[];
+  /** Windows generating right now; any other busy flag is stale after a reconnect. */
+  busyWindowIds?: string[];
 }
 
 export interface UiRegion {

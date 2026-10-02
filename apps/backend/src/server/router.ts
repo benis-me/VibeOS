@@ -18,6 +18,7 @@ import { availableProviderIds } from "../ai/providers/index.ts";
 import { env } from "../config/env.ts";
 import { searchApps } from "../ai/appSearch.ts";
 import { runCommand } from "../ai/commandPalette.ts";
+import { generatingWindowIds } from "../agents/UiGenerationAgent.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
 import {
   handleAppLaunch,
@@ -541,6 +542,7 @@ function sendBootState(ws: ServerWebSocket<WsData>): void {
     models: ModelPolicy.available(),
     availableProviders: availableProviderIds(),
     agentRuns: recentRuns(),
+    busyWindowIds: generatingWindowIds(),
   });
   sendTo(ws, "s2c.boot.ready", {});
   // Now the client is connected and listening: discover every provider's models
