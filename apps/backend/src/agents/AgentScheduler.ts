@@ -1,9 +1,8 @@
 /**
- * Agent scheduler. Wires the event-driven UI generation agent and the
- * timer-driven system-event + maintenance agents.
+ * Agent scheduler for the timer-driven system-event + maintenance agents
+ * (VIBEOS_AGENTS_DISABLED=1 turns these off; UI generation is always on).
  */
 import type { TimerAgent } from "./types.ts";
-import { registerUiGenerationAgent } from "./UiGenerationAgent.ts";
 import { SystemEventAgent } from "./SystemEventAgent.ts";
 import { MaintenanceAgent } from "./MaintenanceAgent.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
@@ -15,14 +14,10 @@ export function startAgents(): void {
   if (started) return;
   started = true;
 
-  // Event-driven: UI generation reacts to user ops and window opens.
-  registerUiGenerationAgent();
-
-  // Timer-driven ambient agents.
   scheduleTimer(SystemEventAgent, () => loadSettings().prefs.proactiveAgents !== false);
   scheduleTimer(MaintenanceAgent, () => true);
 
-  console.log("[agents] scheduler started (ui-generation + system-event + maintenance)");
+  console.log("[agents] timers started (system-event + maintenance)");
 }
 
 function scheduleTimer(agent: TimerAgent, enabled: () => boolean): void {

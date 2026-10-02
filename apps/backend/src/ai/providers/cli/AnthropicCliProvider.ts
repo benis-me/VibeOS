@@ -79,8 +79,9 @@ export class AnthropicCliProvider implements AiProvider {
       "--verbose",
       "--setting-sources",
       "",
-      "--permission-mode",
-      "bypassPermissions",
+      // Every tool is denied and permissions are not bypassed, so a gate failure
+      // fails instead of executing. (`--tools ""` is omitted: codebuddy ignores it
+      // and, without bypassed permissions, can stall for minutes.)
       "--max-turns",
       "6",
       "--disallowedTools",

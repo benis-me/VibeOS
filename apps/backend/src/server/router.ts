@@ -102,9 +102,11 @@ export async function handleMessage(ws: ServerWebSocket<WsData>, raw: string): P
       ? { action: "import", bytes: Buffer.byteLength(msg.payload.command.json) }
       : ["c2s.memory.command", "c2s.application.command"].includes(msg.type)
         ? { type: msg.type }
-        : msg.type === "c2s.communication.command"
-          ? { windowId: msg.payload.windowId, action: msg.payload.command.action }
-          : msg.payload,
+        : msg.type === "c2s.settings.update"
+          ? { keys: Object.keys(msg.payload.partial) } // values may hold API keys
+          : msg.type === "c2s.communication.command"
+            ? { windowId: msg.payload.windowId, action: msg.payload.command.action }
+            : msg.payload,
   );
   const t0 = performance.now();
   try {

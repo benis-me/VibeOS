@@ -164,7 +164,11 @@ function cancelWindow(windowId: string): void {
   log.debug(`■ [${windowId.slice(-6)}] generation stopped by the user`);
 }
 
+let registered = false;
+/** Idempotent: a second registration would generate every action twice. */
 export function registerUiGenerationAgent(): void {
+  if (registered) return;
+  registered = true;
   bus.on("app.delivery", ({ delivery }) => {
     if (!deliveryAlive(delivery)) return;
     const queue = deliveries.get(delivery.windowId) ?? [];

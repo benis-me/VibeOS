@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os";
 import { cliEnv } from "./env.ts";
 
 export interface CliStreamResult {
@@ -21,6 +22,8 @@ export async function streamJsonl(opts: {
   onObject: (obj: Record<string, unknown>) => void;
 }): Promise<CliStreamResult> {
   const proc = Bun.spawn([opts.bin, ...opts.args], {
+    // Never the source tree: a prompt-injected CLI must not land in the repo.
+    cwd: tmpdir(),
     stdin: new TextEncoder().encode(opts.stdin),
     stdout: "pipe",
     stderr: "pipe",

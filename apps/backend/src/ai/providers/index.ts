@@ -39,6 +39,9 @@ const CLI_BINARIES: Partial<Record<ProviderId, string>> = {
   codex: "codex",
 };
 
+/** A CLI subprocess (vs. an HTTP API whose SDK already retries transient errors). */
+export const isCliProvider = (id: ProviderId): boolean => !!CLI_BINARIES[id];
+
 const cache = new Map<ProviderId, AiProvider>();
 
 let activeId: ProviderId = DEFAULT_PROVIDER;

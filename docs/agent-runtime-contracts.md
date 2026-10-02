@@ -35,7 +35,10 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   conversation (no session resume); the full current UI is sent as context every time
   (`[CURRENT UI]` in `PromptAssembler`, capped by `VIBEOS_SNAPSHOT_BUDGET`, 0 = no cap).
   Cost is taken from the Claude CLI's reported figure, else estimated from tokens
-  (`ai/pricing.ts`) so codebuddy / codex / openrouter still show cost.
+  (`ai/pricing.ts`) so codebuddy / codex / openrouter still show cost. A failed run is
+  never re-sent to a provider the user did not choose; only a CLI failure that is not
+  auth/quota/missing-binary is retried once (API SDKs retry themselves). CLI providers
+  run from the OS temp directory, deny every tool and never bypass permissions.
 - **Skins.** Built-ins (`devdock` / `xp` / `aqua`) are immutable. The native **Skins**
   app creates blank custom skins (no built-in foundation), duplicates a selected
   skin's active appearance, and generates versions through `ai/skins.ts` and

@@ -5,7 +5,7 @@ import { ModelPolicy } from "./ModelPolicy.ts";
 import { estimateCostUsd } from "./pricing.ts";
 import { systemPromptFor, localeDirective, imageDirective } from "../prompt/systemPrompts.ts";
 import { env } from "../config/env.ts";
-import { activeProviderId, availableProviderIds, getProvider } from "./providers/index.ts";
+import { activeProviderId, getProvider, isCliProvider } from "./providers/index.ts";
 import type { AiProvider, RunResult } from "./providers/types.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 import * as AgentRepo from "../db/repositories/AgentRepo.ts";
@@ -14,6 +14,9 @@ import { logger } from "../util/log.ts";
 import { messageContext } from "../events/bus.ts";
 
 const log = logger("sdk");
+/** Failures a retry cannot fix: a missing CLI or model, login/auth, quota or billing. */
+const DETERMINISTIC_FAILURE =
+  /not found|authenticat|oauth|log ?in|api key|unauthori[sz]ed|forbidden|quota|credit|billing|\b40[13]\b/i;
 
 export type { RunResult };
 
@@ -238,20 +241,19 @@ export async function run(opts: RunOptions): Promise<RunResult> {
 
     let { result, timedOut } = await attempt(provider, cfg.model, true);
 
-    // Recover from a genuine provider failure (not preemption, not a hang/timeout):
-    // retry once on the same provider, then fall back to another available backend.
-    // Recovery attempts don't stream — they yield a final result patched in one go.
-    const recoverable = () => !result.ok && !timedOut && !preempt?.aborted;
-    if (recoverable()) {
+    // A CLI that crashed gets one more try on the same provider (not streamed).
+    // API SDKs already retried themselves; a missing CLI, auth or quota failure
+    // fails at once; and the prompt never goes to a provider the user didn't pick.
+    // ponytail: message heuristic; use typed provider errors if it misclassifies.
+    if (
+      !result.ok &&
+      !timedOut &&
+      !preempt?.aborted &&
+      isCliProvider(provider.id) &&
+      !DETERMINISTIC_FAILURE.test(result.error ?? "")
+    ) {
       log.warn(`${provider.id} failed (${result.error}); retrying once`);
       ({ result, timedOut } = await attempt(provider, cfg.model, false));
-    }
-    if (recoverable()) {
-      const fallbackId = availableProviderIds().find((id) => id !== provider.id);
-      if (fallbackId) {
-        log.warn(`${provider.id} still failing; falling back to ${fallbackId}`);
-        ({ result, timedOut } = await attempt(await getProvider(fallbackId), undefined, false));
-      }
     }
 
     if (!result.ok) log.error(`run failed (${opts.role}): ${result.error ?? "unknown"}`);

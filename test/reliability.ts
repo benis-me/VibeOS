@@ -23,6 +23,7 @@ import type { ProviderRunOptions, RunResult } from "../apps/backend/src/ai/provi
 import { getAppData } from "../apps/backend/src/db/repositories/ApplicationRepo.ts";
 import { enqueue } from "../apps/backend/src/db/repositories/writeQueue.ts";
 import * as Syscalls from "../apps/backend/src/syscall/SyscallInterpreter.ts";
+import { run as modelRun } from "../apps/backend/src/ai/SdkManager.ts";
 import type { ServerToClient } from "@vibeos/shared/protocol";
 
 async function until(predicate: () => unknown) {
@@ -267,4 +268,14 @@ assert((await Agents.recoverRuns()).includes(maintenanceWindow.id));
 assert.equal(Agents.getRun(runs[1]!.id)?.status, "aborted");
 assert.equal(Agents.getRun(runs[1]!.id)?.error, "interrupted");
 assert.deepEqual(await Agents.recoverRuns(), [], "nothing is left running");
+// Every provider shares `fake`, so any switch to another vendor would add attempts.
+let attempts = 0;
+const failWith = (error: string) => async () => (attempts++, { ok: false, text: "", error });
+fake = failWith("Failed to authenticate: OAuth session expired");
+assert.equal((await modelRun({ role: "system-event", trigger: "user", prompt: "x" })).ok, false);
+assert.equal(attempts, 1, "an auth failure fails at once on the chosen provider");
+attempts = 0;
+fake = failWith("codex exited: stdout closed unexpectedly");
+await modelRun({ role: "system-event", trigger: "user", prompt: "x" });
+assert.equal(attempts, 2, "a CLI crash is retried once, never on another provider");
 console.log("reliability regressions passed");

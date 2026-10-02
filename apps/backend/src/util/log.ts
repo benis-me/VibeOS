@@ -5,7 +5,7 @@
 type Level = "debug" | "info" | "warn" | "error";
 
 const ORDER: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40 };
-const threshold = ORDER[(process.env.VIBEOS_LOG_LEVEL as Level) ?? "debug"] ?? ORDER.debug;
+const threshold = ORDER[(process.env.VIBEOS_LOG_LEVEL as Level) ?? "info"] ?? ORDER.info;
 
 const COLOR: Record<Level, string> = {
   debug: "90", // gray
