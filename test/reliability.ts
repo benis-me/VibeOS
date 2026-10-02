@@ -1,20 +1,19 @@
 // Real disk/database regressions with local fake model/CLI output. Run via reliability.test.ts.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { getDb, closeDb } from "../apps/backend/src/db/database.ts";
+import { getDb } from "../apps/backend/src/db/database.ts";
 import { migrate } from "../apps/backend/src/db/migrate.ts";
 import { ensureSettings } from "../apps/backend/src/db/repositories/SettingsRepo.ts";
 import { ensureDiskLayout, writeContent } from "../apps/backend/src/files/content.ts";
 import { executeDisk, diskPath, watchDisk } from "../apps/backend/src/files/disk.ts";
 import { installApp, seedPresets } from "../apps/backend/src/db/repositories/AppRepo.ts";
 import { openWindow, closeWindow } from "../apps/backend/src/db/repositories/WindowRepo.ts";
-import { ensureMemory, saveSnapshot, addInteraction, consolidationCursor, saveSummary, getMemory } from "../apps/backend/src/db/repositories/AppMemoryRepo.ts";
+import { ensureMemory, saveSnapshot, getMemory, recentInteractions } from "../apps/backend/src/db/repositories/AppMemoryRepo.ts";
 import { getProvider, setActiveProvider, availableProviderIds } from "../apps/backend/src/ai/providers/index.ts";
 import { changeSystemMemory } from "../apps/backend/src/db/repositories/SystemMemoryRepo.ts";
 import { broadcastDiskChanges, executeFileCommand } from "../apps/backend/src/server/filesHandlers.ts";
 import { registerCommunication, communicate } from "../apps/backend/src/events/communication.ts";
 import { registerUiGenerationAgent } from "../apps/backend/src/agents/UiGenerationAgent.ts";
-import { MaintenanceAgent } from "../apps/backend/src/agents/MaintenanceAgent.ts";
 import { bus, messageContext } from "../apps/backend/src/events/bus.ts";
 import * as Agents from "../apps/backend/src/db/repositories/AgentRepo.ts";
 import { codexProvider } from "../apps/backend/src/ai/providers/codex.ts";
@@ -234,21 +233,15 @@ live = false; releaseWrite(); await queuedCreate;
 assert(!existsSync(diskPath("Desktop/cancelled-create.txt")), "legacy create-file also rechecks cancellation inside its writer");
 offFrames();
 
-// Successful consolidation records the input watermark; failures and stale results do not.
+// A committed generation records its summary as that step's result, with no extra model call.
 const maintenanceWindow = await openWindow({ appId: app.id, title: "Maintenance" });
 await ensureMemory(maintenanceWindow.id, app.id);
-for (let n = 0; n < 6; n++) await addInteraction({ windowId: maintenanceWindow.id, opKind: "click", opPayload: { n } });
-let maintenanceCalls = 0;
-fake = async () => { maintenanceCalls++; return { ok: true, text: "<vibeos-summary>Consolidated</vibeos-summary>" }; };
-await MaintenanceAgent.tick(); assert.equal(maintenanceCalls, 1); assert.equal(consolidationCursor(maintenanceWindow.id), 6);
-closeDb(); await MaintenanceAgent.tick(); assert.equal(maintenanceCalls, 1, "restart does not repeat unchanged maintenance");
-await addInteraction({ windowId: maintenanceWindow.id, opKind: "click", opPayload: {} });
-fake = async () => { await saveSummary(maintenanceWindow.id, "Foreground changed"); return { ok: true, text: "<vibeos-summary>Stale maintenance</vibeos-summary>" }; };
-await MaintenanceAgent.tick(); assert.equal(getMemory(maintenanceWindow.id)?.episodeSummary, "Foreground changed"); assert.equal(consolidationCursor(maintenanceWindow.id), 6);
-fake = async () => ({ ok: false, text: "partial", error: "simulated failure" });
-await MaintenanceAgent.tick(); assert.equal(consolidationCursor(maintenanceWindow.id), 6);
-fake = async () => { maintenanceCalls++; return { ok: true, text: "<vibeos-summary>New consolidation</vibeos-summary>" }; };
-await MaintenanceAgent.tick(); await MaintenanceAgent.tick(); assert.equal(maintenanceCalls, 2); assert.equal(consolidationCursor(maintenanceWindow.id), 7);
+fake = async () => ({ ok: true, text: '<vibeos-summary>Saved the draft</vibeos-summary>\n<vibeos-html mode="full"><main data-vibeos-region="root">Saved</main></vibeos-html>' });
+before = completed;
+bus.emit("op.received", { windowId: maintenanceWindow.id, op: { kind: "click", action: "save" } });
+await until(() => completed > before); await Bun.sleep(50);
+assert.equal(recentInteractions(maintenanceWindow.id).at(-1)?.resultSummary, "Saved the draft");
+assert.equal(getMemory(maintenanceWindow.id)?.episodeSummary, "Saved the draft");
 
 // Server-side filters find older history, with no skipped records at equal timestamps.
 const runs = [];

@@ -17,6 +17,7 @@ import {
   recentInteractions,
   saveSnapshot,
   saveSummary,
+  saveInteractionResult,
   addInteraction,
   interactionInput,
 } from "../db/repositories/AppMemoryRepo.ts";
@@ -619,6 +620,8 @@ async function generate(
       `✓ ${app.name} [${windowId.slice(-6)}] ${regions?.length ? `${regions.length} region(s)` : "full"}, ${(performance.now() - t0).toFixed(0)}ms`,
     );
     if (parsed.summary) await saveSummary(windowId, parsed.summary, canPublish);
+    if (parsed.summary && interactionId)
+      await saveInteractionResult(interactionId, parsed.summary, canPublish);
     await recordSummary(result.runId, what);
     if (!canPublish()) return;
     if (trigger.op) {

@@ -1,6 +1,6 @@
 import { migrateApplications } from "../db/repositories/ApplicationRepo.ts";
 import { recoverSkins } from "../db/repositories/SkinRepo.ts";
-import { recoverRuns } from "../db/repositories/AgentRepo.ts";
+import { recoverRuns, prune as pruneRuns } from "../db/repositories/AgentRepo.ts";
 import { getWindow } from "../db/repositories/WindowRepo.ts";
 import { getSnapshot } from "../db/repositories/AppMemoryRepo.ts";
 import { registerCommunication } from "../events/communication.ts";
@@ -40,6 +40,7 @@ export async function boot() {
   const interrupted = (await recoverRuns()).filter(
     (id) => getWindow(id)?.isOpen && !getSnapshot(id).trim(),
   );
+  await pruneRuns(500);
   await seedPresets();
   await syncDesktopFiles();
   await registerCommunication();

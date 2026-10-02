@@ -119,33 +119,16 @@ export function saveSummary(
   });
 }
 
-export function consolidationCursor(windowId: string): number {
-  return (
-    getDb()
-      .query<{ consolidated_seq: number }, [string]>(
-        "SELECT consolidated_seq FROM app_memory WHERE window_id=?",
-      )
-      .get(windowId)?.consolidated_seq ?? 0
-  );
-}
-
-/** Never replace a foreground summary that changed while maintenance was running. */
-export function saveConsolidation(
-  windowId: string,
+/** What an interaction did (the model's summary), shown in later [RECENT INTERACTIONS]. */
+export function saveInteractionResult(
+  id: string,
   summary: string,
-  seq: number,
-  previous: string,
-) {
-  return enqueue(
-    () =>
-      getDb()
-        .query(
-          `UPDATE app_memory SET episode_summary=?, consolidated_seq=?, updated_at=?
-     WHERE window_id=? AND episode_summary=? AND consolidated_seq < ?
-     AND NOT EXISTS (SELECT 1 FROM interactions WHERE window_id=? AND seq>?)`,
-        )
-        .run(summary, seq, Date.now(), windowId, previous, seq, windowId, seq).changes > 0,
-  );
+  canWrite = () => true,
+): Promise<void> {
+  return enqueue(() => {
+    if (!canWrite()) return;
+    getDb().query("UPDATE interactions SET result_summary = ? WHERE id = ?").run(summary, id);
+  });
 }
 
 export function saveSessionId(windowId: string, sessionId: string): Promise<void> {

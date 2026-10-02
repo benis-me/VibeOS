@@ -1,11 +1,11 @@
 /**
- * Agent scheduler for the timer-driven system-event + maintenance agents
- * (VIBEOS_AGENTS_DISABLED=1 turns these off; UI generation is always on).
+ * Agent scheduler for the timer-driven system-event agent
+ * (VIBEOS_AGENTS_DISABLED=1 turns it off; UI generation is always on).
  */
 import type { TimerAgent } from "./types.ts";
 import { SystemEventAgent } from "./SystemEventAgent.ts";
-import { MaintenanceAgent } from "./MaintenanceAgent.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
+import { hasClients } from "../server/wsGateway.ts";
 
 let started = false;
 const timers: ReturnType<typeof setTimeout>[] = [];
@@ -14,10 +14,13 @@ export function startAgents(): void {
   if (started) return;
   started = true;
 
-  scheduleTimer(SystemEventAgent, () => loadSettings().prefs.proactiveAgents !== false);
-  scheduleTimer(MaintenanceAgent, () => true);
+  // Ambient events are for someone watching: with no client connected, no model call.
+  scheduleTimer(
+    SystemEventAgent,
+    () => hasClients() && loadSettings().prefs.proactiveAgents !== false,
+  );
 
-  console.log("[agents] timers started (system-event + maintenance)");
+  console.log("[agents] timers started (system-event)");
 }
 
 function scheduleTimer(agent: TimerAgent, enabled: () => boolean): void {

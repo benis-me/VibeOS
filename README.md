@@ -65,8 +65,9 @@ next — as if it were a real program responding.
 - **Multi-agent runtime** — several agents drive the system concurrently:
   - **UI-Generation Agent** (strong model) — renders/patches windows on user actions.
   - **System-Event Agent** (fast model, on a timer) — invents ambient notifications so
-    the OS feels alive, without being user-triggered.
-  - **Maintenance Agent** (fastest model) — consolidates per-window memory, prunes logs.
+    the OS feels alive, without being user-triggered; it is idle while no client is
+    connected. Each step's own summary feeds later prompts, so memory needs no
+    background model calls.
 - **Desktop shell** — desktop, draggable/resizable multi-window manager, taskbar,
   start menu (split into *system* and *generated* apps), notifications (toasts + center).
 - **Global user profile** — a profile/memory the user writes once; every generated app

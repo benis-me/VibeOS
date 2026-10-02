@@ -17,6 +17,9 @@ export function unregisterSocket(ws: ServerWebSocket<WsData>): void {
   sockets.delete(ws);
 }
 
+/** Someone has the OS open (any connected client). */
+export const hasClients = (): boolean => sockets.size > 0;
+
 /** Send a single frame to one socket. */
 export function sendTo<T extends ServerToClient["type"]>(
   ws: ServerWebSocket<WsData>,
