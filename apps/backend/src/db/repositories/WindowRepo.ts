@@ -43,10 +43,9 @@ function toWindow(row: WindowRow): WindowState {
     viewState: viewStateSchema.parse(JSON.parse(row.view_state_json ?? "{}")),
     snapshotDataVersion:
       getDb()
-        .query<
-          { data_version: string | null },
-          [string]
-        >("SELECT data_version FROM app_memory WHERE window_id=?")
+        .query<{ data_version: string | null }, [string]>(
+          "SELECT data_version FROM app_memory WHERE window_id=?",
+        )
         .get(row.id)?.data_version ?? undefined,
     id: row.id,
     appId: row.app_id,

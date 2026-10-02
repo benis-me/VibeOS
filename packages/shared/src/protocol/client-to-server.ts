@@ -46,7 +46,14 @@ export interface DropTarget {
 }
 
 export type ClientToServer =
-  | { type: "c2s.window.view-state"; payload: { windowId: string; appVersionId?: string; state: import("../domain/runtime.ts").ViewState } }
+  | {
+      type: "c2s.window.view-state";
+      payload: {
+        windowId: string;
+        appVersionId?: string;
+        state: import("../domain/runtime.ts").ViewState;
+      };
+    }
   | { type: "c2s.application.command"; payload: { requestId: string; command: ApplicationCommand } }
   | { type: "c2s.memory.command"; payload: { requestId: string; command: MemoryCommand } }
   | {

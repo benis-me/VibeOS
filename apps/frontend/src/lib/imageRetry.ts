@@ -8,10 +8,13 @@ export function installImageRetries(root: HTMLElement) {
     if (count >= 6) return;
     img.dataset.vibeRetry = String(count + 1);
     const base = img.src.replace(/[?&]r=\d+$/, "");
-    const timer = setTimeout(() => {
-      timers.delete(timer);
-      if (root.contains(img)) img.src = `${base}${base.includes("?") ? "&" : "?"}r=${count + 1}`;
-    }, 1000 + count * 1500);
+    const timer = setTimeout(
+      () => {
+        timers.delete(timer);
+        if (root.contains(img)) img.src = `${base}${base.includes("?") ? "&" : "?"}r=${count + 1}`;
+      },
+      1000 + count * 1500,
+    );
     timers.add(timer);
   };
   root.addEventListener("error", onError, true);

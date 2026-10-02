@@ -83,7 +83,16 @@ const msg = <T extends string, P extends z.ZodTypeAny>(type: T, payload: P) =>
   z.object({ type: z.literal(type), payload });
 
 export const clientToServerSchema = z.discriminatedUnion("type", [
-  msg("c2s.window.view-state", z.object({ windowId: z.string().min(1).max(100), appVersionId: z.string().max(100).optional(), state: viewStateSchema }).strict()),
+  msg(
+    "c2s.window.view-state",
+    z
+      .object({
+        windowId: z.string().min(1).max(100),
+        appVersionId: z.string().max(100).optional(),
+        state: viewStateSchema,
+      })
+      .strict(),
+  ),
   msg(
     "c2s.application.command",
     z.object({ requestId: z.string().min(1).max(100), command: applicationCommandSchema }),

@@ -10,18 +10,14 @@ export function bindCommunication(
   for (const el of root.querySelectorAll<HTMLElement>("[data-vibeos-bind]")) {
     const binding = el.dataset.vibeosBind ?? "";
     if (
-      (binding !== delivery.channel &&
-        !binding.startsWith(delivery.channel + ".")) ||
+      (binding !== delivery.channel && !binding.startsWith(delivery.channel + ".")) ||
       el.matches("input,textarea,select,script,style")
     )
       continue;
     const keys =
-      binding === delivery.channel
-        ? []
-        : binding.slice(delivery.channel.length + 1).split(".");
+      binding === delivery.channel ? [] : binding.slice(delivery.channel.length + 1).split(".");
     let value: unknown = delivery.data;
-    if (keys[0] === "$error")
-      value = delivery.error ? translate(delivery.error) : "";
+    if (keys[0] === "$error") value = delivery.error ? translate(delivery.error) : "";
     else
       for (const key of keys) {
         value =
@@ -33,10 +29,6 @@ export function bindCommunication(
             : undefined;
       }
     el.textContent =
-      value == null
-        ? ""
-        : typeof value === "string"
-          ? value
-          : JSON.stringify(value, null, 2);
+      value == null ? "" : typeof value === "string" ? value : JSON.stringify(value, null, 2);
   }
 }

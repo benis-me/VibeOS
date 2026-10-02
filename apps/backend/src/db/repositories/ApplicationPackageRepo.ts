@@ -145,10 +145,9 @@ export function exportApplication(appId: string, includeData = false): string {
   if (!app || app.kind !== "virtual") throw new Error("applications.error.readOnly");
   const definition = readApplicationVersion(appId)!;
   const row = getDb()
-    .query<
-      { legacy: number },
-      [string]
-    >("SELECT legacy FROM app_versions WHERE id=(SELECT active_version_id FROM apps WHERE id=?)")
+    .query<{ legacy: number }, [string]>(
+      "SELECT legacy FROM app_versions WHERE id=(SELECT active_version_id FROM apps WHERE id=?)",
+    )
     .get(appId);
   // Old snapshots may literally contain a user's records. Export the generation
   // intent; an imported legacy application generates a fresh UI on first open.

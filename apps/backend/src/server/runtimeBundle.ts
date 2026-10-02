@@ -5,9 +5,7 @@ let bundle: Promise<string> | undefined;
 export async function serveRuntimeBundle() {
   bundle ??= Bun.build({
     entrypoints: [
-      fileURLToPath(
-        new URL("../../../frontend/src/runtime/frame.ts", import.meta.url),
-      ),
+      fileURLToPath(new URL("../../../frontend/src/runtime/frame.ts", import.meta.url)),
     ],
     target: "browser",
     format: "iife",

@@ -35,7 +35,10 @@ export function broadcast<T extends ServerToClient["type"]>(
   type: T,
   payload: Extract<ServerToClient, { type: T }>["payload"],
 ): void {
-  bus.emit("system.broadcast", { message: { type, payload } as ServerToClient, trace: messageContext.getStore() });
+  bus.emit("system.broadcast", {
+    message: { type, payload } as ServerToClient,
+    trace: messageContext.getStore(),
+  });
   if (sockets.size === 0) return;
   const env: WsEnvelope = makeEnvelope(type, payload, ulid());
   const data = JSON.stringify(env);

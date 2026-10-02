@@ -59,10 +59,9 @@ interface RequestRow {
 const hash = (text: string) => createHash("sha256").update(text).digest("hex");
 const index = (id: string) =>
   getDb()
-    .query<
-      AppIndex,
-      [string]
-    >("SELECT id, content_path, active_version_id, origin_app_id FROM apps WHERE id = ?")
+    .query<AppIndex, [string]>(
+      "SELECT id, content_path, active_version_id, origin_app_id FROM apps WHERE id = ?",
+    )
     .get(id);
 const dataPath = (id: string) => `System/AppData/${encodeURIComponent(id)}/state.json`;
 const safeDefinition = (app: AppDescriptor): ApplicationDefinition => ({
@@ -115,10 +114,9 @@ function writeVersion(
   const row = index(app.id)!;
   const id = ulid();
   const number = db
-    .query<
-      { n: number },
-      [number, string]
-    >("SELECT COALESCE(MAX(number), ?) + 1 n FROM app_versions WHERE app_id = ?")
+    .query<{ n: number }, [number, string]>(
+      "SELECT COALESCE(MAX(number), ?) + 1 n FROM app_versions WHERE app_id = ?",
+    )
     .get(definition.seedHtml ? 0 : -1, app.id)!.n;
   const path = `${dirname(row.content_path)}/Versions/${id}/definition.json`;
   const { seedHtml, ...meta } = definition;
@@ -234,10 +232,9 @@ export function applicationState(): ApplicationState {
               runtime: v.runtime,
             })),
           requests: db
-            .query<
-              RequestRow,
-              [string]
-            >("SELECT * FROM app_requests WHERE app_id = ? ORDER BY created_at DESC LIMIT 30")
+            .query<RequestRow, [string]>(
+              "SELECT * FROM app_requests WHERE app_id = ? ORDER BY created_at DESC LIMIT 30",
+            )
             .all(app.id)
             .map(requestFromRow),
         };
@@ -539,10 +536,9 @@ export async function migrateApplications() {
     }
     // Each old temporary experience receives its own identity; window IDs and bytes stay intact.
     for (const w of db
-      .query<
-        { id: string; title: string; w: number; h: number },
-        []
-      >("SELECT id,title,w,h FROM windows WHERE app_id='__transient__'")
+      .query<{ id: string; title: string; w: number; h: number }, []>(
+        "SELECT id,title,w,h FROM windows WHERE app_id='__transient__'",
+      )
       .all()) {
       const app = await installApp({
         name: w.title,

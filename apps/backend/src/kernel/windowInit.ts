@@ -26,8 +26,7 @@ export async function renderInitialWindow(windowId: string, app: AppDescriptor):
     const dataVersion = empty ? currentData.version : undefined;
     await saveSnapshot(windowId, seed, undefined, dataVersion);
     broadcast("s2c.ui.patch", { windowId, dataVersion, mode: "full", html: seed, done: true });
-    if (app.kind === "virtual" && !empty)
-      bus.emit("window.firstRender", { windowId });
+    if (app.kind === "virtual" && !empty) bus.emit("window.firstRender", { windowId });
     return;
   }
 
