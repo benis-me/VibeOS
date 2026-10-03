@@ -1,13 +1,11 @@
 import { ulid, stripEmoji } from "@vibeos/shared/util";
 import { getAppData, readApplicationVersion } from "../db/repositories/ApplicationRepo.ts";
-import { validateRuntimeScripts } from "../db/repositories/ApplicationPackageRepo.ts";
 import { isDeepStrictEqual } from "node:util";
 import { learnFromUser } from "../ai/systemMemory.ts";
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import { NATIVE_PRESET_APPS, type AppDelivery } from "@vibeos/shared/domain";
 import { bus, messageContext } from "../events/bus.ts";
 import { deliveryAlive, failDelivery, pendingReplies } from "../events/communication.ts";
-import { parseSubscriptions } from "../db/repositories/CommunicationRepo.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { getApp } from "../db/repositories/AppRepo.ts";
 import { getWindow } from "../db/repositories/WindowRepo.ts";
@@ -27,7 +25,8 @@ import { assemblePrompt, decideRenderMode } from "../prompt/PromptAssembler.ts";
 import { run, recordSummary, recordStep } from "../ai/SdkManager.ts";
 import { parseAiOutput, extractStreamingHtml, extractSummary } from "../ai/streamParser.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
-import { applyRegionsServer, extractRegionIds } from "./regionMerge.ts";
+import { extractRegionIds } from "./regionMerge.ts";
+import { OutputRejected, validateOutput } from "./outputRules.ts";
 import { rewriteImages } from "../ai/imageCache.ts";
 import { logger } from "../util/log.ts";
 
@@ -341,19 +340,23 @@ async function generate(
   const canCommit = () =>
     !isStale(windowId, gen, abort) && (!trigger.message || deliveryAlive(trigger.message));
   let repairReason = "";
+  let repairFull = false;
   for (let attempt = 0; attempt < 2; attempt++) {
     if (!canCommit()) return;
     let buffer = "";
     let lastStreamed = "";
     let status = "";
-    const fullRequired = renderMode === "force-full" || attempt > 0;
+    // Only broken HTML structure forces a complete body; other repairs keep the mode.
+    const fullRequired = renderMode === "force-full" || (attempt > 0 && repairFull);
     const result = await run({
       role: "ui-generation",
       trigger: firstRender ? "user" : "event",
       prompt:
         attempt === 0
           ? prompt
-          : `${prompt}\n\n[RENDER REPAIR: FULL REQUIRED]\nThe previous output was rejected: ${repairReason}. It was NOT applied and none of its syscalls ran. Respond to the original operation using CURRENT UI. Return the COMPLETE window body in <vibeos-html mode="full">; no region patch this time.`,
+          : repairFull
+            ? `${prompt}\n\n[RENDER REPAIR: FULL REQUIRED]\nThe previous output was rejected: ${repairReason}. It was NOT applied and none of its syscalls ran. Respond to the original operation using CURRENT UI. Return the COMPLETE window body in <vibeos-html mode="full">; no region patch this time.`
+            : `${prompt}\n\n[OUTPUT REPAIR]\nThe previous output was rejected: ${repairReason}. It was NOT applied and none of its syscalls ran. Respond to the original operation again with exactly this problem fixed, following the render mode above.`,
       // Every attempt is stateless, including a repair of invalid output.
       abort,
       appName: app.name,
@@ -392,57 +395,21 @@ async function generate(
 
     const parsed = parseAiOutput(result.text, fullRequired ? "full" : undefined);
     let html: string | undefined;
-    let regions = parsed.regions;
+    let regions: typeof parsed.regions;
     const readOnlyRefresh =
       trigger.message?.kind === "event" &&
       trigger.message.topic === "app.data.changed" &&
       "appId" in trigger.message.source &&
       trigger.message.source.appId === app.id;
     try {
-      if (parsed.syscallError) throw new Error(parsed.syscallError);
-      if (parsed.renderError) throw new Error(parsed.renderError);
-      if (regions?.length) {
-        if (fullRequired) throw new Error("A complete window body is required");
-        html = applyRegionsServer(snapshot, regions);
-      } else if (parsed.html !== undefined) {
-        html = parsed.html;
-      } else if (!parsed.syscalls.length && !(readOnlyRefresh && parsed.summary.trim())) {
-        throw new Error("The model returned no UI or system action");
-      }
-      const stateCalls = parsed.syscalls.filter((call) => call.type === "app-state");
-      const needsState =
-        (!readOnlyRefresh && html !== undefined) ||
-        parsed.syscalls.some((call) => call.type === "notify" || call.type === "spawn-window");
-      if (stateCalls.length > 1 || (needsState && stateCalls.length !== 1))
-        throw new Error(
-          "Declare exactly one app-state call: provide the complete shared data for record changes, or omit data for a view-only change. A notification or completed-looking HTML does not persist application state.",
-        );
-      const explicitStateWrite = parsed.syscalls.some(
-        (call) =>
-          call.type === "communication" &&
-          call.command.action === "request" &&
-          "system" in call.command.target &&
-          call.command.target.system === "app-data" &&
-          call.command.topic === "set",
-      );
-      if (
-        readOnlyRefresh &&
-        (stateCalls.some((call) => call.data !== undefined) || explicitStateWrite)
-      )
-        throw new Error(
-          "app.data.changed only refreshes the view; use app-state without data and never repeat the mutation.",
-        );
-      if (stateCalls.some((call) => call.data !== undefined)) {
-        if (explicitStateWrite)
-          throw new Error(
-            "Use one state write: app-state or app-data set, never both in one response.",
-          );
-      }
-      if (html !== undefined) {
-        await validateRuntimeScripts(html, app.manifest.runtime ?? "html");
-        await parseSubscriptions(html);
-      }
+      ({ html, regions } = await validateOutput(parsed, {
+        snapshot,
+        fullRequired,
+        readOnlyRefresh,
+        runtime: app.manifest.runtime ?? "html",
+      }));
     } catch (error) {
+      repairFull = error instanceof OutputRejected && error.full;
       repairReason =
         error instanceof Error
           ? `${error.message}${error.cause ? `: ${String(error.cause)}` : ""}`
@@ -456,7 +423,9 @@ async function generate(
       );
       if (!canCommit()) return;
       if (attempt === 1) throw error;
-      log.warn(`Invalid UI [${windowId.slice(-6)}]: ${repairReason}; retrying full render`);
+      log.warn(
+        `Invalid UI [${windowId.slice(-6)}]: ${repairReason}; retrying${repairFull ? " full render" : ""}`,
+      );
       continue;
     }
 

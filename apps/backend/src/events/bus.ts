@@ -20,6 +20,8 @@ export interface BusEvents {
   "op.dragdrop": { windowId?: string; source: DragPayload; target: DropTarget };
   /** A window was opened and needs its first AI render. */
   "window.firstRender": { windowId: string };
+  /** A window shows a saved interface; its view should reflect the current shared records. */
+  "window.refreshState": { windowId: string };
   /** A window spawned by the AI with a specific seed prompt for its content. */
   "window.spawnRender": { windowId: string; seedPrompt: string };
   /** A window was closed — any in-flight generation for it must be aborted. */

@@ -91,9 +91,11 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   and the model declares `<vibeos-html mode="full|regions">`. Legacy unmarked
   output is still inferred from its region blocks (forced-full operations use
   the complete body). Region extraction stays depth-aware in `streamParser.ts`
-  and `agents/regionMerge.ts` — do not simplify it to a single regex. Missing,
-  duplicate, overlapping, or malformed region targets trigger one full repair;
-  rejected output has no syscalls. Only first paint streams; existing windows
+  and `agents/regionMerge.ts` — do not simplify it to a single regex. Broken HTML
+  structure (incomplete envelope or region blocks; missing, duplicate or overlapping
+  targets) triggers one full repair; other rejections (syscalls, app-state rules,
+  scripts) retry once in the same render mode. The rules live in `agents/outputRules.ts`
+  with table-driven tests; rejected output has no syscalls. Only first paint streams; existing windows
   apply a validated, persisted batch. `regionMerge.ts` is the only merge: a regions
   patch carries the merged snapshot as `html`, the store keeps it, and both surfaces
   replace the named regions' DOM nodes. A region marked `data-vibeos-append` adds its
@@ -145,7 +147,8 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   Read-only `app.data.changed` refreshes may omit it; an already-current view may
   return only a summary without triggering a full repair.
   Same-app peers refresh automatically with the initiating action and canonical data;
-  explicit `app.data.changed` subscriptions override this default. Refreshes never
+  explicit `app.data.changed` subscriptions override this default. A minimized peer's
+  AI refresh waits until it is shown again, then runs once with the latest data. Refreshes never
   repeat state writes; unchanged JSON creates no revision/event. Spawned windows retain
   opener, purpose and record context. `close` without an ID closes the current window;
   completing a task does not force closure. Old visible records initialize shared data

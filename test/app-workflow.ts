@@ -4,7 +4,8 @@ import { getDb, closeDb } from "../apps/backend/src/db/database.ts";
 import { migrate } from "../apps/backend/src/db/migrate.ts";
 import { ensureSettings } from "../apps/backend/src/db/repositories/SettingsRepo.ts";
 import { ensureDiskLayout } from "../apps/backend/src/files/content.ts";
-import { installApp } from "../apps/backend/src/db/repositories/AppRepo.ts";
+import { getApp, installApp } from "../apps/backend/src/db/repositories/AppRepo.ts";
+import { renderInitialWindow } from "../apps/backend/src/kernel/windowInit.ts";
 import {
   openWindow,
   getWindow,
@@ -400,6 +401,58 @@ assert.equal(
   getMemory(parent.id)?.htmlSnapshot,
   savedHtml,
   "window commands never regenerate app content",
+);
+// A minimized view skips the model until it is shown again, then refreshes once.
+let restored = 0;
+fake = async ({ prompt }) => {
+  if (section(prompt, "WINDOW").windowId === parent.id) restored++;
+  return { ok: true, text: html("Refreshed after restore") + block([kept]) };
+};
+await Syscalls.execute(
+  [{ type: "window-state", state: "minimized", windowIds: [parent.id] }],
+  { source: "system" },
+);
+const writer = await openWindow({ appId: app.id, title: "Writer" });
+await ensureMemory(writer.id, app.id);
+await communicate(writer.id, {
+  action: "request",
+  target: { system: "app-data" },
+  topic: "set",
+  responseMode: "data",
+  data: {
+    version: getAppData(app.id).version,
+    data: { ...(getAppData(app.id).data as Record<string, unknown>), hidden: true },
+  },
+});
+await Bun.sleep(50);
+assert.equal(restored, 0, "a minimized view does not call the model");
+await Syscalls.execute([{ type: "focus", windowId: parent.id }], { source: "system" });
+await until(() => getMemory(parent.id)?.htmlSnapshot.includes("Refreshed after restore"));
+await Bun.sleep(30);
+assert.equal(restored, 1, "showing it refreshes once with the latest records");
+
+// Reopening a saved interface keeps it and updates it from the current records.
+const seeded = await installApp({
+  name: "Seeded",
+  manifest: { seedHtml: '<main data-vibeos-region="root">Saved view</main>' },
+});
+await setAppData(seeded.id, { version: getAppData(seeded.id).version, data: { note: "changed" } });
+let seededPrompt = "";
+fake = async ({ prompt }) => {
+  seededPrompt = prompt;
+  return { ok: true, text: html("Saved view, note changed") + block([kept]) };
+};
+const seededWindow = await openWindow({ appId: seeded.id, title: "Seeded" });
+await ensureMemory(seededWindow.id, seeded.id);
+await renderInitialWindow(seededWindow.id, getApp(seeded.id)!);
+await until(() => getMemory(seededWindow.id)?.htmlSnapshot.includes("note changed"));
+assert(
+  seededPrompt.includes('[CURRENT UI]\n<main data-vibeos-region="root">Saved view</main>'),
+  "the model sees the saved interface",
+);
+assert(
+  seededPrompt.includes("[RENDER MODE: INCREMENTAL PREFERRED]"),
+  "a saved interface is updated, not redrawn",
 );
 closeDb();
 assert.equal(getWindow(parent.id)?.state, "normal", "window state survives reopening the database");

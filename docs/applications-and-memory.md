@@ -73,7 +73,9 @@ writes do not create revisions or refreshes. Window selection and unsaved edits
 remain local. Spawned windows retain their opener, purpose, record context and
 same-app version. Optional `close` with no windowId dismisses the current window;
 completing a business action does not inherently close it. A newly opened
-window with shared data invokes AI to populate the reusable interface.
+window with shared data invokes AI to populate the reusable interface; one opened
+from a saved interface shows it at once and then updates it in place from the
+current records. A minimized window's AI refresh waits until it is shown again.
 
 Definitions declare `fileTypes` (extensions or MIME patterns) and `operations`
 (topic plus description). Files' **Open with** lists suitable generated apps.

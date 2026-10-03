@@ -13,7 +13,8 @@ const log = logger("boot");
 /**
  * Decide how a freshly-opened window gets its first content:
  *  - native preset app (Settings / Activity Monitor / App Store) → nothing (React renders it)
- *  - app with a frozen `seedHtml` → push that snapshot immediately
+ *  - app with a frozen `seedHtml` → push that snapshot immediately; saved records
+ *    then update it in place
  *  - otherwise → an AI first render
  */
 export async function renderInitialWindow(windowId: string, app: AppDescriptor): Promise<void> {
@@ -26,7 +27,8 @@ export async function renderInitialWindow(windowId: string, app: AppDescriptor):
     const dataVersion = empty ? currentData.version : undefined;
     await saveSnapshot(windowId, seed, undefined, dataVersion);
     broadcast("s2c.ui.patch", { windowId, dataVersion, mode: "full", html: seed, done: true });
-    if (app.kind === "virtual" && !empty) bus.emit("window.firstRender", { windowId });
+    // Records saved since the seed update its regions in place instead of a full redraw.
+    if (app.kind === "virtual" && !empty) bus.emit("window.refreshState", { windowId });
     return;
   }
 

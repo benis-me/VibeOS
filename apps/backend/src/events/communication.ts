@@ -553,6 +553,8 @@ function publish(topic: string, data: MessageData, source: MessageSource, trace?
     eventTimers.set(key, { timer, data: batchData, trace: batchTrace });
   }
 }
+/** Own-records refreshes held for minimized windows; each runs once its window shows again. */
+const staleViews = new Map<string, () => void>();
 async function eventDelivery(
   windowId: string,
   sub: AppSubscription | undefined,
@@ -561,8 +563,9 @@ async function eventDelivery(
   source: MessageSource,
   trace?: MessageTrace,
 ) {
+  const window = getWindow(windowId);
   if (
-    !getWindow(windowId)?.isOpen ||
+    !window?.isOpen ||
     (sub &&
       !listSubscriptions().some(
         (s) =>
@@ -572,6 +575,22 @@ async function eventDelivery(
       ))
   )
     return;
+  // Re-rendering a minimized view of its own app's records waits until it is visible.
+  if (
+    window.state === "minimized" &&
+    topic === "app.data.changed" &&
+    (sub?.mode ?? "ai") === "ai" &&
+    "appId" in source &&
+    source.appId === window.appId
+  ) {
+    staleViews.set(windowId, () => {
+      const latest = JSON.parse(JSON.stringify(getAppData(window.appId)));
+      void eventDelivery(windowId, sub, topic, latest, source, trace).catch((error) =>
+        console.warn("[communication] app state refresh failed", error),
+      );
+    });
+    return;
+  }
   let error: string | undefined;
   if (sub?.refresh) {
     try {
@@ -616,6 +635,19 @@ function refreshAppData(windowId: string) {
     trace: { id: ulid(), hops: 0, windows: [] },
   });
 }
+/** Let a window's AI view reflect the current shared records, as after another window's write. */
+function refreshView(windowId: string, source: MessageSource, trace?: MessageTrace) {
+  const window = getWindow(windowId);
+  if (!window?.isOpen) return;
+  void eventDelivery(
+    windowId,
+    undefined,
+    "app.data.changed",
+    JSON.parse(JSON.stringify(getAppData(window.appId))),
+    source,
+    trace,
+  ).catch((error) => console.warn("[communication] app state refresh failed", error));
+}
 function observe(message: ServerToClient, trace?: MessageTrace) {
   const source: MessageSource = { system: true };
   switch (message.type) {
@@ -647,14 +679,11 @@ function observe(message: ServerToClient, trace?: MessageTrace) {
             ["self", appId].includes(sub.source.appId),
         );
         if (!declared)
-          void eventDelivery(
+          refreshView(
             window.id,
-            undefined,
-            "app.data.changed",
-            JSON.parse(JSON.stringify(message.payload)),
             { appId, windowId: refreshTrace?.windows[0] ?? "system" },
             refreshTrace,
-          ).catch((error) => console.warn("[communication] app state refresh failed", error));
+          );
       }
       publish(
         "app.data.changed",
@@ -693,9 +722,23 @@ function observe(message: ServerToClient, trace?: MessageTrace) {
       );
       break;
     case "s2c.window.closed":
+      staleViews.delete(message.payload.windowId);
       closeCommunicationWindow(message.payload.windowId);
       publish("windows.closed", { windowId: message.payload.windowId }, source, trace);
       break;
+    case "s2c.window.focused":
+    case "s2c.window.stateChanged": {
+      const id =
+        message.type === "s2c.window.focused"
+          ? message.payload.windowId
+          : message.payload.window.id;
+      const refresh = staleViews.get(id);
+      if (refresh && getWindow(id)?.state !== "minimized") {
+        staleViews.delete(id);
+        refresh();
+      }
+      break;
+    }
   }
 }
 export function closeCommunicationWindow(windowId: string) {
@@ -724,4 +767,8 @@ export async function registerCommunication() {
     else messageContext.exit(refresh);
   });
   bus.on("system.broadcast", ({ message, trace }) => observe(message, trace));
+  bus.on("window.refreshState", ({ windowId }) => {
+    const appId = getWindow(windowId)?.appId;
+    if (appId) refreshView(windowId, { appId, windowId: "system" });
+  });
 }

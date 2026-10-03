@@ -23,7 +23,8 @@ export const syscallSchema = z.discriminatedUnion("type", [
     type: z.literal("notify"),
     title: z.string().min(1).max(120),
     body: z.string().max(500).optional(),
-    kind: notificationKindSchema.optional(),
+    // A cosmetic kind; an unknown one is not worth a regeneration.
+    kind: notificationKindSchema.optional().catch("info"),
   }),
   z.object({
     type: z.literal("open"),
