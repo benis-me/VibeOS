@@ -74,6 +74,41 @@ describe("applyRegionsServer", () => {
     ).toBe(current.replace(">1<", ">3<").replace(">2<", ">4<"));
   });
 
+  test("an append region adds only its children after the existing content", () => {
+    const current =
+      '<main><div class="log" data-vibeos-region="log"><p>$ ls</p><p>a b</p></div><form data-vibeos-region="prompt"><input name="cmd"></form></main>';
+    expect(
+      applyRegionsServer(current, [
+        {
+          region: "log",
+          html: '<div data-vibeos-region="log" data-vibeos-append><p>$ pwd</p></div>',
+        },
+        {
+          region: "prompt",
+          html: '<form data-vibeos-region="prompt"><input name="cmd" value=""></form>',
+        },
+      ]),
+    ).toBe(
+      '<main><div class="log" data-vibeos-region="log"><p>$ ls</p><p>a b</p><p>$ pwd</p></div><form data-vibeos-region="prompt"><input name="cmd" value=""></form></main>',
+    );
+  });
+
+  test("rejects appending to a void region or repeating a region id", () => {
+    expect(() =>
+      applyRegionsServer('<img data-vibeos-region="pic">', [
+        { region: "pic", html: '<img data-vibeos-region="pic" data-vibeos-append>' },
+      ]),
+    ).toThrow();
+    expect(() =>
+      applyRegionsServer('<ul data-vibeos-region="list"><li data-vibeos-region="a">1</li></ul>', [
+        {
+          region: "list",
+          html: '<ul data-vibeos-region="list" data-vibeos-append><li data-vibeos-region="a">2</li></ul>',
+        },
+      ]),
+    ).toThrow();
+  });
+
   test("replacing a nested-content region doesn't stop at the first close tag", () => {
     const current = `<div data-vibeos-region="r"><ul><li>a</li></ul></div><span>after</span>`;
     const out = applyRegionsServer(current, [

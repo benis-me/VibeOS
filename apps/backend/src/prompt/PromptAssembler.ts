@@ -227,11 +227,11 @@ export function assemblePrompt(input: AssembleInput): string {
   // Render-mode directive: the OS decides the BASELINE, the AI decides edge cases.
   const modeDirective =
     renderMode === "force-full"
-      ? `[RENDER MODE: FULL]\nReturn the COMPLETE window body in <vibeos-html mode="full">. Tag separate, updatable parts with unique data-vibeos-region="<stable-id>" so future changes can be patched incrementally. Do NOT return bare region fragments this time.`
+      ? `[RENDER MODE: FULL]\nReturn the COMPLETE window body in <vibeos-html mode="full">. Tag separate, updatable parts with unique data-vibeos-region="<stable-id>", including one per record (e.g. each list row data-vibeos-region="task-<id>"), so future changes can be patched incrementally. Do NOT return bare region fragments this time.`
       : `[RENDER MODE: INCREMENTAL PREFERRED]\nThe window is already rendered (see CURRENT UI${
           regionIds?.length ? `, regions: ${regionIds.join(", ")}` : ""
         }). DECIDE which fits this action:
-- If the action changes only part(s) of the screen → use <vibeos-html mode="regions"> and return ONLY those existing data-vibeos-region elements (for accumulating regions like terminal/chat/list, include ALL their existing content plus the new part). This is the default — prefer it.
+- If the action changes only part(s) of the screen → use <vibeos-html mode="regions"> and return ONLY those existing data-vibeos-region elements (for accumulating regions like terminal/chat/feed, add data-vibeos-append and return only the new part). This is the default — prefer it.
 - To insert/delete a region or change its layout, replace its existing parent region. Never return both an ancestor and its descendant, never invent a target id. Leave unrelated input and scroll regions untouched.
 - If the action structurally replaces the screen (page navigation, switching to a totally different view) → use <vibeos-html mode="full"> with the FULL body instead.
 Choose deliberately before you write: do not re-emit the whole window for a small change, and do not emit a fragment when the layout truly changed.`;

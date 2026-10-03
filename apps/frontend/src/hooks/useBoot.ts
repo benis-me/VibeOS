@@ -127,12 +127,7 @@ export function useBoot(): void {
     offs.push(
       wsClient.on("s2c.ui.patch", (p) => {
         const store = useWindowStore.getState();
-        try {
-          store.applyPatch(p);
-        } catch {
-          // The local tree is out of sync; restore the authoritative snapshot.
-          wsClient.send("c2s.boot.hello", {});
-        }
+        store.applyPatch(p);
         if (p.done) store.setBusy(p.windowId, false);
       }),
     );

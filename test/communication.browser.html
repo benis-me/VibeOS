@@ -120,15 +120,14 @@
       "Submit button command did not override its form",
     );
     assert(!sent.some((s) => s.type === "c2s.op"), "A deterministic command invoked AI");
+    const pageHtml =
+      '<main data-vibeos-region="page"><pre data-vibeos-bind="file.content.text"></pre></main>';
+    // The page region is the whole snapshot, so the server-merged html equals it.
     store.applyPatch({
       windowId: "receiver",
       mode: "regions",
-      regions: [
-        {
-          region: "page",
-          html: '<main data-vibeos-region="page"><pre data-vibeos-bind="file.content.text"></pre></main>',
-        },
-      ],
+      html: pageHtml,
+      regions: [{ region: "page", html: pageHtml }],
       done: true,
     });
     assert(

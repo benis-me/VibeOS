@@ -24,7 +24,9 @@
   import { useWindowStore } from "/apps/frontend/src/stores/windowStore.ts";
   import { wsClient } from "/apps/frontend/src/lib/ws.ts";
   import { useConnectionStore } from "/apps/frontend/src/stores/connectionStore.ts";
+  import { applyRegionsServer } from "/apps/backend/src/agents/regionMerge.ts";
   window.runtimeTest = {
+    applyRegionsServer,
     useConnectionStore,
     React,
     createRoot,

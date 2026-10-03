@@ -1,9 +1,8 @@
-import { extractRegions, extractRegionSpans } from "../ai/streamParser.ts";
+import { extractRegionSpans } from "../ai/streamParser.ts";
 
 /**
- * Server-side region merge so the persisted snapshot stays in sync with what
- * the client renders. Uses string replacement keyed by data-vibeos-region,
- * mirroring the client's DOM-based applyRegions.
+ * The only region merge: string replacement keyed by data-vibeos-region. The
+ * client stores the merged snapshot and replaces the named regions' live nodes.
  */
 export function applyRegionsServer(
   current: string,
@@ -14,20 +13,33 @@ export function applyRegionsServer(
   const seen = new Set<string>();
   const replacements = regions
     .map((r) => {
-      const blocks = extractRegions(r.html.trim());
+      const html = r.html.trim();
+      const blocks = extractRegionSpans(html);
+      const [block] = blocks;
       const span = spans.find((s) => s.region === r.region);
       if (
         seen.has(r.region) ||
         ids.filter((id) => id === r.region).length !== 1 ||
         !span ||
         blocks.length !== 1 ||
-        blocks[0]!.region !== r.region ||
-        blocks[0]!.html !== r.html.trim()
+        !block ||
+        block.region !== r.region ||
+        block.start !== 0 ||
+        block.end !== html.length ||
+        (block.append && (span.innerEnd === undefined || block.innerEnd === undefined))
       ) {
         throw new Error(`Invalid region replacement: ${r.region}`);
       }
       seen.add(r.region);
-      return { ...span, html: r.html };
+      // Appended children follow the existing content; the target keeps its own tag.
+      return {
+        ...span,
+        html: block.append
+          ? current.slice(span.start, span.innerEnd) +
+            html.slice(block.innerStart, block.innerEnd) +
+            current.slice(span.innerEnd, span.end)
+          : r.html,
+      };
     })
     .sort((a, b) => b.start - a.start);
   let out = current;

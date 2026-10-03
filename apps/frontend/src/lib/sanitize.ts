@@ -79,6 +79,8 @@ export function sanitizeAiHtml(html: string, windowId = "preview"): string {
     FORBID_TAGS: ["script", "iframe", "object", "embed", "base"],
     FORBID_ATTR: ["formaction", "action", "ping"],
     ALLOW_DATA_ATTR: true,
+    // Otherwise a leading <style> block is parsed into <head> and silently dropped.
+    FORCE_BODY: true,
   });
   const template = document.createElement("template");
   template.innerHTML = clean;

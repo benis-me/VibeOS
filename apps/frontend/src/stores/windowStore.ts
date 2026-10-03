@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import type { WindowState } from "@vibeos/shared";
 import type { UiPatchPayload } from "@vibeos/shared/protocol";
-import { applyRegions } from "@/lib/patch";
 
 interface WindowStoreState {
   windows: Record<string, WindowState>;
@@ -111,12 +110,10 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
             },
           }
         : {}),
+      // The server merges regions; an acknowledgement without html keeps the snapshot.
       snapshots: {
         ...s.snapshots,
-        [patch.windowId]:
-          patch.mode === "full"
-            ? (patch.html ?? s.snapshots[patch.windowId] ?? "")
-            : applyRegions(s.snapshots[patch.windowId] ?? "", patch.regions ?? []),
+        [patch.windowId]: patch.html ?? s.snapshots[patch.windowId] ?? "",
       },
       patches: { ...s.patches, [patch.windowId]: patch },
     })),

@@ -12,6 +12,7 @@ import { flushSync } from "react-dom";
 import { AiHtmlSurface } from "/apps/frontend/src/components/window/AiHtmlSurface.tsx";
 import { useWindowStore } from "/apps/frontend/src/stores/windowStore.ts";
 import { wsClient } from "/apps/frontend/src/lib/ws.ts";
+import { applyRegionsServer } from "/apps/backend/src/agents/regionMerge.ts";
 import { requestApplication } from "/apps/frontend/src/lib/nativeCommands.ts";
 import { requestFiles } from "/apps/frontend/src/lib/files.ts";
 import { sendSkinCommand } from "/apps/frontend/src/stores/skinStore.ts";
@@ -33,6 +34,7 @@ try {
   const field = (key) => surface.querySelector('[data-vibeos-field="' + key + '"]');
   const type = (key, value) => { const el = field(key); el.value = value; el.dispatchEvent(new Event("input", { bubbles: true })); return el; };
   const patch = (html, operationId) => store.applyPatch({ windowId: "regression", mode: "full", html, operationId, done: true });
+  const regionPatch = (regions, operationId) => store.applyPatch({ windowId: "regression", mode: "regions", html: applyRegionsServer(useWindowStore.getState().snapshots.regression, regions), regions, operationId, done: true });
   type("title", "My title"); const body = "x".repeat(2500) + " EXACT_END"; type("body", body);
   surface.querySelector("button").click();
   assert(op.formData.title === "My title" && op.formData.body === body, "Reserved title/body names and long no-form input arrive intact");
@@ -44,7 +46,7 @@ try {
   patch(initial, submitted);
   assert(field("title").value === "" && field("body").value === "Unsubmitted newer draft", "Acknowledgement clears its submission, never newer typing");
   assert(document.activeElement === field("body") && field("body").selectionStart === 2 && field("body").selectionEnd === 9, "Full patch restores focus and selection");
-  store.applyPatch({ windowId: "regression", mode: "regions", done: true, regions: [{ region: "editor", html: '<section data-vibeos-region="editor"><textarea name="body"></textarea><button data-vibeos-action="save">Save again</button></section>' }] });
+  regionPatch([{ region: "editor", html: '<section data-vibeos-region="editor"><textarea name="body"></textarea><button data-vibeos-action="save">Save again</button></section>' }]);
   assert(field("body").value === "Unsubmitted newer draft", "An affected region preserves an unsent draft");
   surface.querySelector("button").click(); const latest = op.id;
   patch(initial, latest);
@@ -53,9 +55,9 @@ try {
   patch(initial, op.id);
   assert(field("body").value === "", "An identical HTML snapshot still acknowledges its operation");
   const unchangedEditor = initial.match(/<section[\s\S]*?<\/section>/)[0];
-  store.applyPatch({ windowId: "regression", mode: "regions", regions: [{ region: "editor", html: unchangedEditor }], done: true });
+  regionPatch([{ region: "editor", html: unchangedEditor }]);
   type("body", "repeat same region"); surface.querySelector("button").click();
-  store.applyPatch({ windowId: "regression", mode: "regions", regions: [{ region: "editor", html: unchangedEditor }], operationId: op.id, done: true });
+  regionPatch([{ region: "editor", html: unchangedEditor }], op.id);
   assert(field("body").value === "", "An unchanged region resets acknowledged live values to its declared defaults");
   patch('<main><form data-vibeos-action="send"><input name="title"><textarea name="body"></textarea><button type="submit">Send</button></form></main>');
   type("title", "Form title"); type("body", body); surface.querySelector("button").click();

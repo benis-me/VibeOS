@@ -94,8 +94,11 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   and `agents/regionMerge.ts` — do not simplify it to a single regex. Missing,
   duplicate, overlapping, or malformed region targets trigger one full repair;
   rejected output has no syscalls. Only first paint streams; existing windows
-  apply a validated, persisted batch. `AiHtmlSurface` replaces target DOM nodes
-  directly while the store retains a complete snapshot. When changing region rendering, run the browser regression documented in `test/regions.browser.html`.
+  apply a validated, persisted batch. `regionMerge.ts` is the only merge: a regions
+  patch carries the merged snapshot as `html`, the store keeps it, and both surfaces
+  replace the named regions' DOM nodes. A region marked `data-vibeos-append` adds its
+  children after the existing content, so accumulating regions send only new entries.
+  When changing region rendering, run the browser regression documented in `test/regions.browser.html`.
 - **Per-window scheduling** (`agents/UiGenerationAgent.ts`): different windows
   run in parallel; within one window a new action **preempts** (aborts) the
   in-flight one ("latest wins"). Generation is stateless, so a preempt just

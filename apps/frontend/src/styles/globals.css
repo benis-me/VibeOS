@@ -8,6 +8,13 @@
   /* Native controls (select, checkbox, date) follow the theme too. */
   color-scheme: light;
   --radius: 0.625rem;
+  /* Type scale for AI content; the design prompt allows only these sizes. */
+  --text-caption: 11px;
+  --text-label: 12px;
+  --text-body: 13px;
+  --text-title: 15px;
+  --text-display: 22px;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -368,6 +375,7 @@ button:not(:disabled),
    letting it break the OS shell. */
 .ai-surface {
   font-family: var(--font-sans);
+  font-size: var(--text-body);
   color: var(--foreground);
   line-height: 1.5;
   /* Column flex so the AI's content fills the window vertically. This makes
@@ -444,6 +452,90 @@ button:not(:disabled),
 .ai-surface > input,
 .ai-surface > label {
   flex: 0 0 auto;
+}
+
+/* OS-styled defaults, so generated HTML needs no per-element inline styles.
+   :where() keeps them at zero specificity: inline styles, the app's own
+   classes and skin rules all win. */
+:where(.ai-surface) :where(h1) {
+  font-size: var(--text-display);
+}
+:where(.ai-surface) :where(h2, h3) {
+  font-size: var(--text-title);
+}
+:where(.ai-surface) :where(input, select, textarea) {
+  font: inherit;
+  color: inherit;
+}
+:where(.ai-surface) :where(button) {
+  padding: 5px 12px;
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--card);
+}
+:where(.ai-surface) :where(button:hover:not(:disabled)) {
+  background: var(--accent);
+}
+:where(.ai-surface) :where(button:disabled) {
+  opacity: 0.5;
+}
+:where(.ai-surface)
+  :where(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]), select, textarea) {
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--background);
+}
+:where(.ai-surface) :where(button, input, select, textarea):focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--ring) 50%, transparent);
+  outline-offset: 1px;
+}
+:where(.ai-surface) :where(input[type="checkbox"], input[type="radio"], input[type="range"]) {
+  accent-color: var(--brand);
+}
+:where(.ai-surface) :where(table) {
+  width: 100%;
+  border-collapse: collapse;
+}
+:where(.ai-surface) :where(th, td) {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+:where(.ai-surface) :where(th) {
+  font-size: var(--text-label);
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+/* Layout classes named in the design prompt, cheaper than repeated inline styles. */
+:where(.ai-surface) .vo-app {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+:where(.ai-surface) .vo-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+:where(.ai-surface) .vo-card {
+  padding: 12px;
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+:where(.ai-surface) .vo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+:where(.ai-surface) .vo-muted {
+  color: var(--muted-foreground);
 }
 
 @media (prefers-reduced-motion: reduce) {

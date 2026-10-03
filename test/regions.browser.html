@@ -11,7 +11,7 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import { AiHtmlSurface } from "/apps/frontend/src/components/window/AiHtmlSurface.tsx";
 import { useWindowStore } from "/apps/frontend/src/stores/windowStore.ts";
-import { applyRegions } from "/apps/frontend/src/lib/patch.ts";
+import { applyRegionsServer } from "/apps/backend/src/agents/regionMerge.ts";
 import { wsClient } from "/apps/frontend/src/lib/ws.ts";
 
 let checks = 0;
@@ -33,7 +33,8 @@ try {
   input.focus();
   input.setSelectionRange(3, 7);
   scroll.scrollTop = 90;
-  const patch = (regions) => store.applyPatch({ windowId: "regression", mode: "regions", regions, done: true });
+  // As the server does: merge and validate, then send the merged snapshot with the region ids.
+  const patch = (regions, extra) => store.applyPatch({ windowId: "regression", mode: "regions", html: applyRegionsServer(useWindowStore.getState().snapshots.regression, regions), regions, done: true, ...extra });
   patch([{ region: "result", html: '<p data-vibeos-region="result">After</p>' }]);
   patch([{ region: "status", html: '<p data-vibeos-region="status">Ready</p>' }]);
   assert(surface.firstElementChild === page, "Region patches rebuilt the page");
@@ -41,6 +42,8 @@ try {
   assert(document.activeElement === input && input.selectionStart === 3 && input.selectionEnd === 7, "Input focus/selection lost");
   assert(surface.querySelector("[data-scroll]") === scroll && scroll.scrollTop === 90, "Nested scroll reset");
   assert(surface.querySelector('[data-vibeos-region="result"]').textContent === "After" && surface.querySelector('[data-vibeos-region="status"]').textContent === "Ready", "Batched updates skipped a patch");
+  patch([{ region: "status", html: '<p data-vibeos-region="status" data-vibeos-append> and more</p>' }]);
+  assert(surface.querySelector('[data-vibeos-region="status"]').textContent === "Ready and more" && surface.querySelector("input") === input, "An append patch lost earlier content or rebuilt other regions");
   patch([{ region: "row", html: '<tr data-vibeos-region="row"><td>New cell</td></tr>' }]);
   assert(surface.querySelector("tbody > tr > td").textContent === "New cell", "Table region lost its parsing context");
   const row = surface.querySelector("tr");
@@ -61,16 +64,15 @@ try {
   wsClient.send = (type, payload) => { if (type === "c2s.op") op = payload.op; return true; };
   input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   assert(op?.regionPath.join("/") === "editor/page" && op.value === input.value, "Operation lost region context or input");
-  store.applyPatch({ windowId: "regression", operationId: op.id, mode: "regions", done: true, regions: [{ region: "editor", html: '<section data-vibeos-region="editor"><input name="draft" data-vibeos-action="submit-draft"><div data-scroll="true" style="height:40px;overflow:auto"><div style="height:300px">Scrollable</div></div></section>' }] });
+  patch([{ region: "editor", html: '<section data-vibeos-region="editor"><input name="draft" data-vibeos-action="submit-draft"><div data-scroll="true" style="height:40px;overflow:auto"><div style="height:300px">Scrollable</div></div></section>' }], { operationId: op.id });
   assert(surface.querySelector("input").value === "", "An explicit input-region reset was ignored");
   store.applyPatch({ windowId: "regression", mode: "full", html: '<article data-vibeos-region="page">New page</article>', done: true });
   assert(!page.isConnected && surface.firstElementChild.tagName === "ARTICLE", "Explicit full render did not replace the page");
   store.setAll([], { regression: before });
   assert(surface.querySelector("td").textContent === "New cell", "Snapshot restore lost a committed region");
 
-  // Unsanitized merging stays inert; only the surface's sanitized output can execute browser behavior.
+  // Raw snapshots stay inert; only the surface's sanitized output can execute browser behavior.
   window.regionUnsafe = false;
-  applyRegions('<div data-vibeos-region="a">old</div>', [{ region: "a", html: '<div data-vibeos-region="a"><img src="/missing-image" onerror="window.regionUnsafe=true"></div>' }]);
   patch([{ region: "result", html: '<p data-vibeos-region="result"><img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" onerror="window.regionUnsafe=true">Safe</p>' }]);
   await new Promise((resolve) => setTimeout(resolve, 50));
   assert(!window.regionUnsafe && !surface.querySelector("[onerror]"), "Raw patch executed unsanitized HTML");

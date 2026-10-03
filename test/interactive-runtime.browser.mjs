@@ -108,9 +108,11 @@ try {
     );
     T.ops = () => T.sent.filter((x) => x.type === "c2s.op");
     T.patch = (regions) => {
+      const snapshot = T.useWindowStore.getState().snapshots.runtime;
       T.useWindowStore.getState().applyPatch({
         windowId: "runtime",
         mode: "regions",
+        html: T.applyRegionsServer(snapshot, regions),
         regions,
         done: true,
         dataVersion: "v1",

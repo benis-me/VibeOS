@@ -65,7 +65,9 @@ export interface UiPatchPayload {
   /** Only this successful operation may acknowledge its submitted draft values. */
   operationId?: string;
   mode: "full" | "regions";
+  /** The complete window body; for regions, the server-merged snapshot. */
   html?: string;
+  /** Regions whose live DOM nodes are replaced from `html`. */
   regions?: UiRegion[];
   /** true while streaming partial content. */
   streaming?: boolean;

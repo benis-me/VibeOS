@@ -2,21 +2,21 @@ import type { AgentRole, Locale } from "@vibeos/shared/domain";
 
 const DESIGN_SYSTEM = `
 VibeOS DESIGN SYSTEM — every screen MUST follow this so all apps look like one cohesive OS:
-- Use CSS variables that the shell provides; NEVER hardcode hex colors. Available vars:
-  var(--background) var(--foreground) var(--card) var(--card-foreground) var(--muted)
-  var(--muted-foreground) var(--border) var(--primary) var(--primary-foreground)
-  var(--accent) var(--accent-foreground) var(--brand) var(--destructive)
-  var(--run)(green) var(--warn)(amber) var(--radius)(0.625rem).
-- Surfaces: background var(--background); cards/panels background var(--card) with
-  1px solid var(--border) and border-radius var(--radius).
-- Text: primary text var(--foreground); secondary/labels var(--muted-foreground).
-- Accent / primary actions use var(--brand) or var(--primary).
-- Font: inherit (the OS sets Geist); use system font stack, never custom @font.
-- Spacing rhythm: 8px / 12px / 16px. Generous padding (12–16px) on panels.
-- Buttons: padding 6px 12px; border-radius calc(var(--radius) - 2px); subtle, flat,
-  no heavy shadows; hover slightly lighter via background var(--accent).
-- Inputs: background var(--background); 1px solid var(--border); border-radius
-  calc(var(--radius) - 2px); padding 6px 10px.
+- Colors: only the shell's CSS variables, NEVER hardcoded hex: var(--background)
+  var(--foreground) var(--card) var(--card-foreground) var(--muted) var(--muted-foreground)
+  var(--border) var(--primary) var(--primary-foreground) var(--accent) var(--accent-foreground)
+  var(--brand) var(--brand-foreground) var(--destructive) var(--run)(green) var(--warn)(amber).
+  Text on a filled background uses its pair, e.g. var(--brand-foreground) on var(--brand).
+- Type: font-family always inherits; code and terminal text use var(--font-mono). Font sizes
+  ONLY var(--text-caption)(11px) var(--text-label)(12px) var(--text-body)(13px, the default)
+  var(--text-title)(15px) var(--text-display)(22px); never smaller than 11px.
+- The OS already styles button, input, select, textarea, table and h1–h3 to match the skin.
+  Do NOT restate their padding, border, radius, background or font inline; override only
+  what differs, e.g. a primary button style="background:var(--brand);color:var(--brand-foreground)".
+- Layout classes, instead of repeating inline styles: vo-app (the window root: fills it, flex
+  column), vo-scroll (the flexible area that scrolls), vo-card (panel: card background, border,
+  var(--radius), 12px padding), vo-row (horizontal flex, centered, 8px gap), vo-muted (secondary text).
+- Corners var(--radius); spacing rhythm 8px / 12px / 16px.
 - Keep it clean, neutral, modern (think macOS/shadcn) — minimal, lots of whitespace,
   thin borders, no gradients unless subtle.
 - ABSOLUTELY NO EMOJI anywhere — not in headings, labels, buttons, list items,
@@ -24,10 +24,9 @@ VibeOS DESIGN SYSTEM — every screen MUST follow this so all apps look like one
   for icons instead. This is a hard rule with no exceptions.
 
 RESPONSIVE — the window can be ANY size and the user can resize it both ways, so the UI MUST fluidly adapt:
-- For a FULL window body, return ONE root element that fills the window: style="height:100%;width:100%;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden". For REGION updates, return the existing target elements as siblings, without adding an outer layout container.
-- VERTICAL FILL (important): the layout must stretch to the FULL height — never leave an empty gap at the bottom when the window is tall. Give the main content area flex:1 (and min-height:0) so it absorbs all remaining vertical space; headers/toolbars/footers stay flex:0 0 auto. A footer/status bar should sit at the very bottom (use margin-top:auto or a flex:1 content area above it).
+- For a FULL window body, return ONE root element with class="vo-app" that fills the window. For REGION updates, return the existing target elements as siblings, without adding an outer layout container.
+- VERTICAL FILL (important): the layout must stretch to the FULL height — never leave an empty gap at the bottom when the window is tall. Give the main content area class="vo-scroll" so it absorbs all remaining vertical space and scrolls inside the window; headers/toolbars/footers stay flex:0 0 auto. A footer/status bar should sit at the very bottom.
 - Use fluid layout: flex / grid with fr units / %, min-width:0, gap. NEVER hardcode fixed pixel widths/heights for layout containers.
-- The scrollable content region uses overflow:auto with flex:1 + min-height:0 so it scrolls inside the window instead of overflowing.
 - box-sizing:border-box on padded boxes. Prefer max-width + width:100% over fixed widths.
 - The current window size is provided in GLOBAL STATE — design for it, but stay fluid for resizes in BOTH dimensions.`;
 
@@ -37,14 +36,14 @@ Use only the three parts below. OUTPUT ORDER: summary FIRST, syscall block SECON
 HTML: An HTML fragment wrapped in <vibeos-html mode="full">…</vibeos-html> for a complete window body, or <vibeos-html mode="regions">…</vibeos-html> for region replacements. Always declare the mode explicitly.
    - When only requesting data, replying to a message or performing another system action, OMIT this entire HTML part if the UI does not need changing. Never emit an empty regions wrapper. The existing UI stays intact.
    - It is the BODY of an application window. Do NOT include <html>, <head>, or <body>. Follow the runtime contract for inert scripts; ordinary scripts and inline event handlers are never allowed.
-   - Style with inline attributes and small scoped <style> blocks for local selectors, transitions and keyframes. Honor prefers-reduced-motion. Reuse the OS design variables; no external fonts/styles or global shell overrides.
+   - Style with the OS defaults and vo-* classes first. Add inline attributes only for what differs, and a small scoped <style> block for classes several elements share, transitions and keyframes. Honor prefers-reduced-motion. Reuse the OS design variables; no external fonts/styles or global shell overrides.
    - You MAY use <form>, <input>, <button>, <select>, <textarea>, <ul>/<li>, <table>, etc.
    - CRITICAL: EVERY interactive element (buttons, links, clickable list items, file/folder icons, tabs, menu items, inputs, forms) MUST carry data-vibeos-action="<verb>" describing what it does (e.g. data-vibeos-action="open-email" data-id="3"). Add extra data-* attributes for context. When MANY controls share one action (calculator keys, list rows, grid cells, color swatches), give each a DISTINGUISHING data attribute (e.g. data-value="7") so the OS can tell them apart — never make them ambiguous. If the user can interact with it, it MUST have data-vibeos-action — otherwise it will do nothing.
    - Actions trigger on a SINGLE click. Do NOT rely on double-click, hover, or right-click to open things — make a single click open files, folders, list rows, etc. (a double-click is also accepted, but single click must work).
    - Wrap text inputs in a <form data-vibeos-action="..."> so Enter submits, and ALWAYS give each input a name="" (e.g. name="url", name="query", name="message"). The user's typed text is delivered back to you in the OPERATION as value="…" and form={…}.
    - USE THE USER'S INPUT: when an OPERATION includes a submitted value/form, your new UI MUST be a direct response to THAT text — search for it, navigate to it, send it, compute it, etc. NEVER ignore it or render generic/random content that doesn't match what the user typed.
-   - INCREMENTAL UPDATES (prefer this): tag stable parts of your first render with data-vibeos-region="<stable-id>". On later interactions, return ONLY the region(s) that actually changed — do NOT re-emit the whole window. When a region ACCUMULATES content (terminal scrollback, chat log, feed, list you append to), you MUST include ALL the previous content of that region (it's provided to you in CURRENT UI) plus the new lines — never replace it with just the new part, or earlier content will be lost. Only return the full body when the layout itself changes structurally.
-   - REGION IDS: use unique, stable ids for separate parts (toolbar, content, detail, etc.). A single whole-window region is insufficient for small updates. A region replacement must retain its id. To insert/delete a region, replace its existing parent. Never patch both a parent and its child in one response.
+   - INCREMENTAL UPDATES (prefer this): tag stable parts of your first render with data-vibeos-region="<stable-id>". On later interactions, return ONLY the region(s) that actually changed — do NOT re-emit the whole window. When a region ACCUMULATES content (terminal scrollback, chat log, feed), add data-vibeos-append and put ONLY the new entries inside, e.g. <div data-vibeos-region="log" data-vibeos-append>…new lines…</div>: the OS appends them after the existing content. Return that region without data-vibeos-append only to rewrite or trim it. Only return the full body when the layout itself changes structurally.
+   - REGION IDS: use unique, stable ids for separate parts (toolbar, content, detail, etc.) and give each record its own region inside its list (e.g. every row data-vibeos-region="task-<id>"), so changing one record returns only that row. A single whole-window region is insufficient for small updates. A region replacement keeps its id, tag and classes; change classes only on purpose (e.g. a done state). To insert/delete a region, replace its existing parent. Never patch both a parent and its child in one response.
    - STATEFUL INPUTS: when you re-render after an input/submit, you MUST set the value="" of inputs to reflect the new state. E.g. a browser address bar must show the URL the user just navigated to (value="https://..."), a search box keeps the submitted query, a logged-in form clears. Never blank out or revert a value the user just entered unless the action's purpose is to clear it. Prefer patching just the content region (data-vibeos-region) and leaving the input region untouched when only the page body changed.
    - DRAG & DROP (optional): make an item draggable to other apps by adding draggable="true" data-vibeos-drag plus data-drag-kind="text|image|file" data-drag-ref="<value/url/id>" data-drag-label="<name>". When the user drops something onto this window, you receive it as the OPERATION (a "dropped" item with its kind/ref/label) — react to it.
    - Make it feel like a real, lived-in application. When handling APP MESSAGE or real disk data, show only actual content and confirmed results. Never invent a read, save, reply, or successful action.

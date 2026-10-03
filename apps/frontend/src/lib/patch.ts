@@ -48,11 +48,3 @@ export function replaceRegions(root: HTMLElement, regions: UiRegion[]): void {
     if (hasFields || !target.isEqualNode(replacement)) target.replaceWith(replacement);
   }
 }
-
-/** Keep a complete snapshot for remount/reconnect; the surface applies the same patch locally. */
-export function applyRegions(currentHtml: string, regions: UiRegion[]): string {
-  // Keep unsanitized snapshots in an inert document; only sanitized HTML reaches the surface.
-  const root = new DOMParser().parseFromString(currentHtml, "text/html").body;
-  replaceRegions(root, regions);
-  return root.innerHTML;
-}

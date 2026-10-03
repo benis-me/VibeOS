@@ -565,6 +565,7 @@ async function generate(
               dataVersion: currentData.version,
               operationId: acknowledged,
               mode: "regions",
+              html,
               regions,
               done: true,
             }

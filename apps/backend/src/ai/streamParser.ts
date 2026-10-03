@@ -125,6 +125,7 @@ function htmlTags(html: string) {
     close: boolean;
     single: boolean;
     region?: string;
+    append: boolean;
     start: number;
     end: number;
   }[] = [];
@@ -135,18 +136,20 @@ function htmlTags(html: string) {
       attrs = match[3] ?? "",
       close = match[1] === "/";
     const attributes = /([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g;
-    let region: string | undefined, attr: RegExpExecArray | null;
+    let region: string | undefined,
+      append = false,
+      attr: RegExpExecArray | null;
     while ((attr = attributes.exec(attrs))) {
-      if (attr[1]!.toLowerCase() === "data-vibeos-region") {
-        region = attr[2] ?? attr[3] ?? attr[4];
-        break;
-      }
+      const name = attr[1]!.toLowerCase();
+      if (name === "data-vibeos-region") region ??= attr[2] ?? attr[3] ?? attr[4];
+      else if (name === "data-vibeos-append") append = true;
     }
     tags.push({
       tag,
       close,
       single: VOID_TAGS.has(tag) || attrs.trim().endsWith("/"),
       region,
+      append,
       start: match.index,
       end: re.lastIndex,
     });
@@ -172,13 +175,21 @@ export function extractRegions(html: string): { region: string; html: string }[]
   }));
 }
 
+interface RegionSpan {
+  region: string;
+  start: number;
+  end: number;
+  /** Content bounds; a void or self-closing region has no innerEnd. */
+  innerStart: number;
+  innerEnd?: number;
+  /** Carries data-vibeos-append: its children follow the existing content. */
+  append: boolean;
+}
+
 /** Shared by output validation and disk-snapshot merging, so they agree on actual target elements. */
-export function extractRegionSpans(
-  html: string,
-  includeNested = false,
-): { region: string; start: number; end: number }[] {
+export function extractRegionSpans(html: string, includeNested = false): RegionSpan[] {
   const tags = htmlTags(html),
-    spans: { region: string; start: number; end: number }[] = [];
+    spans: RegionSpan[] = [];
   for (let i = 0; i < tags.length; i++) {
     const open = tags[i]!;
     if (open.close || !open.region) continue;
@@ -197,7 +208,14 @@ export function extractRegionSpans(
       }
     }
     if (endIndex < 0) continue;
-    spans.push({ region: open.region, start: open.start, end: tags[endIndex]!.end });
+    spans.push({
+      region: open.region,
+      start: open.start,
+      end: tags[endIndex]!.end,
+      innerStart: open.end,
+      innerEnd: open.single ? undefined : tags[endIndex]!.start,
+      append: open.append,
+    });
     if (!includeNested) i = endIndex;
   }
   return spans;
