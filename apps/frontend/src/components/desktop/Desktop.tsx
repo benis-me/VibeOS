@@ -14,6 +14,7 @@ import { desktopMenu } from "@/components/contextmenu/menus";
 import { wsClient, API_BASE } from "@/lib/ws";
 import { OPEN_SPOTLIGHT_EVENT, type OpenSpotlightDetail } from "@/lib/uiEvents";
 import { gridPosition } from "@/lib/desktopGrid";
+import { ClosedToast } from "@/components/notifications/ClosedToast";
 
 export function Desktop() {
   const nodeMap = useVfsStore((s) => s.nodes);
@@ -123,6 +124,7 @@ export function Desktop() {
       <WindowManager />
 
       <NotificationToasts />
+      <ClosedToast />
       <NotificationCenter open={notifOpen} onClose={() => setNotifOpen(false)} />
 
       <Spotlight

@@ -21,8 +21,9 @@ import {
 import type { AppDescriptor, Skin, Theme, WindowState, VfsNode } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
 import type { MenuItem } from "./ContextMenu";
+import { closeWindow } from "@/lib/windowClose";
 
-type WinCtl = "c2s.window.minimize" | "c2s.window.maximize" | "c2s.window.close" | "c2s.app.save";
+type WinCtl = "c2s.window.minimize" | "c2s.window.maximize" | "c2s.app.save";
 const openApp = (appId: string) => wsClient.send("c2s.window.open", { appId });
 const winMsg = (type: WinCtl, windowId: string) => wsClient.send(type, { windowId });
 const setPref = (partial: Record<string, unknown>) =>
@@ -147,7 +148,7 @@ export function windowMenu(o: { t: T; win: WindowState; native: boolean }): Menu
       label: o.t("win.close"),
       icon: <X size={14} />,
       danger: true,
-      onSelect: () => winMsg("c2s.window.close", o.win.id),
+      onSelect: () => closeWindow(o.win),
     },
   ];
 }
@@ -177,7 +178,7 @@ export function taskbarItemMenu(o: { t: T; win: WindowState }): MenuItem[] {
       label: o.t("win.close"),
       icon: <X size={14} />,
       danger: true,
-      onSelect: () => winMsg("c2s.window.close", o.win.id),
+      onSelect: () => closeWindow(o.win),
     },
   ];
 }
@@ -254,7 +255,7 @@ export function appContentMenu(o: { t: T; win: WindowState; native: boolean }): 
     label: o.t("win.close"),
     icon: <X size={14} />,
     danger: true,
-    onSelect: () => winMsg("c2s.window.close", o.win.id),
+    onSelect: () => closeWindow(o.win),
   });
   return items;
 }

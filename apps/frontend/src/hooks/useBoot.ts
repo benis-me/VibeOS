@@ -64,6 +64,7 @@ export function useBoot(): void {
         apps.setAll(p.apps);
         vfs.setAll([...p.desktopNodes, ...p.recycleBinNodes]);
         win.setAll(p.windows, p.snapshots, p.busyWindowIds);
+        win.setRecent(p.recentWindows ?? []);
         notif.setAll(p.notifications);
         useActivityStore.getState().setAll(p.agentRuns);
       }),
@@ -140,6 +141,7 @@ export function useBoot(): void {
     );
 
     offs.push(wsClient.on("s2c.window.opened", (p) => win.upsert(p.window)));
+    offs.push(wsClient.on("s2c.window.recent", (p) => win.setRecent(p.windows)));
     offs.push(
       wsClient.on("s2c.window.closed", (p) => {
         win.remove(p.windowId);

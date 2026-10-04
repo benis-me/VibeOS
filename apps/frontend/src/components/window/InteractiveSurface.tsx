@@ -239,7 +239,11 @@ export function InteractiveSurface({ windowId }: { windowId: string }) {
     };
   }, [windowId, win?.appVersionId, srcDoc]);
   return (
-    <div ref={container} className="relative h-full w-full overflow-hidden">
+    <div
+      ref={container}
+      className="relative h-full w-full overflow-hidden"
+      aria-busy={busy || undefined}
+    >
       {(booting || busy || requests > 0) && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-foreground/10">
           <div className="vibeos-progress h-full w-2/5 bg-brand" />

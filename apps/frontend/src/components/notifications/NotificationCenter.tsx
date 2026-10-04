@@ -30,8 +30,17 @@ export function NotificationCenter({ open, onClose }: Props) {
       if ((e.target as HTMLElement)?.closest?.(TRIGGER)) return;
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     window.addEventListener("pointerdown", onDown);
-    return () => window.removeEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    // Keyboard users land inside the panel.
+    ref.current?.querySelector<HTMLElement>("button")?.focus();
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose]);
 
   return (

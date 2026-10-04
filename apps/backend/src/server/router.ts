@@ -55,7 +55,14 @@ import {
   findOpenWindowByApp,
   getWindow,
   saveViewState,
+  listRecentClosed,
+  reopenWindow,
 } from "../db/repositories/WindowRepo.ts";
+import {
+  parseSubscriptions,
+  storeDeclaredSubscriptions,
+} from "../db/repositories/CommunicationRepo.ts";
+import { enqueue } from "../db/repositories/writeQueue.ts";
 import { ensureMemory, getSnapshot, getMemory } from "../db/repositories/AppMemoryRepo.ts";
 import {
   listByLocation,
@@ -202,6 +209,28 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
       bus.emit("window.closed", { windowId: msg.payload.windowId });
       await closeWindow(msg.payload.windowId);
       broadcast("s2c.window.closed", { windowId: msg.payload.windowId });
+      broadcast("s2c.window.recent", { windows: listRecentClosed() });
+      return;
+    }
+
+    case "c2s.window.reopen": {
+      // The last view comes back as it was: no regeneration, declared subscriptions restored.
+      const w = await reopenWindow(msg.payload.windowId);
+      if (!w) return;
+      broadcast("s2c.window.opened", { window: w });
+      const html = getSnapshot(w.id);
+      if (html.trim()) {
+        const subscriptions = await parseSubscriptions(html).catch(() => []);
+        await enqueue(() => storeDeclaredSubscriptions(w.id, subscriptions));
+        broadcast("s2c.ui.patch", {
+          windowId: w.id,
+          dataVersion: w.snapshotDataVersion,
+          mode: "full",
+          html,
+          done: true,
+        });
+      }
+      broadcast("s2c.window.recent", { windows: listRecentClosed() });
       return;
     }
 
@@ -361,7 +390,7 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
           appId,
           title: notif.title,
           kind: "app",
-          rect: { x: 150, y: 100, w: 640, h: 460 },
+          size: { w: 640, h: 460 },
         });
         await ensureMemory(w.id, appId);
         broadcast("s2c.window.opened", { window: w });
@@ -545,6 +574,7 @@ function sendBootState(ws: ServerWebSocket<WsData>): void {
     availableProviders: availableProviderIds(),
     agentRuns: recentRuns(),
     busyWindowIds: generatingWindowIds(),
+    recentWindows: listRecentClosed(),
   });
   sendTo(ws, "s2c.boot.ready", {});
   // Now the client is connected and listening: discover every provider's models

@@ -14,6 +14,9 @@ There is no publication workflow or new application permission system.
 
 - A temporary generated experience has its own app ID. Saving it promotes that
   identity and retains its windows and shared data.
+- Closing a generated window can be undone for five seconds. Closed temporary
+  experiences stay under Start › Recent (latest eight, one per app) and reopen with
+  their last view; nothing regenerates. Saving pins one to My Apps.
 - An application generation request belongs to the app. Closing Applications
   does not cancel it. Only successfully validated output creates a version and
   activates it. Cancel, failure and restart preserve the previous version.

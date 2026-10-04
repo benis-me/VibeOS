@@ -323,6 +323,7 @@ export function AiHtmlSurface({ windowId }: Props) {
         onScroll={onScroll}
         style={{ contain: "layout paint style", isolation: "isolate" }}
         className="ai-surface h-full w-full overflow-auto"
+        aria-busy={busy || undefined}
       />
     </div>
   );

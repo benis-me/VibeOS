@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Search, Loader2, LayoutGrid, AppWindow, Sparkles, ChevronRight } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
@@ -43,6 +43,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
   const appMap = useAppStore((s) => s.apps);
   const locale = useLocale();
   const t = useT();
+  const listId = useId();
 
   // A leading ">" switches from app search to AI command mode (Raycast/VS Code
   // convention): the rest of the line is a natural-language instruction the AI
@@ -200,6 +201,9 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
         >
           <motion.div
             {...panel}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("startmenu.appSearch")}
             className="w-[min(620px,92vw)] overflow-hidden rounded-2xl border bg-popover/95 shadow-2xl sheen"
             onPointerDown={(e) => e.stopPropagation()}
           >
@@ -219,6 +223,11 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
                   setCmdError("");
                 }}
                 onKeyDown={onKeyDown}
+                role="combobox"
+                aria-expanded={!!q}
+                aria-controls={listId}
+                aria-autocomplete="list"
+                aria-activedescendant={q ? `${listId}-${active}` : undefined}
                 placeholder={t("spotlight.placeholder")}
                 className="h-14 flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
               />
@@ -275,11 +284,17 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
             )}
 
             {q && (
-              <div className="max-h-80 overflow-auto border-t p-1.5">
+              <div
+                id={listId}
+                role="listbox"
+                aria-label={t("startmenu.appSearch")}
+                className="max-h-80 overflow-auto border-t p-1.5"
+              >
                 {local.length > 0 && <Heading icon={AppWindow} label={t("spotlight.local")} />}
                 {local.map(({ app, win }, i) => (
                   <Row
                     key={app.id}
+                    id={`${listId}-${i}`}
                     active={i === active}
                     onHover={() => setActive(i)}
                     onClick={() => run(i)}
@@ -297,6 +312,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
                   />
                 ))}
                 <Row
+                  id={`${listId}-${local.length}`}
                   active={active === local.length}
                   onHover={() => setActive(local.length)}
                   onClick={() => run(local.length)}
@@ -320,6 +336,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
                         />
                       )}
                       <Row
+                        id={`${listId}-${ideasFrom + j}`}
                         active={ideasFrom + j === active}
                         onHover={() => setActive(ideasFrom + j)}
                         onClick={() => run(ideasFrom + j)}
@@ -331,7 +348,10 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
                   );
                 })}
                 {(loading || failed) && (
-                  <div className="flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground">
+                  <div
+                    role="status"
+                    className="flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground"
+                  >
                     {loading && <Loader2 className="size-3.5 animate-spin" />}
                     {loading ? t("spotlight.thinking") : t("spotlight.searchFailed")}
                   </div>
@@ -354,7 +374,10 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
 
 function Heading({ icon: Icon, label }: { icon: typeof AppWindow; label: string }) {
   return (
-    <div className="flex items-center gap-1.5 px-3 pb-1 pt-2.5 text-2xs font-medium text-muted-foreground">
+    <div
+      role="presentation"
+      className="flex items-center gap-1.5 px-3 pb-1 pt-2.5 text-2xs font-medium text-muted-foreground"
+    >
       <Icon className="size-3" />
       {label}
     </div>
@@ -362,6 +385,7 @@ function Heading({ icon: Icon, label }: { icon: typeof AppWindow; label: string 
 }
 
 function Row(props: {
+  id: string;
   active: boolean;
   onHover: () => void;
   onClick: () => void;
@@ -373,6 +397,10 @@ function Row(props: {
   return (
     <button
       type="button"
+      id={props.id}
+      role="option"
+      aria-selected={props.active}
+      tabIndex={-1}
       onPointerEnter={props.onHover}
       onClick={props.onClick}
       className={cn(

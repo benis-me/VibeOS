@@ -16,10 +16,11 @@ import { useWindowMotion, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { windowMenu, appContentMenu } from "@/components/contextmenu/menus";
+import { closeWindow } from "@/lib/windowClose";
 
 // Memoized so dragging/focusing one window doesn't re-render every other
 // window's surface (which would re-inject HTML and stutter the drag).
-export const Window = memo(function Window({ win }: { win: WindowState }) {
+export const Window = memo(function Window({ win, layer }: { win: WindowState; layer: number }) {
   const app = useAppStore((s) => s.apps[win.appId]);
   const { onMoveHandle, onResize } = useWindowDrag(win.id);
   const t = useT();
@@ -111,7 +112,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
         width,
         height,
         // Widgets sit on the desktop, behind normal windows.
-        zIndex: widget ? 0 : win.z,
+        zIndex: widget ? 0 : layer,
         borderRadius: maximized ? 0 : undefined,
         transformOrigin: "center",
         pointerEvents: minimized ? "none" : undefined,
@@ -180,7 +181,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
               kind="close"
               title={t("win.close")}
               danger
-              onClick={() => wsClient.send("c2s.window.close", { windowId: win.id })}
+              onClick={() => closeWindow(win)}
             >
               <X className="size-3.5" />
             </TitleButton>
@@ -199,7 +200,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
             <div className="mx-auto mt-1 h-1 w-8 rounded-full bg-foreground/25" />
           </div>
           <button
-            onClick={() => wsClient.send("c2s.window.close", { windowId: win.id })}
+            onClick={() => closeWindow(win)}
             title={t("win.close")}
             className="absolute right-1.5 top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-background/70 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive-fill hover:text-white group-hover:opacity-100"
           >

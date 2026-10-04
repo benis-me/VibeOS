@@ -83,6 +83,44 @@ export function listOpenWindows(): WindowState[] {
     .map(toWindow);
 }
 
+/**
+ * The most recently closed window of each unsaved experience (a temporary app in
+ * Cache/Applications, not uninstalled to Trash) whose last view is still on disk.
+ */
+export function listRecentClosed(limit = 8): WindowState[] {
+  const rows = getDb()
+    .query<WindowRow, []>(
+      `SELECT w.* FROM windows w
+       JOIN apps a ON a.id = w.app_id
+       JOIN app_memory m ON m.window_id = w.id
+       WHERE w.is_open = 0 AND a.kind = 'virtual' AND a.is_installed = 0
+         AND a.content_path LIKE 'Cache/Applications/%'
+         AND (m.snapshot_path IS NOT NULL OR m.html_snapshot != '')
+         AND NOT EXISTS (SELECT 1 FROM windows o WHERE o.app_id = w.app_id AND o.is_open = 1)
+       ORDER BY w.updated_at DESC LIMIT 64`,
+    )
+    .all();
+  const seen = new Set<string>();
+  return rows
+    .filter((row) => !seen.has(row.app_id) && seen.add(row.app_id))
+    .slice(0, limit)
+    .map(toWindow);
+}
+
+/** Reopen a closed window on top, with its geometry and last view intact. */
+export function reopenWindow(id: string): Promise<WindowState | null> {
+  return enqueue(() => {
+    const window = getWindow(id);
+    if (!window || window.isOpen) return null;
+    const db = getDb();
+    db.query("UPDATE windows SET focused = 0 WHERE is_open = 1").run();
+    db.query(
+      "UPDATE windows SET is_open = 1, focused = 1, state = 'normal', z = ?, updated_at = ? WHERE id = ?",
+    ).run(nextZ(), Date.now(), id);
+    return getWindow(id);
+  });
+}
+
 export function getWindow(id: string): WindowState | null {
   const db = getDb();
   const row = db.query<WindowRow, [string]>("SELECT * FROM windows WHERE id = ?").get(id);

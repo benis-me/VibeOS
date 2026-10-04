@@ -38,6 +38,7 @@ import { requestFiles, fileDownloadUrl } from "@/lib/files";
 import { sendCommunication } from "@/lib/communication";
 import { openContextMenu, type MenuItem } from "@/components/contextmenu/ContextMenu";
 import { buttonVariants } from "@/components/ui/button";
+import { guardClose } from "@/lib/windowClose";
 import { useWindowStore } from "@/stores/windowStore";
 import { wsClient } from "@/lib/ws";
 import { useChromeStore } from "@/stores/chromeStore";
@@ -174,9 +175,18 @@ export function FilesApp({
     };
   }, [windowId, path]);
 
-  const canLeave = () => !dirty || window.confirm(t("files.discard"));
+  // Unsaved edits are confirmed inside the window, then `then` runs (no browser dialog).
+  const dirtyRef = useRef(false);
+  dirtyRef.current = dirty;
+  const [leaving, setLeaving] = useState<(() => void) | null>(null);
+  const canLeave = useCallback((then: () => void) => {
+    if (!dirtyRef.current) return true;
+    setLeaving(() => then);
+    return false;
+  }, []);
+  useEffect(() => guardClose(windowId, canLeave), [windowId, canLeave]);
   const navigate = async (address: string, historyIndex?: number): Promise<boolean> => {
-    if (busy || !canLeave()) return false;
+    if (busy || !canLeave(() => void navigate(address, historyIndex))) return false;
     const id = ++navigationSequence.current;
     setNavigating(true);
     setError(null);
@@ -617,6 +627,32 @@ export function FilesApp({
           ))}
         </nav>
         <div className="flex min-w-0 flex-1 flex-col">
+          {leaving && (
+            <div
+              role="alert"
+              className="flex shrink-0 items-center gap-2 border-b bg-card px-3 py-2 text-xs"
+            >
+              <span className="flex-1">{t("files.discard")}</span>
+              <button
+                type="button"
+                className={buttonVariants({ variant: "ghost", size: "sm" })}
+                onClick={() => setLeaving(null)}
+              >
+                {t("files.keepEditing")}
+              </button>
+              <button
+                type="button"
+                className={buttonVariants({ variant: "destructive", size: "sm" })}
+                onClick={() => {
+                  dirtyRef.current = false;
+                  setLeaving(null);
+                  leaving();
+                }}
+              >
+                {t("files.discardChanges")}
+              </button>
+            </div>
+          )}
           {editor ? (
             <>
               <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
@@ -625,11 +661,12 @@ export function FilesApp({
                   title={t("files.back")}
                   disabled={busy}
                   onClick={() => {
-                    if (canLeave()) {
+                    const back = () => {
                       sequence.current++;
                       setEditor(null);
                       setError(null);
-                    }
+                    };
+                    if (canLeave(back)) back();
                   }}
                 >
                   <ArrowLeft className="size-3.5" />

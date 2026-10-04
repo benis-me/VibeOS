@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import type { AppDescriptor } from "@vibeos/shared";
 import { AppIcon } from "@/components/AppIcon";
 import { useAppStore } from "@/stores/appStore";
+import { useWindowStore } from "@/stores/windowStore";
 import { wsClient } from "@/lib/ws";
 import { appLabel, useT } from "@/lib/i18n";
 import { usePopoverMotion } from "@/lib/motion";
@@ -26,6 +27,7 @@ export function StartMenu({ open, onClose, onAppSearch }: Props) {
   );
   const system = useMemo(() => apps.filter((a) => a.kind === "preset"), [apps]);
   const generated = useMemo(() => apps.filter((a) => a.kind === "virtual"), [apps]);
+  const recent = useWindowStore((s) => s.recent);
   const ref = useRef<HTMLDivElement>(null);
   const t = useT();
   const menu = usePopoverMotion();
@@ -38,8 +40,17 @@ export function StartMenu({ open, onClose, onAppSearch }: Props) {
       if ((e.target as HTMLElement)?.closest?.(TRIGGER)) return;
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     window.addEventListener("pointerdown", onDown);
-    return () => window.removeEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    // Keyboard users land inside the menu.
+    ref.current?.querySelector<HTMLElement>("button")?.focus();
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose]);
 
   const launch = (appId: string) => {
@@ -73,6 +84,20 @@ export function StartMenu({ open, onClose, onAppSearch }: Props) {
           <AppSection title={t("startmenu.system")} apps={system} onLaunch={launch} />
           {generated.length > 0 && (
             <AppSection title={t("startmenu.generated")} apps={generated} onLaunch={launch} />
+          )}
+          {recent.length > 0 && (
+            // Unsaved experiences come back with their last view; nothing regenerates.
+            <AppSection
+              title={t("startmenu.recent")}
+              apps={recent.flatMap((w) => {
+                const app = appMap[w.appId];
+                return app ? [{ ...app, id: w.id, name: w.title }] : [];
+              })}
+              onLaunch={(windowId) => {
+                wsClient.send("c2s.window.reopen", { windowId });
+                onClose();
+              }}
+            />
           )}
         </motion.div>
       )}

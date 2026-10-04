@@ -45,11 +45,18 @@ function toApp(row: AppRow): AppDescriptor {
   };
 }
 
-export function listApps(includeOpenDrafts = false): AppDescriptor[] {
+/** `includeDrafts`: also unsaved experiences that are open or can reopen from Recent. */
+export function listApps(includeDrafts = false): AppDescriptor[] {
   const db = getDb();
   return db
     .query<AppRow, []>(
-      `SELECT * FROM apps WHERE is_installed = 1 ${includeOpenDrafts ? "OR id IN (SELECT app_id FROM windows WHERE is_open=1)" : ""} ORDER BY created_at`,
+      `SELECT * FROM apps WHERE is_installed = 1 ${
+        includeDrafts
+          ? `OR id IN (SELECT app_id FROM windows WHERE is_open=1)
+             OR (kind = 'virtual' AND content_path LIKE 'Cache/Applications/%'
+                 AND id IN (SELECT app_id FROM windows WHERE is_open=0))`
+          : ""
+      } ORDER BY created_at`,
     )
     .all()
     .filter(isAvailable)

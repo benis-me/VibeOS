@@ -46,7 +46,8 @@ export async function handleAppLaunch(p: ClientToServerPayload<"c2s.app.launch">
     appId,
     title: p.name,
     kind: widget ? "widget" : "app",
-    rect: { x: widget ? 60 : 140, y: widget ? 60 : 90, ...size },
+    // Apps cascade so successive launches never cover each other; widgets keep their corner.
+    ...(widget ? { rect: { x: 60, y: 60, ...size } } : { size }),
   });
   await ensureMemory(w.id, appId);
   broadcast("s2c.window.opened", { window: w });

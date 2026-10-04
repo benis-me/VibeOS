@@ -32,32 +32,35 @@ function Toast({ n }: { n: Notification }) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: offset }}
       transition={{ duration: 0.2, ease: EASE_OUT }}
+      role={n.kind === "error" ? "alert" : undefined}
       className={cn(
         "vibe-notif pointer-events-auto w-80 rounded-xl border bg-card/95 p-3 shadow-xl backdrop-blur sheen",
       )}
-      onClick={() => {
-        wsClient.send("c2s.notification.click", { id: n.id });
-        dismiss(n.id);
-      }}
     >
       <div className="flex items-start gap-2.5">
-        <span className="mt-0.5">{NOTIFICATION_ICON[n.kind]}</span>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{n.title}</div>
-          {n.body && <div className="mt-0.5 text-xs text-muted-foreground">{n.body}</div>}
-          {n.action && (
-            <div className="mt-1.5 text-xs font-medium text-brand">{n.action.label}</div>
-          )}
-        </div>
-        {/* Only dismisses: clicking the card itself opens what it refers to. */}
+        {/* The card opens what it refers to; the X beside it only dismisses. */}
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-start gap-2.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          onClick={() => {
+            wsClient.send("c2s.notification.click", { id: n.id });
+            dismiss(n.id);
+          }}
+        >
+          <span className="mt-0.5">{NOTIFICATION_ICON[n.kind]}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">{n.title}</span>
+            {n.body && <span className="mt-0.5 block text-xs text-muted-foreground">{n.body}</span>}
+            {n.action && (
+              <span className="mt-1.5 block text-xs font-medium text-brand">{n.action.label}</span>
+            )}
+          </span>
+        </button>
         <button
           type="button"
           aria-label={t("communication.dismiss")}
           title={t("communication.dismiss")}
-          onClick={(e) => {
-            e.stopPropagation();
-            dismiss(n.id);
-          }}
+          onClick={() => dismiss(n.id)}
           className="-m-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           <X className="size-3.5" />
@@ -70,7 +73,10 @@ function Toast({ n }: { n: Notification }) {
 export function NotificationToasts() {
   const toasts = useNotificationStore((s) => s.toasts);
   return (
-    <div className="pointer-events-none absolute right-3 top-3 z-[9999] flex flex-col gap-2">
+    <div
+      aria-live="polite"
+      className="pointer-events-none absolute right-3 top-3 z-[9999] flex flex-col gap-2"
+    >
       <AnimatePresence initial={false}>
         {toasts.slice(-4).map((n) => (
           <Toast key={n.id} n={n} />

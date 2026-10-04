@@ -13,6 +13,7 @@ import {
   resizeGeneratedWindow,
   getWindow,
   listOpenWindows,
+  listRecentClosed,
   setWindowState,
 } from "../db/repositories/WindowRepo.ts";
 import { ensureMemory } from "../db/repositories/AppMemoryRepo.ts";
@@ -240,6 +241,7 @@ async function one(call: Syscall, ctx: SyscallContext): Promise<void> {
       bus.emit("window.closed", { windowId });
       await closeWindow(windowId);
       broadcast("s2c.window.closed", { windowId });
+      broadcast("s2c.window.recent", { windows: listRecentClosed() });
       await recordStep("window.closed", { windowId });
       return;
     }

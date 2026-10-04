@@ -51,6 +51,8 @@ export interface BootStatePayload {
   agentRuns: AgentRun[];
   /** Windows generating right now; any other busy flag is stale after a reconnect. */
   busyWindowIds?: string[];
+  /** Recently closed, unsaved experiences that can be reopened as they were. */
+  recentWindows?: WindowState[];
 }
 
 export interface UiRegion {
@@ -105,6 +107,7 @@ export type ServerToClient =
     }
   | { type: "s2c.window.opened"; payload: { window: WindowState } }
   | { type: "s2c.window.closed"; payload: { windowId: string } }
+  | { type: "s2c.window.recent"; payload: { windows: WindowState[] } }
   | { type: "s2c.window.focused"; payload: { windowId: string } }
   | { type: "s2c.window.moved"; payload: { window: WindowState } }
   | { type: "s2c.window.stateChanged"; payload: { window: WindowState } }

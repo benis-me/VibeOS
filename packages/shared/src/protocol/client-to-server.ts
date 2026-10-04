@@ -70,6 +70,8 @@ export type ClientToServer =
     }
   | { type: "c2s.window.open"; payload: { appId: string; hint?: string } }
   | { type: "c2s.window.close"; payload: { windowId: string } }
+  /** Undo a close, or reopen a recent unsaved experience with its last view. */
+  | { type: "c2s.window.reopen"; payload: { windowId: string } }
   /** Stop the window's in-flight generation; its current UI stays. */
   | { type: "c2s.window.cancel"; payload: { windowId: string } }
   | { type: "c2s.window.focus"; payload: { windowId: string } }

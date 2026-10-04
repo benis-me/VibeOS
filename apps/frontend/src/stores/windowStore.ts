@@ -13,6 +13,9 @@ interface WindowStoreState {
   progress: Record<string, { since: number; status?: string }>;
   /** Why the last generation left the window unfinished (an i18n key). */
   failed: Record<string, string>;
+  /** Recently closed unsaved experiences, newest first (server-maintained). */
+  recent: WindowState[];
+  setRecent: (windows: WindowState[]) => void;
   setAll: (windows: WindowState[], snapshots: Record<string, string>, busyIds?: string[]) => void;
   upsert: (w: WindowState) => void;
   remove: (id: string) => void;
@@ -30,6 +33,8 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
   busy: {},
   progress: {},
   failed: {},
+  recent: [],
+  setRecent: (recent) => set({ recent }),
   setAll: (windows, snapshots, busyIds = []) =>
     set((s) => {
       const map: Record<string, WindowState> = {};
