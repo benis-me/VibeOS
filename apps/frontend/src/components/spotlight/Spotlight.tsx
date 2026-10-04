@@ -5,7 +5,7 @@ import { AppIcon } from "@/components/AppIcon";
 import type { AppDescriptor, AppSearchResult, WindowState } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
 import { ulid } from "@vibeos/shared/util";
-import { translate, useLocale, useT } from "@/lib/i18n";
+import { appLabel, translate, useLocale, useT } from "@/lib/i18n";
 import { isComposing } from "@/lib/fields";
 import { usePopoverMotion, useOverlayMotion } from "@/lib/motion";
 import { useAppStore } from "@/stores/appStore";
@@ -246,7 +246,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
                       {commandText.trim() || t("spotlight.cmdHint")}
                     </span>
                   </span>
-                  <kbd className="rounded border bg-muted px-1 font-sans text-[10px] text-muted-foreground">
+                  <kbd className="rounded border bg-muted px-1 font-sans text-2xs text-muted-foreground">
                     ↵
                   </kbd>
                 </button>
@@ -287,11 +287,11 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
                       <AppIcon
                         name={app.icon}
                         presetId={app.presetId}
-                        label={app.name}
+                        label={appLabel(t, app)}
                         className="size-6"
                       />
                     }
-                    title={app.name}
+                    title={appLabel(t, app)}
                     detail={app.manifest.description === app.name ? "" : app.manifest.description}
                     badge={win ? t("spotlight.opened") : ""}
                   />
@@ -340,7 +340,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
             )}
 
             {!isCommand && (
-              <div className="flex items-center gap-1.5 border-t px-4 py-1.5 text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-1.5 border-t px-4 py-1.5 text-2xs text-muted-foreground">
                 <kbd className="rounded border bg-muted px-1 font-sans">&gt;</kbd>
                 {t("spotlight.cmdMode")}
               </div>
@@ -354,7 +354,7 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
 
 function Heading({ icon: Icon, label }: { icon: typeof AppWindow; label: string }) {
   return (
-    <div className="flex items-center gap-1.5 px-3 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground">
+    <div className="flex items-center gap-1.5 px-3 pb-1 pt-2.5 text-2xs font-medium text-muted-foreground">
       <Icon className="size-3" />
       {label}
     </div>
@@ -388,7 +388,7 @@ function Row(props: {
         )}
       </span>
       {props.badge && (
-        <span className="shrink-0 text-[11px] text-muted-foreground">{props.badge}</span>
+        <span className="shrink-0 text-2xs text-muted-foreground">{props.badge}</span>
       )}
     </button>
   );

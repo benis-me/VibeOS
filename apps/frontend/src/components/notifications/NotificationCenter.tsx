@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { usePopoverMotion } from "@/lib/motion";
 import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
 import { cn } from "@/lib/utils";
+import { NOTIFICATION_ICON } from "./NotificationToasts";
 
 const TRIGGER = '[data-popover-trigger="notifications"]';
 
@@ -71,8 +72,9 @@ export function NotificationCenter({ open, onClose }: Props) {
                 >
                   <div className="flex w-full items-center gap-2">
                     {!n.read && <span className="size-1.5 rounded-full bg-brand" />}
+                    <span className="shrink-0">{NOTIFICATION_ICON[n.kind]}</span>
                     <span className="flex-1 truncate text-sm font-medium">{n.title}</span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-2xs text-muted-foreground">
                       {new Date(n.createdAt).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",

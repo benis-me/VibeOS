@@ -4,7 +4,8 @@ import type { ProfileChange } from "@vibeos/shared";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { wsClient } from "@/lib/ws";
 import { useT } from "@/lib/i18n";
-import { Pane, Switch } from "./primitives";
+import { Pane, Switch } from "@/components/ui/primitives";
+import { buttonVariants } from "@/components/ui/button";
 
 type Draft = { id?: string; content: string };
 
@@ -60,7 +61,7 @@ export function ProfilePane() {
             setDraft({ content: "" });
             setRemoving(null);
           }}
-          className="vibe-btn flex shrink-0 items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-[12px] transition-colors hover:bg-accent disabled:opacity-40"
+          className={buttonVariants()}
         >
           <Plus className="size-3.5" />
           {t("settings.profile.add")}
@@ -96,14 +97,14 @@ export function ProfilePane() {
               type="button"
               disabled={!!pending}
               onClick={() => setDraft(null)}
-              className="rounded-lg px-3 py-1.5 text-[12px] text-muted-foreground hover:bg-accent disabled:opacity-40"
+              className={buttonVariants({ variant: "ghost" })}
             >
               {t("settings.profile.cancel")}
             </button>
             <button
               type="submit"
               disabled={!draft.content.trim() || !!pending}
-              className="vibe-btn rounded-lg border bg-background px-3 py-1.5 text-[12px] hover:bg-accent disabled:opacity-40"
+              className={buttonVariants()}
             >
               {t(pending ? "settings.profile.saving" : "settings.profile.save")}
             </button>
@@ -111,7 +112,7 @@ export function ProfilePane() {
         </form>
       )}
 
-      <div className="mb-3 flex items-center justify-between gap-3 text-[12px]">
+      <div className="mb-3 flex items-center justify-between gap-3 text-xs">
         <span className="text-muted-foreground" aria-live="polite">
           {enabledCount
             ? `${t("settings.profile.enabled")} · ${enabledCount} / ${entries.length}`
@@ -120,7 +121,7 @@ export function ProfilePane() {
         <button
           disabled={!enabledCount}
           onClick={() => change({ action: "disable-all" })}
-          className="rounded-md px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
         >
           {t("settings.profile.disableAll")}
         </button>
@@ -146,7 +147,7 @@ export function ProfilePane() {
                   >
                     {entry.content}
                   </p>
-                  <span className="mt-1.5 block text-[11px] text-muted-foreground">
+                  <span className="mt-1.5 block text-2xs text-muted-foreground">
                     {t(entry.enabled ? "settings.profile.enabled" : "settings.profile.disabled")}
                   </span>
                 </div>
@@ -163,7 +164,7 @@ export function ProfilePane() {
                     setDraft({ id: entry.id, content: entry.content });
                     setRemoving(null);
                   }}
-                  className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40"
+                  className={buttonVariants({ variant: "ghost", size: "icon" })}
                 >
                   <Pencil className="size-4" />
                 </button>
@@ -172,19 +173,19 @@ export function ProfilePane() {
                   aria-label={t("settings.profile.remove")}
                   title={t("settings.profile.remove")}
                   onClick={() => setRemoving(entry.id)}
-                  className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-destructive disabled:opacity-40"
+                  className={buttonVariants({ variant: "ghost", size: "icon" })}
                 >
                   <Trash2 className="size-4" />
                 </button>
               </div>
               {removing === entry.id && (
-                <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-3 text-[12px]">
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t pt-3 text-xs">
                   <span className="mr-auto text-muted-foreground">
                     {t("settings.profile.removePrompt")}
                   </span>
                   <button
                     onClick={() => setRemoving(null)}
-                    className="rounded-md px-2 py-1 hover:bg-accent"
+                    className={buttonVariants({ variant: "ghost", size: "sm" })}
                   >
                     {t("settings.profile.cancel")}
                   </button>
@@ -193,7 +194,7 @@ export function ProfilePane() {
                       change({ action: "remove", id: entry.id });
                       setRemoving(null);
                     }}
-                    className="rounded-md px-2 py-1 text-destructive hover:bg-destructive/10"
+                    className={buttonVariants({ variant: "destructive", size: "sm" })}
                   >
                     {t("settings.profile.confirmRemove")}
                   </button>

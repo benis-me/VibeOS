@@ -55,5 +55,6 @@ Useful env: `PORT`, `VIBEOS_DB_PATH`, `VIBEOS_AGENTS_DISABLED=1`, `VIBEOS_LOG_LE
 - Visuals follow DevDock: neutral black/white/gray, oklch tokens, Geist +
   JetBrains Mono, thin borders, subtle shadows. Focused window = frosted glass.
   Skins (`devdock` / `xp` / `aqua`) layer over the same tokens via `data-skin`; new
-  chrome should use `.vibe-*` hooks so a skin can restyle it.
+  chrome should use `.vibe-*` hooks so a skin can restyle it. Native apps share
+  `components/ui` (`buttonVariants`, `Select`) and the `text-2xs`/`text-xs`/13px scale.
 

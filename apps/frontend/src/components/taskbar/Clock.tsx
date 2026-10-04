@@ -14,7 +14,7 @@ export function Clock() {
   return (
     <div className="vibe-clock flex flex-col items-end px-3 text-right leading-tight">
       <span className="text-xs font-medium">{time}</span>
-      <span className="text-[10px] text-muted-foreground">{date}</span>
+      <span className="text-2xs text-muted-foreground">{date}</span>
     </div>
   );
 }

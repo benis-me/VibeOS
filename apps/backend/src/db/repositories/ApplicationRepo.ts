@@ -442,18 +442,26 @@ export async function saveWindowAsApplication(windowId: string, name?: string, i
       },
     });
   } else {
+    const definition = readApplicationVersion(app.id, window.appVersionId) ?? safeDefinition(app);
+    // Saving an unchanged installed app again must not add another version.
+    const unchanged =
+      app.isInstalled &&
+      definition.seedHtml === snapshot &&
+      definition.defaultSize?.w === window.rect.w &&
+      definition.defaultSize?.h === window.rect.h;
     await enqueue(() => {
       getDb().query("UPDATE apps SET is_installed=1 WHERE id=?").run(app.id);
-      writeVersion(
-        app,
-        {
-          ...(readApplicationVersion(app.id, window.appVersionId) ?? safeDefinition(app)),
-          defaultSize: { w: window.rect.w, h: window.rect.h },
-          seedHtml: snapshot,
-        },
-        "Saved current experience",
-        true,
-      );
+      if (!unchanged)
+        writeVersion(
+          app,
+          {
+            ...definition,
+            defaultSize: { w: window.rect.w, h: window.rect.h },
+            seedHtml: snapshot,
+          },
+          "Saved current experience",
+          true,
+        );
     });
     await renameApplication(app.id, name ?? app.name);
   }

@@ -10,7 +10,7 @@ import { useNotificationStore } from "@/stores/notificationStore";
 import { wsClient } from "@/lib/ws";
 import { StartMenu } from "@/components/startmenu/StartMenu";
 import { Clock } from "./Clock";
-import { useT } from "@/lib/i18n";
+import { appLabel, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { taskbarMenu, taskbarItemMenu } from "@/components/contextmenu/menus";
@@ -39,6 +39,10 @@ export function Taskbar({
     (s) => s.skins.find((skin) => skin.id === selectedSkin)?.foundation ?? selectedSkin,
   );
   const unread = useNotificationStore((s) => s.notifications.filter((n) => !n.read).length);
+  // Red is reserved for unread errors; ordinary unread items get a neutral badge.
+  const unreadError = useNotificationStore((s) =>
+    s.notifications.some((n) => !n.read && n.kind === "error"),
+  );
   // XP keeps its iconic "start"; the macOS-style Default/Aqua docks say "Apps".
   const startLabel = skin === "xp" ? t("taskbar.start") : t("taskbar.apps");
 
@@ -99,10 +103,10 @@ export function Taskbar({
                 <AppIcon
                   name={app?.icon}
                   presetId={app?.presetId}
-                  label={app?.name ?? w.title}
+                  label={appLabel(t, app, w.title)}
                   className="size-4"
                 />
-                <span className="vibe-taskitem-label truncate">{w.title}</span>
+                <span className="vibe-taskitem-label truncate">{appLabel(t, app, w.title)}</span>
                 {busy[w.id] && (
                   <span className="vibe-taskitem-busy size-1.5 shrink-0 rounded-full bg-brand motion-safe:animate-pulse" />
                 )}
@@ -120,7 +124,12 @@ export function Taskbar({
           >
             <Bell className="size-4" />
             {unread > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex min-w-4 items-center justify-center rounded-full bg-destructive-fill px-1 text-[9px] font-semibold text-white">
+              <span
+                className={cn(
+                  "absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-2xs leading-none font-semibold",
+                  unreadError ? "bg-destructive-fill text-white" : "bg-foreground text-background",
+                )}
+              >
                 {unread > 9 ? "9+" : unread}
               </span>
             )}

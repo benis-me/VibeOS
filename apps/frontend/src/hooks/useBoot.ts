@@ -111,12 +111,13 @@ export function useBoot(): void {
           return;
         }
         const byCode = translate(locale, `error.${p.code}`);
-        const title = byCode === `error.${p.code}` ? translate(locale, "error.generic") : byCode;
+        const fallback = byCode === `error.${p.code}` ? translate(locale, "error.generic") : byCode;
+        // A known message key is the reason itself (e.g. nothing to save yet), not an internal error.
         useNotificationStore.getState().push({
           id: ulid(),
           kind: "error",
-          title,
-          body: detail,
+          title: known ? detail : fallback,
+          body: known ? undefined : detail,
           source: "system",
           read: false,
           createdAt: Date.now(),

@@ -18,9 +18,11 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { useT } from "@/lib/i18n";
+import { buttonVariants } from "@/components/ui/button";
+import { Select } from "@/components/ui/primitives";
 
-const button =
-  "vibe-btn inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border bg-card px-2 text-xs hover:bg-accent disabled:opacity-40";
+const button = buttonVariants();
+const iconButton = buttonVariants({ size: "icon" });
 const input =
   "vibe-input min-w-0 rounded-md border bg-background px-2.5 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring";
 export function SkinsApp() {
@@ -92,15 +94,15 @@ export function SkinsApp() {
       <div className="shrink-0 border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <Palette className="size-4 shrink-0 text-muted-foreground" />
-          <select
+          <Select
             aria-label={t("skins.select")}
-            className={`${input} h-8 flex-1`}
+            className="min-w-0 flex-1"
             value={skin.id}
             disabled={disabled}
-            onChange={(e) => {
-              setSelected(e.target.value as typeof selected);
+            onChange={(value) => {
+              setSelected(value as typeof selected);
               setEdit(null);
-              void perform({ action: "activate", id: e.target.value });
+              void perform({ action: "activate", id: value });
             }}
           >
             <optgroup label={t("skins.builtin")}>
@@ -123,16 +125,14 @@ export function SkinsApp() {
                   ))}
               </optgroup>
             )}
-          </select>
+          </Select>
           {!skin.builtIn && (
-            <select
+            <Select
               aria-label={t("skins.version")}
               value={skin.activeVersionId ?? ""}
               disabled={disabled || !skin.versions.length}
-              className={`${input} h-8 w-24 shrink-0 text-xs`}
-              onChange={(e) =>
-                void perform({ action: "activate", id: skin.id, versionId: e.target.value })
-              }
+              className="w-24 shrink-0"
+              onChange={(versionId) => void perform({ action: "activate", id: skin.id, versionId })}
             >
               {!skin.versions.length && <option value="">{t("skins.initial")}</option>}
               {skin.versions.map((v) => (
@@ -140,7 +140,7 @@ export function SkinsApp() {
                   v{v.number}
                 </option>
               ))}
-            </select>
+            </Select>
           )}
           {(
             [
@@ -153,7 +153,7 @@ export function SkinsApp() {
             <button
               key={action}
               type="button"
-              className={`${button} w-8 px-0`}
+              className={iconButton}
               title={t(`skins.${action}`)}
               aria-label={t(`skins.${action}`)}
               disabled={disabled || unavailable}
@@ -164,7 +164,7 @@ export function SkinsApp() {
           ))}
           <button
             type="button"
-            className={`${button} w-8 px-0`}
+            className={iconButton}
             aria-label={t("skins.more")}
             title={t("skins.more")}
             aria-haspopup="menu"
@@ -247,7 +247,7 @@ export function SkinsApp() {
               {t("files.cancel")}
             </button>
             <button
-              className={`${button} ${edit === "delete" ? "text-destructive" : ""}`}
+              className={buttonVariants({ variant: edit === "delete" ? "destructive" : "outline" })}
               disabled={disabled || (edit !== "delete" && !name.trim())}
             >
               {t("files.confirm")}
@@ -290,7 +290,7 @@ export function SkinsApp() {
                   <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">
                     {request.prompt}
                   </p>
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">
+                  <p className="mt-1.5 text-2xs text-muted-foreground">
                     {t("skins.basedOn")} {base ? `v${base.number}` : t("skins.initial")}
                   </p>
                 </div>
@@ -377,7 +377,7 @@ export function SkinsApp() {
             {running ? (
               <button
                 type="button"
-                className={`${button} w-8 px-0`}
+                className={iconButton}
                 aria-label={t("skins.stop")}
                 title={t("skins.stop")}
                 disabled={disabled}
@@ -388,7 +388,7 @@ export function SkinsApp() {
             ) : (
               <button
                 type="submit"
-                className={`${button} w-8 border-transparent bg-brand px-0 text-brand-foreground hover:bg-brand/90`}
+                className={buttonVariants({ variant: "default", size: "icon" })}
                 aria-label={t("skins.generate")}
                 title={t("skins.generate")}
                 disabled={disabled || !prompt.trim() || !!skin.loadError}

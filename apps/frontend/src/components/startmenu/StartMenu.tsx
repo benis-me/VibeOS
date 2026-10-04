@@ -5,7 +5,7 @@ import type { AppDescriptor } from "@vibeos/shared";
 import { AppIcon } from "@/components/AppIcon";
 import { useAppStore } from "@/stores/appStore";
 import { wsClient } from "@/lib/ws";
-import { useT } from "@/lib/i18n";
+import { appLabel, useT } from "@/lib/i18n";
 import { usePopoverMotion } from "@/lib/motion";
 import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
 import { cn } from "@/lib/utils";
@@ -67,9 +67,7 @@ export function StartMenu({ open, onClose, onAppSearch }: Props) {
           >
             <Search className="size-4 text-muted-foreground" />
             <span className="flex-1 text-sm">{t("startmenu.appSearch")}</span>
-            <span className="text-[10px] text-muted-foreground">
-              {t("startmenu.appSearchHint")}
-            </span>
+            <span className="text-2xs text-muted-foreground">{t("startmenu.appSearchHint")}</span>
           </button>
 
           <AppSection title={t("startmenu.system")} apps={system} onLaunch={launch} />
@@ -91,9 +89,10 @@ function AppSection({
   apps: AppDescriptor[];
   onLaunch: (appId: string) => void;
 }) {
+  const t = useT();
   return (
     <div className="vibe-startsection mb-1">
-      <div className="mb-1 px-1 text-[11px] font-medium text-muted-foreground">{title}</div>
+      <div className="mb-1 px-1 text-2xs font-medium text-muted-foreground">{title}</div>
       <div className="grid grid-cols-3 gap-1">
         {apps.map((app) => (
           <button
@@ -101,8 +100,13 @@ function AppSection({
             onClick={() => onLaunch(app.id)}
             className="vibe-startapp flex flex-col items-center gap-1.5 rounded-lg p-3 text-center transition-colors hover:bg-accent"
           >
-            <AppIcon name={app.icon} presetId={app.presetId} label={app.name} className="size-7" />
-            <span className="line-clamp-1 text-xs text-foreground/90">{app.name}</span>
+            <AppIcon
+              name={app.icon}
+              presetId={app.presetId}
+              label={appLabel(t, app)}
+              className="size-7"
+            />
+            <span className="line-clamp-1 text-xs text-foreground/90">{appLabel(t, app)}</span>
           </button>
         ))}
       </div>

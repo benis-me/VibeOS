@@ -14,9 +14,10 @@ import { fileDownloadUrl, filePreviewUrl, requestFiles } from "@/lib/files";
 import { useT } from "@/lib/i18n";
 import { wsClient } from "@/lib/ws";
 import { useWindowStore } from "@/stores/windowStore";
+import { buttonVariants } from "@/components/ui/button";
 
-const button =
-  "vibe-btn inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs hover:bg-accent";
+const button = buttonVariants();
+const iconButton = buttonVariants({ size: "icon" });
 
 /** Native viewers share chrome; text is literal, media uses browser controls. */
 export function FileViewerApp({ windowId, media = false }: { windowId: string; media?: boolean }) {
@@ -79,7 +80,7 @@ function Viewer({ path, media }: { path?: string; media: boolean }) {
           <>
             {!media && (
               <button
-                className={button}
+                className={iconButton}
                 aria-pressed={wrap}
                 title={t("viewer.wrap")}
                 onClick={() => setWrap(!wrap)}
@@ -94,13 +95,18 @@ function Viewer({ path, media }: { path?: string; media: boolean }) {
               </button>
             )}
             <button
-              className={button}
+              className={iconButton}
               title={t("files.refresh")}
               onClick={() => setRefresh((n) => n + 1)}
             >
               <RefreshCw className="size-3.5" />
             </button>
-            <a className={button} href={fileDownloadUrl(path)} download title={t("files.download")}>
+            <a
+              className={iconButton}
+              href={fileDownloadUrl(path)}
+              download
+              title={t("files.download")}
+            >
               <Download className="size-3.5" />
             </a>
           </>

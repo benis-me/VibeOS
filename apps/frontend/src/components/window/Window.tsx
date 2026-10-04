@@ -11,7 +11,7 @@ import { InteractiveSurface } from "./InteractiveSurface";
 import { NATIVE_APPS } from "./nativeApps";
 import { CHROMES } from "./chromes";
 import { AppIcon } from "@/components/AppIcon";
-import { useT } from "@/lib/i18n";
+import { appLabel, useT } from "@/lib/i18n";
 import { useWindowMotion, EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { openContextMenu } from "@/components/contextmenu/ContextMenu";
@@ -23,6 +23,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
   const app = useAppStore((s) => s.apps[win.appId]);
   const { onMoveHandle, onResize } = useWindowDrag(win.id);
   const t = useT();
+  const title = appLabel(t, app, win.title);
   const winMotion = useWindowMotion();
   const reduced = useReducedMotion();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -73,7 +74,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
     <motion.div
       ref={rootRef}
       role="dialog"
-      aria-label={win.title}
+      aria-label={title}
       onPointerDown={widget ? undefined : focus}
       initial={winMotion.initial}
       exit={winMotion.exit}
@@ -102,7 +103,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
           ? "rounded-2xl border-white/20 bg-card/25 shadow-xl backdrop-blur-2xl"
           : win.focused
             ? "rounded-xl ring-1 ring-ring/30 win-focused win-glass"
-            : "rounded-xl bg-card",
+            : "rounded-xl bg-card win-unfocused",
       )}
       style={{
         left: maximized ? 0 : `clamp(0px, ${rect.x}px, calc(100vw - ${width}))`,
@@ -135,7 +136,7 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
           <AppIcon
             name={app?.icon}
             presetId={app?.presetId}
-            label={app?.name ?? win.title}
+            label={title}
             className={cn("size-4", !win.focused && "opacity-50")}
           />
           <span
@@ -144,19 +145,23 @@ export const Window = memo(function Window({ win }: { win: WindowState }) {
               win.focused ? "text-foreground/90" : "text-muted-foreground",
             )}
           >
-            {win.title}
+            {title}
           </span>
           {!native && <GenerationStatus windowId={win.id} />}
+          {!native && (
+            // Kept apart from the window controls: saving is not a fourth traffic light.
+            <button
+              type="button"
+              title={t("win.saveAsApp")}
+              aria-label={t("win.saveAsApp")}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => wsClient.send("c2s.app.save", { windowId: win.id })}
+              className="vibe-titlebar-action flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition hover:bg-current/10 hover:opacity-100"
+            >
+              <Save className="size-3.5" />
+            </button>
+          )}
           <div className="vibe-winbtns flex items-center gap-1">
-            {!native && (
-              <TitleButton
-                kind="save"
-                title={t("win.saveAsApp")}
-                onClick={() => wsClient.send("c2s.app.save", { windowId: win.id })}
-              >
-                <Save className="size-3.5" />
-              </TitleButton>
-            )}
             <TitleButton
               kind="min"
               title={t("win.minimize")}
@@ -303,7 +308,7 @@ function GenerationStatus({ windowId }: { windowId: string }) {
   };
   return (
     <span
-      className="vibe-genstatus flex min-w-0 shrink items-center gap-1.5 text-[11px] text-muted-foreground"
+      className="vibe-genstatus flex min-w-0 shrink items-center gap-1.5 text-2xs text-muted-foreground"
       title={progress.status}
     >
       <Loader2 className="size-3 shrink-0 motion-safe:animate-spin" />
@@ -379,7 +384,7 @@ function TitleButton({
   children: React.ReactNode;
   onClick: () => void;
   title: string;
-  kind?: "save" | "min" | "max" | "close";
+  kind?: "min" | "max" | "close";
   danger?: boolean;
 }) {
   return (

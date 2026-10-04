@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Send, Square } from "lucide-react";
+import {
+  ArrowUp,
+  Copy,
+  Download,
+  Eraser,
+  FolderOpen,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Square,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import type { ApplicationCommand, AppRuntime } from "@vibeos/shared";
 import { useAppStore } from "@/stores/appStore";
 import { useApplicationStore } from "@/stores/applicationStore";
@@ -8,6 +20,10 @@ import { requestApplication } from "@/lib/nativeCommands";
 import { requestFiles } from "@/lib/files";
 import { wsClient } from "@/lib/ws";
 import { useT } from "@/lib/i18n";
+import { isComposing } from "@/lib/fields";
+import { buttonVariants } from "@/components/ui/button";
+import { Select } from "@/components/ui/primitives";
+import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 
 export function AppStoreApp() {
   const t = useT();
@@ -37,19 +53,17 @@ export function AppStoreApp() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [confirm, setConfirm] = useState<"uninstall" | "clear-data" | null>(null);
-  const [includeData, setIncludeData] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const running = detail?.requests.find(
     (r) => r.status === "generating" || r.status === "validating",
   );
-  const button =
-    "vibe-btn rounded-md border bg-card px-2.5 py-1.5 text-xs hover:bg-accent disabled:opacity-40";
+  const button = buttonVariants();
+  const iconButton = buttonVariants({ size: "icon" });
   useEffect(() => {
     setPrompt("");
     setError("");
     setNotice("");
-    setIncludeData(false);
     setConfirm(null);
   }, [app?.id]);
   useEffect(() => {
@@ -77,12 +91,12 @@ export function AppStoreApp() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-background text-foreground">
       <div className="shrink-0 space-y-2 border-b p-3">
-        <div className="flex gap-2">
-          <select
+        <div className="flex items-center gap-2">
+          <Select
             aria-label={t("applications.select")}
             value={app?.id ?? ""}
-            onChange={(e) => state.select(e.target.value)}
-            className="vibe-input min-w-0 flex-1 rounded-md border bg-card px-2 py-1.5 text-[13px]"
+            onChange={(id) => state.select(id)}
+            className="min-w-0 flex-1"
           >
             {!app && <option value="">{t("applications.empty")}</option>}
             {apps.map((a) => (
@@ -90,20 +104,15 @@ export function AppStoreApp() {
                 {a.name}
               </option>
             ))}
-          </select>
-          <select
+          </Select>
+          <Select
             aria-label={t("skins.version")}
             disabled={!detail || busy || !!running}
             value={detail?.activeVersionId ?? ""}
-            onChange={(e) =>
-              app &&
-              void run({
-                action: "activate",
-                appId: app.id,
-                versionId: e.target.value,
-              })
+            onChange={(versionId) =>
+              app && void run({ action: "activate", appId: app.id, versionId })
             }
-            className="vibe-input max-w-44 rounded-md border bg-card px-2 text-xs"
+            className="max-w-44 shrink-0"
           >
             {!detail && <option value="">—</option>}
             {detail?.versions.map((v) => (
@@ -112,88 +121,112 @@ export function AppStoreApp() {
                 {t(`runtime.${v.runtime}`)}
               </option>
             ))}
-          </select>
+          </Select>
+          {app && (
+            <button
+              type="button"
+              className={button}
+              onClick={() => wsClient.send("c2s.window.open", { appId: app.id })}
+            >
+              {t("applications.open")}
+            </button>
+          )}
           <button
-            className={button}
+            type="button"
+            className={iconButton}
+            title={t("applications.create")}
+            aria-label={t("applications.create")}
             disabled={busy}
             onClick={() => setDraft({ action: "create", name: "" })}
           >
-            <Plus className="mr-1 inline size-3.5" />
-            {t("applications.create")}
+            <Plus className="size-3.5" />
           </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {app && (
-            <>
-              <button
-                className={button}
-                onClick={() => wsClient.send("c2s.window.open", { appId: app.id })}
-              >
-                {t("applications.open")}
-              </button>
-              <button
-                className={button}
-                disabled={busy || !!running}
-                onClick={() => setDraft({ action: "rename", name: app.name })}
-              >
-                {t("skins.rename")}
-              </button>
-              <button
-                className={button}
-                disabled={busy}
-                onClick={() =>
-                  void run({
-                    action: "duplicate",
-                    appId: app.id,
-                    name: `${app.name} ${t("skins.copySuffix")}`,
-                  })
-                }
-              >
-                {t("applications.duplicate")}
-              </button>
-              <button className={button} disabled={busy} onClick={() => setConfirm("uninstall")}>
-                {t("applications.uninstall")}
-              </button>
-              <button className={button} disabled={busy} onClick={() => setConfirm("clear-data")}>
-                {t("applications.clearData")}
-              </button>
-              <button
-                className={button}
-                disabled={!detail}
-                onClick={() =>
-                  detail &&
-                  void requestFiles({
-                    action: "reveal",
-                    path: detail.path,
-                  }).catch((e) => setError(t(e.message)))
-                }
-              >
-                {t("applications.contents")}
-              </button>
-            </>
-          )}
-          <button className={button} disabled={busy} onClick={() => fileInput.current?.click()}>
-            {t("store.import")}
+          <button
+            type="button"
+            className={iconButton}
+            title={t("applications.more")}
+            aria-label={t("applications.more")}
+            aria-haspopup="menu"
+            disabled={busy}
+            onClick={(e) =>
+              openContextMenu(e, [
+                ...(app
+                  ? ([
+                      {
+                        type: "item",
+                        label: t("skins.rename"),
+                        icon: <Pencil className="size-4" />,
+                        disabled: !!running,
+                        onSelect: () => setDraft({ action: "rename", name: app.name }),
+                      },
+                      {
+                        type: "item",
+                        label: t("applications.duplicate"),
+                        icon: <Copy className="size-4" />,
+                        onSelect: () =>
+                          void run({
+                            action: "duplicate",
+                            appId: app.id,
+                            name: `${app.name} ${t("skins.copySuffix")}`,
+                          }),
+                      },
+                      {
+                        type: "item",
+                        label: t("applications.contents"),
+                        icon: <FolderOpen className="size-4" />,
+                        disabled: !detail,
+                        onSelect: () =>
+                          detail &&
+                          void requestFiles({ action: "reveal", path: detail.path }).catch((e) =>
+                            setError(t(e.message)),
+                          ),
+                      },
+                      { type: "separator" },
+                    ] as const)
+                  : []),
+                {
+                  type: "item",
+                  label: t("store.import"),
+                  icon: <Upload className="size-4" />,
+                  onSelect: () => fileInput.current?.click(),
+                },
+                ...(app
+                  ? ([
+                      {
+                        type: "item",
+                        label: t("store.export"),
+                        icon: <Download className="size-4" />,
+                        onSelect: () => void run({ action: "export", appId: app.id }),
+                      },
+                      {
+                        type: "item",
+                        label: t("applications.exportWithData"),
+                        icon: <Download className="size-4" />,
+                        onSelect: () =>
+                          void run({ action: "export", appId: app.id, includeData: true }),
+                      },
+                      { type: "separator" },
+                      {
+                        type: "item",
+                        label: t("applications.clearData"),
+                        icon: <Eraser className="size-4" />,
+                        danger: true,
+                        onSelect: () => setConfirm("clear-data"),
+                      },
+                      {
+                        type: "item",
+                        label: t("applications.uninstall"),
+                        icon: <Trash2 className="size-4" />,
+                        danger: true,
+                        onSelect: () => setConfirm("uninstall"),
+                      },
+                    ] as const)
+                  : []),
+              ])
+            }
+          >
+            <MoreHorizontal className="size-3.5" />
           </button>
-          {app && (
-            <>
-              <button
-                className={button}
-                disabled={busy}
-                onClick={() => void run({ action: "export", appId: app.id, includeData })}
-              >
-                {t("store.export")}
-              </button>
-              <label className="ml-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={includeData}
-                  onChange={(e) => setIncludeData(e.target.checked)}
-                />
-                {t("applications.includeData")}
-              </label>
-            </>
-          )}
           <input
             ref={fileInput}
             type="file"
@@ -248,11 +281,11 @@ export function AppStoreApp() {
               )}
             </span>
             <button
-              className={button}
+              className={buttonVariants({ variant: "destructive" })}
               disabled={busy}
               onClick={() => void run({ action: confirm, appId: app.id })}
             >
-              {t("settings.profile.confirmRemove")}
+              {t(confirm === "uninstall" ? "files.trashItem" : "applications.clearData")}
             </button>
             <button className={button} onClick={() => setConfirm(null)}>
               {t("settings.profile.cancel")}
@@ -293,10 +326,13 @@ export function AppStoreApp() {
                 </p>
                 {r.error && <p className="text-destructive">{t(r.error)}</p>}
                 {["generating", "validating"].includes(r.status) && (
-                  <progress
+                  <div
+                    role="progressbar"
                     aria-label={t(`applications.status.${r.status}`)}
-                    className="mt-2 h-1 w-full"
-                  />
+                    className="mt-2 h-0.5 w-full overflow-hidden bg-foreground/10"
+                  >
+                    <div className="vibeos-progress h-full w-2/5 bg-brand" />
+                  </div>
                 )}
               </div>
             </div>
@@ -341,19 +377,19 @@ export function AppStoreApp() {
                 </button>
               </div>
             ))}
-          <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
             {t("runtime.nextVersion")}
-            <select
+            <Select
               aria-label={t("runtime.nextVersion")}
               value={runtime}
               disabled={busy || !!running}
-              onChange={(e) => setRuntime(e.target.value as AppRuntime)}
-              className="vibe-input rounded-md border bg-card px-2 py-1 text-foreground"
+              onChange={(value) => setRuntime(value as AppRuntime)}
+              className="text-foreground"
             >
               <option value="html">{t("runtime.html")}</option>
               <option value="interactive">{t("runtime.interactive")}</option>
-            </select>
-          </label>
+            </Select>
+          </div>
           <div className="flex items-end gap-2">
             <textarea
               aria-label={t("applications.prompt")}
@@ -363,26 +399,32 @@ export function AppStoreApp() {
               rows={2}
               disabled={!!running}
               onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !isComposing(e.nativeEvent)) {
+                  e.preventDefault();
+                  e.currentTarget.form?.requestSubmit();
+                }
+              }}
               className="vibe-input min-h-16 min-w-0 flex-1 resize-y rounded-lg border bg-card p-2.5 text-[13px]"
             />
             {running ? (
               <button
                 type="button"
-                className={button}
+                className={iconButton}
                 title={t("skins.stop")}
                 aria-label={t("skins.stop")}
                 onClick={() => void run({ action: "cancel", requestId: running.id })}
               >
-                <Square className="size-4" />
+                <Square className="size-3.5" />
               </button>
             ) : (
               <button
-                className={button}
+                className={buttonVariants({ variant: "default", size: "icon" })}
                 disabled={busy || !prompt.trim()}
                 title={t("applications.generate")}
                 aria-label={t("applications.generate")}
               >
-                <Send className="size-4" />
+                <ArrowUp className="size-4" />
               </button>
             )}
           </div>

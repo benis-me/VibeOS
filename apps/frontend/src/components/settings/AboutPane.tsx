@@ -1,6 +1,6 @@
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useT } from "@/lib/i18n";
-import { Pane, Group, Row } from "./primitives";
+import { Pane, Group, Row } from "@/components/ui/primitives";
 
 export function AboutPane() {
   const t = useT();

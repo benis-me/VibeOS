@@ -9,6 +9,8 @@ import { openWindow } from "../db/repositories/WindowRepo.ts";
 import { ensureMemory } from "../db/repositories/AppMemoryRepo.ts";
 import { ensureShortcut } from "../db/repositories/VfsRepo.ts";
 import { logger } from "../util/log.ts";
+import * as NotificationRepo from "../db/repositories/NotificationRepo.ts";
+import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 
 const log = logger("router");
 
@@ -66,6 +68,17 @@ export async function handleAppSave(p: ClientToServerPayload<"c2s.app.save">): P
   broadcast("s2c.syscall.appInstalled", { app, shortcut: shortcut ?? undefined });
   broadcast("s2c.window.stateChanged", { window: currentWindow(p.windowId)! });
   await handleApplicationCommand({ action: "state" });
+  // Visible confirmation; clicking it opens Applications.
+  const en = loadSettings().locale === "en";
+  const notification = await NotificationRepo.create({
+    kind: "success",
+    title: en ? "Saved as an app" : "已保存为应用",
+    body: en ? `"${app.name}" is in Applications.` : `「${app.name}」已保存到应用程序。`,
+    appId: app.id,
+    source: "system",
+    action: { label: en ? "Open Applications" : "打开应用程序", openAppId: "app-store" },
+  });
+  broadcast("s2c.syscall.notify", { notification });
 }
 
 /** Export an installed app to a shareable .vibeapp file on the desktop. */

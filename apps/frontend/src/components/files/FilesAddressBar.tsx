@@ -28,6 +28,7 @@ export function FilesAddressBar({
   onNavigate,
   onRefresh,
   directories,
+  children,
 }: {
   path: string;
   busy: boolean;
@@ -40,6 +41,8 @@ export function FilesAddressBar({
   onNavigate: (address: string) => Promise<boolean>;
   onRefresh: () => void;
   directories: string[];
+  /** Folder actions and search, so Files keeps a single toolbar row. */
+  children?: React.ReactNode;
 }) {
   const t = useT();
   const locationsId = useId();
@@ -98,7 +101,7 @@ export function FilesAddressBar({
   return (
     <div
       ref={root}
-      className="vibe-files-addressbar flex h-14 shrink-0 items-center gap-2 border-b bg-card/50 px-3"
+      className="vibe-files-addressbar flex h-11 shrink-0 items-center gap-2 border-b bg-card/50 px-3"
     >
       <div className="flex shrink-0 items-center gap-0.5">
         <button
@@ -242,6 +245,7 @@ export function FilesAddressBar({
           className={`size-4 ${loading ? "animate-spin motion-reduce:animate-none" : ""}`}
         />
       </button>
+      {children}
       <span role="status" className="sr-only">
         {copied ? t("files.pathCopied") : ""}
       </span>

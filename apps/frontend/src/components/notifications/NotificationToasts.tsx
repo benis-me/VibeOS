@@ -8,7 +8,7 @@ import { useT } from "@/lib/i18n";
 import { EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-const ICON: Record<NotificationKind, React.ReactNode> = {
+export const NOTIFICATION_ICON: Record<NotificationKind, React.ReactNode> = {
   info: <Info className="size-4 text-muted-foreground" />,
   success: <CheckCircle2 className="size-4 text-run" />,
   warning: <AlertTriangle className="size-4 text-warn" />,
@@ -41,7 +41,7 @@ function Toast({ n }: { n: Notification }) {
       }}
     >
       <div className="flex items-start gap-2.5">
-        <span className="mt-0.5">{ICON[n.kind]}</span>
+        <span className="mt-0.5">{NOTIFICATION_ICON[n.kind]}</span>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">{n.title}</div>
           {n.body && <div className="mt-0.5 text-xs text-muted-foreground">{n.body}</div>}

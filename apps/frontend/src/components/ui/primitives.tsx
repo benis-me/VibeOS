@@ -77,7 +77,7 @@ export function Row({
       <div className="min-w-0">
         <div className="text-[13px]">{label}</div>
         {hint && (
-          <div className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{hint}</div>
+          <div className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">{hint}</div>
         )}
       </div>
       <div className="shrink-0">{children}</div>
@@ -85,23 +85,26 @@ export function Row({
   );
 }
 
+/** The native apps' one select: a native control with the OS chevron. */
 export function Select({
   value,
   onChange,
   children,
   className,
+  ...props
 }: {
   value: string;
   onChange: (v: string) => void;
   children: React.ReactNode;
   className?: string;
-}) {
+} & Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange" | "className">) {
   return (
     <div className={cn("relative inline-flex", className)}>
       <select
+        {...props}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="vibe-select w-full appearance-none truncate rounded-lg border bg-background py-1.5 pl-2.5 pr-7 text-[13px] outline-none transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="vibe-select h-8 w-full appearance-none truncate rounded-md border bg-background pl-2.5 pr-7 text-[13px] outline-none transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
       >
         {children}
       </select>
@@ -189,7 +192,7 @@ export function Caps({ caps, t }: { caps?: ModelCapability[]; t: (k: string) => 
       {caps.map((c) => (
         <span
           key={c}
-          className="rounded bg-muted px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground"
+          className="rounded bg-muted px-1.5 py-0.5 text-2xs font-medium text-muted-foreground"
         >
           {t(`settings.cap.${c}`)}
         </span>
@@ -396,7 +399,7 @@ export function Combobox({
                   groups.map((g, gi) => (
                     <div key={g.name ?? `_g${gi}`}>
                       {g.name && (
-                        <div className="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <div className="px-2 pb-1 pt-2 text-2xs font-medium text-muted-foreground">
                           {g.name}
                         </div>
                       )}
@@ -418,7 +421,7 @@ export function Combobox({
                           <span className="min-w-0 flex-1">
                             <span className="block truncate">{o.label}</span>
                             {o.sub && (
-                              <span className="block truncate text-[11px] text-muted-foreground">
+                              <span className="block truncate text-2xs text-muted-foreground">
                                 {o.sub}
                               </span>
                             )}

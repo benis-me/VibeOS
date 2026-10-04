@@ -13,6 +13,7 @@ import { useActivityStore } from "@/stores/activityStore";
 import { wsClient } from "@/lib/ws";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { Select } from "@/components/ui/primitives";
 import { requestFiles } from "@/lib/files";
 
 type T = (k: string) => string;
@@ -99,7 +100,7 @@ export function ActivityMonitorApp() {
           <div className="flex items-center justify-between px-5 pt-4">
             <h1 className="text-[13px] font-semibold tracking-tight">{t("activity.recent")}</h1>
             {summary.running > 0 && (
-              <span className="flex items-center gap-1.5 text-[11px] text-brand">
+              <span className="flex items-center gap-1.5 text-2xs text-brand">
                 <span className="size-1.5 animate-pulse rounded-full bg-brand" />
                 {summary.running} {t("activity.running")}
               </span>
@@ -125,7 +126,7 @@ export function ActivityMonitorApp() {
             <Panel
               title={t("activity.tokenUsage")}
               aside={
-                <span className="flex items-center gap-2.5 text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-2.5 text-2xs text-muted-foreground">
                   <Legend className="bg-brand/40" label={t("activity.in")} />
                   <Legend className="bg-brand" label={t("activity.out")} />
                 </span>
@@ -164,7 +165,7 @@ export function ActivityMonitorApp() {
             <Panel title={t("activity.byModel")}>
               <div className="flex flex-col gap-1.5 pt-0.5">
                 {byModel.top.map(([model, n]) => (
-                  <div key={model} className="flex items-center gap-2 text-[11px]">
+                  <div key={model} className="flex items-center gap-2 text-2xs">
                     <span className="w-24 shrink-0 truncate text-muted-foreground" title={model}>
                       {model}
                     </span>
@@ -185,7 +186,7 @@ export function ActivityMonitorApp() {
         </div>
 
         <div className="vibe-activity-filters flex shrink-0 flex-wrap items-center gap-2 border-b px-5 py-2">
-          <label className="flex min-w-36 flex-1 items-center gap-2 rounded-md border bg-input-background px-2 text-muted-foreground focus-within:ring-1 focus-within:ring-ring">
+          <label className="flex min-w-36 flex-1 items-center gap-2 rounded-md border bg-background px-2 text-muted-foreground focus-within:ring-2 focus-within:ring-ring/40">
             <Search className="size-3.5 shrink-0" />
             <input
               type="search"
@@ -196,15 +197,11 @@ export function ActivityMonitorApp() {
               onChange={(e) => setQuery(e.target.value)}
             />
           </label>
-          <select
+          <Select
             aria-label={t("activity.col.status")}
             value={filter.status ?? ""}
-            className="h-8 rounded-md border bg-background px-2 text-xs"
-            onChange={(e) =>
-              setFilter({
-                ...filter,
-                status: (e.target.value as ActivityFilter["status"]) || undefined,
-              })
+            onChange={(value) =>
+              setFilter({ ...filter, status: (value as ActivityFilter["status"]) || undefined })
             }
           >
             <option value="">{t("activity.allStatuses")}</option>
@@ -213,16 +210,12 @@ export function ActivityMonitorApp() {
                 {t(`activity.status.${status}`)}
               </option>
             ))}
-          </select>
-          <select
+          </Select>
+          <Select
             aria-label={t("activity.role")}
             value={filter.role ?? ""}
-            className="h-8 rounded-md border bg-background px-2 text-xs"
-            onChange={(e) =>
-              setFilter({
-                ...filter,
-                role: (e.target.value as ActivityFilter["role"]) || undefined,
-              })
+            onChange={(value) =>
+              setFilter({ ...filter, role: (value as ActivityFilter["role"]) || undefined })
             }
           >
             <option value="">{t("activity.allRoles")}</option>
@@ -231,7 +224,7 @@ export function ActivityMonitorApp() {
                 {t(`activity.role.${role}`)}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* ---- runs table ---- */}
@@ -240,7 +233,7 @@ export function ActivityMonitorApp() {
             <div
               className={cn(
                 COLS,
-                "sticky top-0 z-10 border-b bg-background px-5 py-1.5 text-[10px] font-medium uppercase text-muted-foreground",
+                "sticky top-0 z-10 border-b bg-background px-5 py-1.5 text-2xs font-medium text-muted-foreground",
               )}
             >
               <span>{t("activity.col.app")}</span>
@@ -274,7 +267,7 @@ export function ActivityMonitorApp() {
             </div>
           )}
           {loading && (
-            <div className="flex items-center justify-center gap-2 py-3 text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-center gap-2 py-3 text-2xs text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" />
               {t("activity.loading")}
             </div>
@@ -309,7 +302,7 @@ function RunRow({ r, t, onSelect }: { r: AgentRun; t: T; onSelect: () => void })
     <div
       className={cn(
         COLS,
-        "items-center border-b border-border/50 px-5 py-2 text-[12px] transition-colors hover:bg-accent/30",
+        "items-center border-b border-border/50 px-5 py-2 text-xs transition-colors hover:bg-accent/30",
       )}
     >
       <button
@@ -320,7 +313,7 @@ function RunRow({ r, t, onSelect }: { r: AgentRun; t: T; onSelect: () => void })
       >
         <div className="min-w-0">
           <div className="truncate font-medium">{r.appName ?? t(`activity.role.${r.role}`)}</div>
-          <div className="truncate text-[10px] text-muted-foreground">
+          <div className="truncate text-2xs text-muted-foreground">
             {t(`activity.role.${r.role}`)}
           </div>
         </div>
@@ -332,10 +325,10 @@ function RunRow({ r, t, onSelect }: { r: AgentRun; t: T; onSelect: () => void })
         >
           {r.status === "error" ? r.error : (r.summary ?? "—")}
         </div>
-        <div className="min-w-0 truncate text-[11px] text-muted-foreground" title={r.model}>
+        <div className="min-w-0 truncate text-2xs text-muted-foreground" title={r.model}>
           {r.model ?? "—"}
         </div>
-        <div className="flex items-center gap-1.5 text-[11px]">
+        <div className="flex items-center gap-1.5 text-2xs">
           <span className={cn("size-1.5 shrink-0 rounded-full", DOT[r.status])} />
           <span className="truncate text-muted-foreground">{t(`activity.status.${r.status}`)}</span>
         </div>
@@ -355,12 +348,12 @@ function RunRow({ r, t, onSelect }: { r: AgentRun; t: T; onSelect: () => void })
               wsClient.send("c2s.activity.stop", { runId: r.id });
             }}
             title={t("activity.stop")}
-            className="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive-fill hover:text-white"
+            className="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive-fill hover:text-white"
           >
             <Square className="size-2.5" fill="currentColor" /> {t("activity.stop")}
           </button>
         ) : (
-          <span className="text-[11px] text-muted-foreground/40">—</span>
+          <span className="text-2xs text-muted-foreground/40">—</span>
         )}
       </div>
     </div>
@@ -494,7 +487,7 @@ function RunDetails({
           <h2 id={titleId} className="min-w-0 flex-1 truncate text-xs font-semibold">
             {run.appName ?? t(`activity.role.${run.role}`)} · {t("activity.details")}
           </h2>
-          <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span className="flex shrink-0 items-center gap-1.5 text-2xs text-muted-foreground">
             <span className={cn("size-1.5 rounded-full", DOT[run.status])} />
             {t(`activity.status.${run.status}`)}
           </span>
@@ -522,7 +515,7 @@ function RunDetails({
           <p className="whitespace-pre-wrap break-words font-medium leading-relaxed">
             {run.summary ?? "—"}
           </p>
-          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-muted-foreground">
             <span>{t(`activity.role.${run.role}`)}</span>
             <span aria-hidden="true">·</span>
             <span className="min-w-0 truncate" title={run.model}>
@@ -535,7 +528,7 @@ function RunDetails({
           {run.error && (
             <p className="mt-2 whitespace-pre-wrap break-words text-destructive">{run.error}</p>
           )}
-          <dl className="my-3 grid grid-cols-3 divide-x border-y py-2 text-[10px] text-muted-foreground">
+          <dl className="my-3 grid grid-cols-3 divide-x border-y py-2 text-2xs text-muted-foreground">
             <div className="pr-3">
               <dt>{t("activity.col.time")}</dt>
               <dd className="mt-0.5 text-[13px] font-medium tabular-nums text-foreground">
@@ -555,7 +548,7 @@ function RunDetails({
               </dd>
             </div>
           </dl>
-          <details className="mb-3 text-[10px] text-muted-foreground">
+          <details className="mb-3 text-2xs text-muted-foreground">
             <summary className="cursor-pointer rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
               {t("activity.technicalDetails")}
             </summary>
@@ -582,7 +575,7 @@ function RunDetails({
                     onClick={() => onSelect(r)}
                     aria-current={r.id === run.id ? "true" : undefined}
                     className={cn(
-                      "flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] hover:bg-accent",
+                      "flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-2xs hover:bg-accent",
                       r.id === run.id && "border-brand/50 bg-brand/10",
                     )}
                   >
@@ -620,7 +613,7 @@ function RunDetails({
                     >
                       <span
                         className={cn(
-                          "absolute -left-2.5 top-0 flex size-5 items-center justify-center rounded-full border bg-background font-mono text-[9px] text-muted-foreground",
+                          "absolute -left-2.5 top-0 flex size-5 items-center justify-center rounded-full border bg-background font-mono text-2xs text-muted-foreground",
                           log.level === "error" && "border-destructive/50 text-destructive",
                         )}
                       >
@@ -634,7 +627,7 @@ function RunDetails({
                         </strong>
                         <time
                           title={new Date(log.ts).toLocaleTimeString()}
-                          className="shrink-0 font-mono text-[10px] text-muted-foreground"
+                          className="shrink-0 font-mono text-2xs text-muted-foreground"
                         >
                           +
                           {(
@@ -644,13 +637,13 @@ function RunDetails({
                         </time>
                       </div>
                       {actor && actor.appName !== run.appName && (
-                        <p className="mt-1 text-[10px] text-muted-foreground">
+                        <p className="mt-1 text-2xs text-muted-foreground">
                           {actor.appName ?? t(`activity.role.${actor.role}`)}
                         </p>
                       )}
                       {typeof data.path === "string" && (
                         <button
-                          className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded border bg-muted/30 px-2 py-1 text-left text-[11px] hover:border-brand/40 hover:text-brand"
+                          className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded border bg-muted/30 px-2 py-1 text-left text-2xs hover:border-brand/40 hover:text-brand"
                           onClick={() => void reveal(data.path as string)}
                           title={t("activity.reveal")}
                         >
@@ -659,7 +652,7 @@ function RunDetails({
                         </button>
                       )}
                       {fields.length > 0 && (
-                        <dl className="mt-1.5 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-x-4 gap-y-1 text-[11px]">
+                        <dl className="mt-1.5 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-x-4 gap-y-1 text-2xs">
                           {fields.map(([key, value]) => (
                             <div key={key} className="flex min-w-0 items-baseline gap-2">
                               <dt className="shrink-0 text-muted-foreground">
@@ -678,7 +671,7 @@ function RunDetails({
                         </dl>
                       )}
                       {identifiers.length > 0 && (
-                        <details className="mt-1.5 text-[10px] text-muted-foreground">
+                        <details className="mt-1.5 text-2xs text-muted-foreground">
                           <summary className="cursor-pointer rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
                             {t("activity.technicalDetails")}
                           </summary>
@@ -710,7 +703,7 @@ function RunDetails({
 function Metric({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="text-2xs text-muted-foreground">{label}</span>
       <span
         className={cn(
           "text-[15px] font-semibold tabular-nums leading-none",
@@ -735,7 +728,7 @@ function Panel({
   return (
     <div className="rounded-lg border bg-card/40 p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] font-medium text-foreground/70">{title}</span>
+        <span className="text-2xs font-medium text-foreground/70">{title}</span>
         {aside}
       </div>
       {children}

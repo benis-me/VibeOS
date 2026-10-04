@@ -75,7 +75,7 @@ export function WelcomeApp({ windowId }: { windowId: string }) {
         </div>
       ) : (
         <>
-          <div className="mt-7 text-[11px] font-medium text-muted-foreground">
+          <div className="mt-7 text-2xs font-medium text-muted-foreground">
             {t("welcome.tryThese")}
           </div>
           <div className="mt-2 flex flex-col gap-1.5">
@@ -109,7 +109,7 @@ export function WelcomeApp({ windowId }: { windowId: string }) {
         {t("welcome.start")}
         <ArrowRight weight="bold" className="size-4" />
       </button>
-      <p className="mt-3 text-center text-[11px] text-muted-foreground">{t("welcome.hint")}</p>
+      <p className="mt-3 text-center text-2xs text-muted-foreground">{t("welcome.hint")}</p>
     </div>
   );
 }

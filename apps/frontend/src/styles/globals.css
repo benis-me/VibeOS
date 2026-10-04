@@ -236,6 +236,8 @@
 
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Smallest native step (labels, meta); with text-xs 12px, 13px body, text-sm and up. */
+  --text-2xs: 11px;
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -255,6 +257,13 @@
 @layer base {
   * {
     border-color: var(--color-border);
+  }
+  /* Native checkboxes, ranges and progress bars use the skin's brand, not system blue. */
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="range"],
+  progress {
+    accent-color: var(--brand);
   }
 }
 
@@ -342,23 +351,29 @@ button:not(:disabled),
 }
 
 /* ---- VibeOS window chrome ---- */
-/* Focused window: a thin, subtle shadow — enough to lift it off the desktop. */
+/* Focused window: a subtle shadow that lifts it above the others. */
 .win-focused {
   box-shadow:
-    0 4px 14px -6px rgba(0, 0, 0, 0.22),
+    0 8px 24px -10px rgba(0, 0, 0, 0.28),
     0 1px 3px -1px rgba(0, 0, 0, 0.14);
 }
 .dark .win-focused {
   box-shadow:
-    0 5px 16px -7px rgba(0, 0, 0, 0.45),
+    0 10px 28px -10px rgba(0, 0, 0, 0.6),
     0 1px 4px -1px rgba(0, 0, 0, 0.3);
 }
-/* Unfocused window: frosted glass — translucent + heavy backdrop blur. */
+/* Unfocused window: a faint shadow, so stacked windows still read as layers. */
+.win-unfocused {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.dark .win-unfocused {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+/* Focused window: frosted glass — translucent + heavy backdrop blur. */
 .win-glass {
   background-color: color-mix(in oklab, var(--card) 55%, transparent);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
-  box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.18);
 }
 .win-glass-content {
   background-color: color-mix(in oklab, var(--background) 45%, transparent);
@@ -698,12 +713,10 @@ button:not(:disabled),
 [data-skin="devdock"] .vibe-winbtn-max::after {
   --g: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2010%2010'%20fill='none'%20stroke='%23000'%20stroke-width='1.4'%20stroke-linecap='round'%3E%3Cpath%20d='M5,2.3V7.7M2.3,5H7.7'/%3E%3C/svg%3E");
 }
-[data-skin="devdock"] .vibe-winbtn-save {
-  order: 4;
-  background: #c9ccd1;
-}
-[data-skin="devdock"] .vibe-winbtn-save::after {
-  --g: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2010%2010'%20fill='none'%20stroke='%23000'%20stroke-width='1.4'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M5,2.4V7.2M3,5.3L5,7.6L7,5.3'/%3E%3C/svg%3E");
+/* The save action sits at the right edge, apart from the traffic lights. */
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-titlebar-action {
+  position: absolute;
+  right: 8px;
 }
 /* Unselected window → gray traffic lights (both macOS skins). */
 :is([data-skin="devdock"], [data-skin="aqua"]) .vibe-window:not([data-focused]) .vibe-winbtn {
@@ -935,9 +948,6 @@ button:not(:disabled),
 [data-skin="aqua"] .vibe-winbtn-max {
   background: radial-gradient(circle at 50% 35%, #6fe06f, #28c840);
 }
-[data-skin="aqua"] .vibe-winbtn-save {
-  background: radial-gradient(circle at 50% 35%, #d8d8d8, #b0b0b0);
-}
 /* Aqua Dock — glossy translucent (geometry comes from the shared :is() block). */
 [data-skin="aqua"] .vibe-taskbar {
   border: 1px solid rgba(0, 0, 0, 0.2);
@@ -976,9 +986,6 @@ button:not(:disabled),
 }
 [data-skin="aqua"] .vibe-winbtn-max {
   order: 3;
-}
-[data-skin="aqua"] .vibe-winbtn-save {
-  order: 4;
 }
 
 /* ---------------- Skin form controls inside AI app content -----------------
@@ -1262,6 +1269,10 @@ button:not(:disabled),
 .vibe-menu-item[data-disabled="true"] {
   opacity: 0.4;
   pointer-events: none;
+}
+/* Destructive items read as such before hover, not only when highlighted. */
+.vibe-menu-item[data-danger="true"] {
+  color: var(--destructive);
 }
 .vibe-menu-item[data-danger="true"]:hover,
 .vibe-menu-item[data-danger="true"][data-active="true"] {

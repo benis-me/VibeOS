@@ -105,7 +105,7 @@ export function DesktopIcon({ node }: { node: VfsNode }) {
       </span>
       <span
         className={cn(
-          "line-clamp-2 text-[11px]",
+          "line-clamp-2 text-2xs",
           hasWallpaper ? "desktop-icon-on-wallpaper" : "text-foreground/90 drop-shadow",
         )}
       >

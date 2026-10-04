@@ -43,7 +43,8 @@ const zh: Dict = {
   "applications.uninstall": "卸载",
   "applications.clearData": "清空数据",
   "applications.contents": "显示包内容",
-  "applications.includeData": "包含应用数据",
+  "applications.exportWithData": "导出（含应用数据）",
+  "applications.more": "更多操作",
   "applications.name": "应用名称",
   "applications.uninstallPrompt": "将应用移到回收站并关闭相关窗口？数据将保留。",
   "applications.clearPrompt": "清空此应用的共享数据？原数据会备份。",
@@ -177,6 +178,8 @@ const zh: Dict = {
   "files.disk": "系统盘",
   "files.trash": "回收站",
   "files.trashItem": "移到回收站",
+  "files.new": "新建",
+  "files.actions": "所选项目的操作",
   "files.back": "返回文件列表",
   "files.download": "下载",
   "files.save": "保存",
@@ -247,7 +250,8 @@ const zh: Dict = {
   "welcome.example.game": "一个能玩的复古街机游戏",
   "welcome.example.music": "一个霓虹律动的音乐可视化器",
   "welcome.start": "开始体验",
-  "welcome.hint": "随时按 ⌘K / Ctrl+K 让 AI 执行命令；本页可从「应用」菜单的 Welcome 重新打开。",
+  "welcome.hint":
+    "按 ⌘K / Ctrl+K 搜索或描述应用，输入 > 让 AI 执行命令；本页可从「应用」菜单的「欢迎」重新打开。",
   "spotlight.placeholder": "搜索已有应用，或描述一个新 App；输入 > 让 AI 执行命令…",
   "spotlight.local": "已有应用",
   "spotlight.opened": "已打开",
@@ -291,7 +295,7 @@ const zh: Dict = {
   // Context menus
   "menu.openApp": "打开应用",
   "menu.activity": "活动监视器",
-  "menu.reload": "刷新",
+  "menu.reload": "重新生成",
   "menu.delete": "移到回收站",
   "menu.cleanup": "整理桌面",
   // Settings — shell
@@ -580,7 +584,8 @@ const en: Dict = {
   "applications.uninstall": "Uninstall",
   "applications.clearData": "Clear data",
   "applications.contents": "Show package contents",
-  "applications.includeData": "Include app data",
+  "applications.exportWithData": "Export with app data",
+  "applications.more": "More actions",
   "applications.name": "Application name",
   "applications.uninstallPrompt":
     "Move this app to Trash and close its windows? App data will be retained.",
@@ -720,6 +725,8 @@ const en: Dict = {
   "files.disk": "System disk",
   "files.trash": "Trash",
   "files.trashItem": "Move to Trash",
+  "files.new": "New",
+  "files.actions": "Actions for the selection",
   "files.back": "Back to files",
   "files.download": "Download",
   "files.save": "Save",
@@ -792,7 +799,7 @@ const en: Dict = {
   "welcome.example.music": "A neon music visualizer",
   "welcome.start": "Get started",
   "welcome.hint":
-    "Press ⌘K / Ctrl+K anytime to run an AI command. Reopen this from Welcome in the Apps menu.",
+    "Press ⌘K / Ctrl+K to search or describe an app; type > for an AI command. Reopen this from Welcome in the Apps menu.",
   "spotlight.placeholder": "Search your apps or describe a new one; type > for an AI command…",
   "spotlight.local": "Your apps",
   "spotlight.opened": "Open",
@@ -835,7 +842,7 @@ const en: Dict = {
   // Context menus
   "menu.openApp": "Open App",
   "menu.activity": "Activity Monitor",
-  "menu.reload": "Reload",
+  "menu.reload": "Regenerate",
   "menu.delete": "Move to Recycle Bin",
   "menu.cleanup": "Clean Up",
   "settings.title": "Settings",
@@ -1098,6 +1105,15 @@ export function browserLocale(): Locale {
 
 export function translate(locale: Locale, key: string): string {
   return DICT[locale][key] ?? DICT.zh[key] ?? key;
+}
+
+/** A preset app's localized name unless its window has its own title; generated apps keep theirs. */
+export function appLabel(
+  t: (key: string) => string,
+  app?: { name: string; presetId?: string },
+  title = app?.name ?? "",
+): string {
+  return app?.presetId && title === app.name ? t(`preset.${app.presetId}`) : title;
 }
 
 /** Current effective locale: the chosen one, else the browser default. */

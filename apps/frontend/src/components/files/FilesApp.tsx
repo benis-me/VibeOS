@@ -5,7 +5,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   CornerUpRight,
-  ArrowUp,
   Check,
   Copy,
   Download,
@@ -13,11 +12,15 @@ import {
   FilePlus,
   FilePenLine,
   Folder,
+  FolderInput,
   FolderPlus,
   HardDrive,
+  MoreHorizontal,
   Pencil,
+  Plus,
   Save,
   Trash2,
+  Undo2,
   Upload,
   Send,
   X,
@@ -33,17 +36,18 @@ import {
 } from "@vibeos/shared";
 import { requestFiles, fileDownloadUrl } from "@/lib/files";
 import { sendCommunication } from "@/lib/communication";
-import { openContextMenu } from "@/components/contextmenu/ContextMenu";
+import { openContextMenu, type MenuItem } from "@/components/contextmenu/ContextMenu";
+import { buttonVariants } from "@/components/ui/button";
 import { useWindowStore } from "@/stores/windowStore";
 import { wsClient } from "@/lib/ws";
 import { useChromeStore } from "@/stores/chromeStore";
 import { FilesAddressBar } from "./FilesAddressBar";
 import { AppIcon } from "@/components/AppIcon";
 import { useAppStore } from "@/stores/appStore";
-import { useT } from "@/lib/i18n";
+import { appLabel, useT } from "@/lib/i18n";
 
-const button =
-  "vibe-btn inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-40";
+const button = buttonVariants();
+const iconButton = buttonVariants({ size: "icon" });
 const input =
   "vibe-input min-w-0 rounded-md border bg-background px-2.5 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40";
 const parent = (path: string) => path.split("/").slice(0, -1).join("/");
@@ -318,9 +322,9 @@ export function FilesApp({
     else void mutate({ action: "open", path: e.path });
   };
   const sendFile = async (
+    entry: DiskEntry,
     target: { appId: string; open: true; newWindow?: boolean } | { windowId: string },
   ) => {
-    if (!current) return;
     setHandoff("pending");
     setError(null);
     try {
@@ -328,7 +332,7 @@ export function FilesApp({
         action: "request",
         target,
         topic: "file.open",
-        data: { path: current.path },
+        data: { path: entry.path },
         responseMode: "data",
         channel: "open-with",
       });
@@ -339,6 +343,137 @@ export function FilesApp({
       setError((e as Error).message);
     }
   };
+
+  const download = (path: string) => {
+    const link = document.createElement("a");
+    link.href = fileDownloadUrl(path);
+    link.download = "";
+    link.click();
+  };
+  const openWith = (e: DiskEntry): MenuItem[] => [
+    ...Object.values(apps)
+      .filter(
+        (a) =>
+          a.isInstalled &&
+          (a.presetId
+            ? ["text-viewer", "media-viewer"].includes(a.presetId)
+            : supportsFile(a.manifest.fileTypes, e.path, fileMediaType(e.path))),
+      )
+      .map((app) => ({
+        type: "item" as const,
+        label: appLabel(t, app),
+        icon: (
+          <AppIcon
+            name={app.icon}
+            presetId={app.presetId}
+            label={appLabel(t, app)}
+            className="size-4"
+          />
+        ),
+        onSelect: () =>
+          void sendFile(e, { appId: app.id, open: true, newWindow: !app.manifest.singleInstance }),
+      })),
+    { type: "separator" },
+    {
+      type: "submenu",
+      label: t("communication.sendWindow"),
+      items: Object.values(windows)
+        .filter((w) => w.isOpen && w.id !== windowId && !apps[w.appId]?.presetId)
+        .map((w) => ({
+          type: "item" as const,
+          label: w.title,
+          onSelect: () => void sendFile(e, { windowId: w.id }),
+        })),
+    },
+  ];
+  /** One entry's actions: its context menu and the toolbar's "⋯" button. */
+  const entryMenu = (e: DiskEntry): MenuItem[] =>
+    trash
+      ? [
+          {
+            type: "item",
+            label: t("files.restore"),
+            icon: <Undo2 className="size-4" />,
+            disabled: busy,
+            onSelect: async () => {
+              if (await mutate({ action: "restore", path: e.path })) setSelected(null);
+            },
+          },
+          {
+            type: "item",
+            label: t("files.delete"),
+            icon: <Trash2 className="size-4" />,
+            danger: true,
+            disabled: busy,
+            onSelect: () => setForm({ action: "delete", value: "", target: e }),
+          },
+        ]
+      : [
+          ...(e.kind === "file" && handoff !== "pending"
+            ? ([
+                {
+                  type: "submenu",
+                  label: t("communication.openWith"),
+                  icon: <Send className="size-4" />,
+                  items: openWith(e),
+                },
+                { type: "separator" },
+              ] satisfies MenuItem[])
+            : []),
+          {
+            type: "item",
+            label: t("files.rename"),
+            icon: <Pencil className="size-4" />,
+            disabled: busy,
+            onSelect: () => setForm({ action: "rename", value: e.name, target: e }),
+          },
+          {
+            type: "item",
+            label: t("files.move"),
+            icon: <FolderInput className="size-4" />,
+            disabled: busy,
+            onSelect: () => setForm({ action: "move", value: e.path, target: e }),
+          },
+          {
+            type: "item",
+            label: t("files.copy"),
+            icon: <Copy className="size-4" />,
+            disabled: busy,
+            onSelect: () => setForm({ action: "copy", value: e.path, target: e }),
+          },
+          ...(e.kind === "file" && !fileMediaType(e.path)
+            ? ([
+                {
+                  type: "item",
+                  label: t("files.edit"),
+                  icon: <FilePenLine className="size-4" />,
+                  disabled: busy,
+                  onSelect: () => void openFile(e.path),
+                },
+              ] satisfies MenuItem[])
+            : []),
+          ...(e.kind === "file" || e.kind === "shortcut"
+            ? ([
+                {
+                  type: "item",
+                  label: t("files.download"),
+                  icon: <Download className="size-4" />,
+                  onSelect: () => download(e.path),
+                },
+              ] satisfies MenuItem[])
+            : []),
+          { type: "separator" },
+          {
+            type: "item",
+            label: t("files.trashItem"),
+            icon: <Trash2 className="size-4" />,
+            danger: true,
+            disabled: busy,
+            onSelect: async () => {
+              if (await mutate({ action: "trash", path: e.path })) setSelected(null);
+            },
+          },
+        ];
 
   return (
     <div className="vibe-files flex h-full min-w-0 flex-col bg-background text-foreground">
@@ -386,7 +521,72 @@ export function FilesApp({
         directories={entries
           .filter((entry) => entry.kind === "directory")
           .map((entry) => entry.path)}
-      />
+      >
+        {!editor && (
+          <>
+            {!trash && (
+              <button
+                type="button"
+                className={button}
+                aria-haspopup="menu"
+                disabled={busy}
+                onClick={(event) =>
+                  openContextMenu(event, [
+                    {
+                      type: "item",
+                      label: t("files.mkdir"),
+                      icon: <FolderPlus className="size-4" />,
+                      onSelect: () => setForm({ action: "mkdir", value: "" }),
+                    },
+                    {
+                      type: "item",
+                      label: t("files.newFile"),
+                      icon: <FilePlus className="size-4" />,
+                      onSelect: () => setForm({ action: "newFile", value: "" }),
+                    },
+                    {
+                      type: "item",
+                      label: t("files.upload"),
+                      icon: <Upload className="size-4" />,
+                      onSelect: () => upload.current?.click(),
+                    },
+                  ])
+                }
+              >
+                <Plus className="size-3.5" />
+                {t("files.new")}
+              </button>
+            )}
+            <button
+              type="button"
+              className={iconButton}
+              title={t("files.actions")}
+              aria-label={t("files.actions")}
+              aria-haspopup="menu"
+              disabled={!current || busy}
+              onClick={(event) => current && openContextMenu(event, entryMenu(current))}
+            >
+              <MoreHorizontal className="size-3.5" />
+            </button>
+            <input
+              type="search"
+              className={`${input} h-8 w-40 text-xs`}
+              aria-label={t("files.search")}
+              placeholder={t("files.search")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <input
+              ref={upload}
+              type="file"
+              multiple
+              className="hidden"
+              aria-label={t("files.upload")}
+              onChange={(e) => void importFiles(e.target.files)}
+            />
+          </>
+        )}
+      </FilesAddressBar>
       <div className="flex min-h-0 flex-1">
         <nav
           aria-label={t("files.locations")}
@@ -499,189 +699,6 @@ export function FilesApp({
             </>
           ) : (
             <>
-              <div className="flex h-12 shrink-0 items-center gap-1.5 overflow-x-auto border-b px-3">
-                {trash ? (
-                  <>
-                    <button
-                      className={button}
-                      disabled={!current || busy}
-                      onClick={async () => {
-                        if (current && (await mutate({ action: "restore", path: current.path })))
-                          setSelected(null);
-                      }}
-                    >
-                      <ArrowUp className="size-3.5" />
-                      {t("files.restore")}
-                    </button>
-                    <button
-                      className={button}
-                      disabled={!current || busy}
-                      onClick={() => setForm({ action: "delete", value: "", target: current })}
-                    >
-                      <Trash2 className="size-3.5" />
-                      {t("files.delete")}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      className={button}
-                      aria-haspopup="menu"
-                      disabled={
-                        !current || current.kind !== "file" || busy || handoff === "pending"
-                      }
-                      onClick={(e) =>
-                        openContextMenu(e, [
-                          ...Object.values(apps)
-                            .filter(
-                              (a) =>
-                                a.isInstalled &&
-                                (a.presetId
-                                  ? ["text-viewer", "media-viewer"].includes(a.presetId)
-                                  : supportsFile(
-                                      a.manifest.fileTypes,
-                                      current?.path ?? "",
-                                      fileMediaType(current?.path ?? ""),
-                                    )),
-                            )
-                            .map((app) => ({
-                              type: "item" as const,
-                              label: app.name,
-                              icon: (
-                                <AppIcon
-                                  name={app.icon}
-                                  presetId={app.presetId}
-                                  label={app.name}
-                                  className="size-4"
-                                />
-                              ),
-                              onSelect: () =>
-                                void sendFile({
-                                  appId: app.id,
-                                  open: true,
-                                  newWindow: !app.manifest.singleInstance,
-                                }),
-                            })),
-                          { type: "separator" as const },
-                          {
-                            type: "submenu" as const,
-                            label: t("communication.sendWindow"),
-                            items: Object.values(windows)
-                              .filter(
-                                (w) => w.isOpen && w.id !== windowId && !apps[w.appId]?.presetId,
-                              )
-                              .map((w) => ({
-                                type: "item" as const,
-                                label: w.title,
-                                onSelect: () => void sendFile({ windowId: w.id }),
-                              })),
-                          },
-                        ])
-                      }
-                    >
-                      <Send className="size-3.5" />
-                      {t("communication.openWith")}
-                    </button>
-                    <button
-                      className={button}
-                      disabled={busy}
-                      onClick={() => setForm({ action: "mkdir", value: "" })}
-                    >
-                      <FolderPlus className="size-3.5" />
-                      {t("files.mkdir")}
-                    </button>
-                    <button
-                      className={button}
-                      disabled={busy}
-                      onClick={() => setForm({ action: "newFile", value: "" })}
-                    >
-                      <FilePlus className="size-3.5" />
-                      {t("files.newFile")}
-                    </button>
-                    <button
-                      className={button}
-                      disabled={busy}
-                      onClick={() => upload.current?.click()}
-                    >
-                      <Upload className="size-3.5" />
-                      {t("files.upload")}
-                    </button>
-                    <input
-                      ref={upload}
-                      type="file"
-                      multiple
-                      className="hidden"
-                      aria-label={t("files.upload")}
-                      onChange={(e) => void importFiles(e.target.files)}
-                    />
-                    {current && (
-                      <>
-                        <button
-                          className={button}
-                          title={t("files.rename")}
-                          disabled={busy}
-                          onClick={() =>
-                            setForm({ action: "rename", value: current.name, target: current })
-                          }
-                        >
-                          <Pencil className="size-3.5" />
-                        </button>
-                        <button
-                          className={button}
-                          title={t("files.move")}
-                          disabled={busy}
-                          onClick={() =>
-                            setForm({ action: "move", value: current.path, target: current })
-                          }
-                        >
-                          <ArrowUp className="size-3.5" />
-                        </button>
-                        <button
-                          className={button}
-                          title={t("files.copy")}
-                          disabled={busy}
-                          onClick={() =>
-                            setForm({ action: "copy", value: current.path, target: current })
-                          }
-                        >
-                          <Copy className="size-3.5" />
-                        </button>
-                        <button
-                          className={button}
-                          title={t("files.trashItem")}
-                          disabled={busy}
-                          onClick={async () => {
-                            if (await mutate({ action: "trash", path: current.path }))
-                              setSelected(null);
-                          }}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                        {current.kind === "file" && !fileMediaType(current.path) && (
-                          <button
-                            className={button}
-                            title={t("files.edit")}
-                            disabled={busy}
-                            onClick={() => void openFile(current.path)}
-                          >
-                            <FilePenLine className="size-3.5" />
-                          </button>
-                        )}
-                        {(current.kind === "file" || current.kind === "shortcut") && (
-                          <a
-                            className={button}
-                            href={fileDownloadUrl(current.path)}
-                            download
-                            title={t("files.download")}
-                          >
-                            <Download className="size-3.5" />
-                          </a>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
               {form && (
                 <form
                   className="space-y-2 border-b bg-card/50 p-3"
@@ -736,15 +753,6 @@ export function FilesApp({
                   {errorText(error)}
                 </p>
               )}
-              <div className="shrink-0 px-3 py-2">
-                <input
-                  className={`${input} w-full text-xs`}
-                  aria-label={t("files.search")}
-                  placeholder={t("files.search")}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
               <div
                 role="listbox"
                 aria-label={t("files.entries")}
@@ -823,7 +831,10 @@ export function FilesApp({
                                   : []),
                               ]);
                             }
-                          : undefined
+                          : (event) => {
+                              setSelected(e.path);
+                              openContextMenu(event, entryMenu(e));
+                            }
                       }
                       onKeyDown={(event) => {
                         if (event.key === "Enter") {
@@ -854,13 +865,13 @@ export function FilesApp({
                         <span className="min-w-0">
                           <span className="block truncate">{e.name}</span>
                           {e.originalPath && (
-                            <span className="block truncate text-[10px] text-muted-foreground">
+                            <span className="block truncate text-2xs text-muted-foreground">
                               /{e.originalPath}
                             </span>
                           )}
                         </span>
                       </span>
-                      <span className="text-right text-[10px] text-muted-foreground">
+                      <span className="text-right text-2xs text-muted-foreground">
                         {e.kind === "directory"
                           ? t("files.folder")
                           : e.kind === "application"
@@ -877,7 +888,7 @@ export function FilesApp({
               </div>
               <div
                 role="status"
-                className="flex shrink-0 items-center gap-2 border-t px-3 py-1.5 text-[10px] text-muted-foreground"
+                className="flex shrink-0 items-center gap-2 border-t px-3 py-1.5 text-2xs text-muted-foreground"
               >
                 <span>{busy ? t("files.working") : `${filtered.length} ${t("files.items")}`}</span>
                 {current && (

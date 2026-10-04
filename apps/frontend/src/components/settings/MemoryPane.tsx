@@ -4,7 +4,7 @@ import { useMemoryStore } from "@/stores/memoryStore";
 import { requestMemory } from "@/lib/nativeCommands";
 import { useT } from "@/lib/i18n";
 import type { MemoryCommand } from "@vibeos/shared";
-import { Pane, Switch } from "./primitives";
+import { Pane, Switch } from "@/components/ui/primitives";
 
 export function MemoryPane() {
   const t = useT();
@@ -134,7 +134,7 @@ export function MemoryPane() {
                 <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">
                   {entry.content}
                 </p>
-                <time className="mt-1 block text-[11px] text-muted-foreground">
+                <time className="mt-1 block text-2xs text-muted-foreground">
                   {new Date(entry.updatedAt).toLocaleString()}
                 </time>
               </div>

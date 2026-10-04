@@ -16,7 +16,7 @@ import {
   ROLES,
   EFFORTS,
   THINKING_MODES,
-} from "./primitives";
+} from "@/components/ui/primitives";
 
 /** 默认模型 — pick provider+model per task, plus the image-generation model. */
 export function DefaultModelsPane() {
@@ -149,12 +149,12 @@ export function DefaultModelsPane() {
 
       <GroupLabel>{t("settings.models.image")}</GroupLabel>
       <Group>
-        <div className="px-3.5 pt-2.5 text-[11px] leading-relaxed text-muted-foreground">
+        <div className="px-3.5 pt-2.5 text-2xs leading-relaxed text-muted-foreground">
           {t("settings.models.imageHint")}
         </div>
         <Row label={t("settings.role.model")}>
           {imageOptions.length === 0 ? (
-            <span className="text-[12px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {t("settings.models.noImageProvider")}
             </span>
           ) : (

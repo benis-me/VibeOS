@@ -7,7 +7,15 @@ import { wsClient, API_BASE } from "@/lib/ws";
 import { fileToWallpaperDataUrl } from "@/lib/image";
 import { isComposing } from "@/lib/fields";
 import { useT, useLocale } from "@/lib/i18n";
-import { Pane, GroupLabel, Group, Row, Select, Segmented, Switch } from "./primitives";
+import {
+  Pane,
+  GroupLabel,
+  Group,
+  Row,
+  Select,
+  Segmented,
+  Switch,
+} from "@/components/ui/primitives";
 
 export function GeneralPane() {
   const t = useT();
@@ -179,7 +187,7 @@ function WallpaperRow() {
 
         <div className="min-w-0 flex-1">
           <div className="text-[13px]">{t("settings.wallpaper")}</div>
-          <div className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+          <div className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
             {t("settings.wallpaper.hint")}
           </div>
 
@@ -188,7 +196,7 @@ function WallpaperRow() {
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={!!busy}
-              className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-accent disabled:opacity-50"
+              className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs text-foreground/80 transition-colors hover:bg-accent disabled:opacity-50"
             >
               <Upload className="size-3.5" />
               {t("settings.wallpaper.upload")}
@@ -198,7 +206,7 @@ function WallpaperRow() {
                 type="button"
                 onClick={onReset}
                 disabled={!!busy}
-                className="vibe-btn rounded-lg border bg-card px-2.5 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-accent disabled:opacity-50"
+                className="vibe-btn rounded-lg border bg-card px-2.5 py-1.5 text-xs text-foreground/80 transition-colors hover:bg-accent disabled:opacity-50"
               >
                 {t("settings.wallpaper.reset")}
               </button>
@@ -225,7 +233,7 @@ function WallpaperRow() {
               type="button"
               onClick={onGenerate}
               disabled={!imageOn || !prompt.trim() || !!busy}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-[12px] font-medium text-brand-foreground transition-colors hover:bg-brand/90 disabled:opacity-50"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-colors hover:bg-brand/90 disabled:opacity-50"
             >
               {busy === "generate" ? (
                 <Loader2 className="size-3.5 animate-spin" />
@@ -240,7 +248,7 @@ function WallpaperRow() {
             </button>
           </div>
           {!imageOn && (
-            <div className="mt-1.5 text-[11px] text-muted-foreground">
+            <div className="mt-1.5 text-2xs text-muted-foreground">
               {t("settings.wallpaper.needModel")}
             </div>
           )}
