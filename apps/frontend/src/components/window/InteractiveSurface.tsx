@@ -21,6 +21,7 @@ export function InteractiveSurface({ windowId }: { windowId: string }) {
   const win = useWindowStore((s) => s.windows[windowId]);
   const busy = useWindowStore((s) => s.busy[windowId]);
   const view = useRef<ViewState>(win?.viewState ?? {});
+  const loads = useRef(0);
   const srcDoc = useMemo(() => {
     const nonce = crypto.randomUUID();
     const base = API_BASE || location.origin;
@@ -35,6 +36,7 @@ export function InteractiveSurface({ windowId }: { windowId: string }) {
   useEffect(() => {
     const iframe = frame.current;
     if (!iframe) return;
+    loads.current = 0;
     setRequests(0);
     setBooting(true);
     let port: MessagePort | undefined;
@@ -313,6 +315,12 @@ export function InteractiveSurface({ windowId }: { windowId: string }) {
         sandbox="allow-scripts allow-forms"
         referrerPolicy="no-referrer"
         srcDoc={srcDoc}
+        // The runtime never navigates: another load means generated code tried to
+        // leave its page (the host CSP blocks the request itself). Not reloaded
+        // automatically, so a script that navigates at start cannot loop.
+        onLoad={() => {
+          if (++loads.current > 1) setError(translate.current("runtime.error.navigation"));
+        }}
         className="h-full w-full border-0"
       />
     </div>

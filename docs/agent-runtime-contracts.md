@@ -44,6 +44,11 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   after clicks and data refreshes; follows `ui-generation` until given its own model),
   `system-event` and `maintenance`. Model discovery results are reused for five minutes;
   Settings → Scan forces a refresh.
+- **Host CSP.** `vite.config.ts` gives `index.html` a resource-only policy: images,
+  media and frames load only from the shell, the backend API origin, `data:` and
+  `blob:`. Generated HTML therefore cannot send context out through external images,
+  CSS `url()` or frame navigation. Scripts and connections are not restricted, so
+  Vite HMR and the cross-port WebSocket keep working.
 - **Skins.** Built-ins (`devdock` / `xp` / `aqua`) are immutable. The native **Skins**
   app creates blank custom skins (no built-in foundation), duplicates a selected
   skin's active appearance, and generates versions through `ai/skins.ts` and

@@ -16,6 +16,8 @@ const zh: Dict = {
   "runtime.repair": "让 AI 修复",
   "runtime.reload": "重新加载",
   "runtime.error.start": "应用运行时未能启动。请重新加载。",
+  "runtime.error.navigation":
+    "这个应用的脚本试图离开自己的页面，已被拦截。可以让 AI 修复，或重新加载。",
   "runtime.error.script": "应用脚本格式或语法无效，原版本已保留。",
   "runtime.error.act":
     "应用脚本在没有你的操作时请求了 AI（vibe.act 只能在点击、按键或提交时调用，且一次一个），已拦下。可以让 AI 修复脚本。",
@@ -571,6 +573,8 @@ const en: Dict = {
   "runtime.repair": "Repair with AI",
   "runtime.reload": "Reload",
   "runtime.error.start": "The app runtime could not start. Please reload.",
+  "runtime.error.navigation":
+    "This app's script tried to leave its page and was blocked. Repair it with AI, or reload.",
   "runtime.error.script": "Invalid app script format or syntax. The previous version is preserved.",
   "runtime.error.act":
     "The app's script asked the AI without your action (vibe.act only runs from a click, key or submit, one request at a time), so it was blocked. You can ask AI to repair the script.",
