@@ -85,7 +85,6 @@ export function FilesApp({
   const path = storedPath === ".Trash" ? "Trash" : storedPath;
   const requestedFile = useChromeStore((s) => s.states[windowId]?.file ?? "");
   const apps = useAppStore((state) => state.apps);
-  const windows = useWindowStore((state) => state.windows);
   const [handoff, setHandoff] = useState<"pending" | "done" | null>(null);
   const [history, setHistory] = useState({ paths: [path], index: 0 });
   const [navigating, setNavigating] = useState(false);
@@ -387,7 +386,7 @@ export function FilesApp({
     {
       type: "submenu",
       label: t("communication.sendWindow"),
-      items: Object.values(windows)
+      items: Object.values(useWindowStore.getState().windows)
         .filter((w) => w.isOpen && w.id !== windowId && !apps[w.appId]?.presetId)
         .map((w) => ({
           type: "item" as const,

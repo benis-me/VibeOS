@@ -10,7 +10,7 @@ export type ResizeDir = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 const MIN_W = 320;
 const MIN_H = 200;
 
-/** Pointer-based move/resize that updates the store live and persists on release. */
+/** Pointer-based move/resize: live geometry per frame, committed and persisted on release. */
 export function useWindowDrag(windowId: string) {
   const frame = useRef<number | null>(null);
   const latest = useRef<Rect | null>(null);
@@ -67,10 +67,7 @@ export function useWindowDrag(windowId: string) {
         if (frame.current == null) {
           frame.current = requestAnimationFrame(() => {
             frame.current = null;
-            const cur = useWindowStore.getState().windows[windowId];
-            if (cur && latest.current) {
-              useWindowStore.getState().upsert({ ...cur, rect: latest.current });
-            }
+            if (latest.current) useWindowStore.getState().setDragRect(windowId, latest.current);
           });
         }
       };
@@ -82,6 +79,10 @@ export function useWindowDrag(windowId: string) {
         frame.current = null;
         const rect = latest.current;
         latest.current = null;
+        const store = useWindowStore.getState();
+        const cur = store.windows[windowId];
+        if (rect && cur) store.upsert({ ...cur, rect });
+        store.setDragRect(windowId);
         if (rect) {
           wsClient.send("c2s.window.move", { windowId, ...rect });
         }

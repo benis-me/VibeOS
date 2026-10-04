@@ -62,7 +62,7 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
   }, [minimized, reduced, win.id]);
   // Fit the current screen without losing the preferred geometry on a larger screen.
   // CSS keeps this responsive to both viewport and skin/taskbar changes.
-  const rect = win.rect;
+  const rect = useWindowStore((s) => s.dragRects[win.id]) ?? win.rect;
   const width = maximized ? "100vw" : `min(${rect.w}px, 100vw)`;
   const availableHeight = "calc(100vh - var(--taskbar-h))";
   const height = maximized ? availableHeight : `min(${rect.h}px, ${availableHeight})`;

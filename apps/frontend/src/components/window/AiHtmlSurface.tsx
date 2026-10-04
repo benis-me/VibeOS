@@ -10,11 +10,11 @@ import { bindCommunication, sendCommunication } from "@/lib/communication";
 import { useT } from "@/lib/i18n";
 import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import { sanitizeAiHtml } from "@/lib/sanitize";
-import { replaceRegions } from "@/lib/patch";
+import { carriesDataVersion, replaceRegions } from "@/lib/patch";
 import { wsClient, API_BASE } from "@/lib/ws";
 import { useDelegatedEvents } from "@/hooks/useDelegatedEvents";
 import { useWindowStore } from "@/stores/windowStore";
-import { createDrafts, fieldKey, type Field } from "@/lib/fields";
+import { captureFocus, createDrafts } from "@/lib/fields";
 import { installImageRetries } from "@/lib/imageRetry";
 import { runPrepared, restorePrepared } from "@/lib/preparedInteractions";
 
@@ -165,15 +165,7 @@ export function AiHtmlSurface({ windowId }: Props) {
       let out = html ? sanitizeAiHtml(html, windowId) : "";
       if (API_BASE && out) out = out.replace(/(["'])\/api\/img\//g, `$1${API_BASE}/api/img/`);
       const patch = local ? state.patches[windowId] : undefined;
-      const active = document.activeElement;
-      const focused =
-        active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement
-          ? {
-              key: fieldKey(active),
-              start: active.selectionStart,
-              end: active.selectionEnd,
-            }
-          : null;
+      const restoreFocus = captureFocus();
       const scroll = el.scrollTop || scrollMemory.get(windowId) || 0;
       if (patch?.mode === "regions") {
         // Sanitize the complete document first; sanitizing a bare <tr> drops its context.
@@ -196,43 +188,33 @@ export function AiHtmlSurface({ windowId }: Props) {
       }
       el.scrollTop = scroll;
       if (!patch) dataVersion.current = state.windows[windowId]?.snapshotDataVersion;
-      else if (
-        !patch.streaming &&
-        (patch.dataVersion !== undefined || patch.mode === "full" || patch.regions?.length)
-      )
-        dataVersion.current = patch.dataVersion;
+      else if (carriesDataVersion(patch)) dataVersion.current = patch.dataVersion;
       for (const delivery of data.current.values())
         bindCommunication(el, delivery, translate.current);
       if (!state.patches[windowId]?.streaming)
         void sendCommunication(windowId, { action: "refresh" }).catch(() => {});
       drafts.restore(el, patch?.done ? patch.operationId : undefined);
       restorePrepared(el, view.current);
-      if (!focused || active?.isConnected) return;
-      for (const f of el.querySelectorAll<Field>("input, textarea")) {
-        if (fieldKey(f) !== focused.key) continue;
-        if (
-          focused.start != null &&
-          (f instanceof HTMLInputElement || f instanceof HTMLTextAreaElement)
-        ) {
-          try {
-            f.focus({ preventScroll: true });
-            (f as HTMLInputElement).setSelectionRange(focused.start, focused.end);
-          } catch {
-            /* Some input types do not support selection. */
-          }
-        }
-        break;
-      }
+      restoreFocus(el);
     };
     render(useWindowStore.getState(), false);
-    return useWindowStore.subscribe((state, previous) => {
+    let preview = 0;
+    const off = useWindowStore.subscribe((state, previous) => {
       if (
-        state.snapshots[windowId] !== previous.snapshots[windowId] ||
-        state.patches[windowId] !== previous.patches[windowId]
-      ) {
-        render(state, true);
-      }
+        state.snapshots[windowId] === previous.snapshots[windowId] &&
+        state.patches[windowId] === previous.patches[windowId]
+      )
+        return;
+      cancelAnimationFrame(preview);
+      // A streaming preview only needs its latest version, at most once a frame.
+      if (state.patches[windowId]?.streaming)
+        preview = requestAnimationFrame(() => render(useWindowStore.getState(), true));
+      else render(state, true);
     });
+    return () => {
+      cancelAnimationFrame(preview);
+      off();
+    };
   }, [windowId, showError, drafts]);
 
   useEffect(() => {

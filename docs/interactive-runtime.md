@@ -88,6 +88,8 @@ Streaming previews never mount scripts. Script syntax and declarations are valid
 - Interactive exports use `.vibeapp` format 3. Classic exports remain format 2 without a runtime field. Import validates before writes, and duplication preserves the mode.
 - Authoring prefers a small `vibeos-application` JSON code fence followed by raw `<vibeos-html mode="full">`; this avoids JSON-escaping HTML/CSS/JS. Legacy all-JSON model output remains accepted.
 - `/api/app-runtime.js` is built from local sources by Bun, once per backend process. Restart the backend after editing the runtime bundle's source during development.
+  Chrome does not HTTP-cache subresources of opaque-origin frames, so each frame fetches it again; cache headers would not help.
+- The host assembles the frame theme (shipped CSS, Latin font subsets as data URLs) once per stylesheet change and reuses it for every frame; live skin tokens are added per frame.
 
 ## Regression checks
 

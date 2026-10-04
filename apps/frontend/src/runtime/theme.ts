@@ -23,8 +23,16 @@ async function fontData(url: string) {
   return fonts.get(url)!;
 }
 
-/** Reuse shipped CSS/fonts and live skin tokens; no model-generated styles enter this copy. */
-export async function runtimeTheme(surface: HTMLElement, apiBase: string) {
+// Stylesheets change only with skins (and dev reloads): assemble them once per
+// change instead of once per window.
+let sheets: Promise<string> | undefined;
+new MutationObserver(() => {
+  sheets = undefined;
+}).observe(document.head, { childList: true, subtree: true, characterData: true });
+// UI text is CJK (system fonts) or Latin; other packaged subsets would only add size.
+const OTHER_SUBSETS = /-(cyrillic|greek|vietnamese)(-ext)?-/;
+
+async function shippedCss(apiBase: string) {
   const css: string[] = [];
   for (const sheet of document.styleSheets) {
     if (sheet.ownerNode instanceof Element && sheet.ownerNode.closest(".ai-surface")) continue;
@@ -36,22 +44,28 @@ export async function runtimeTheme(surface: HTMLElement, apiBase: string) {
     }
     for (const rule of rules) {
       let text = rule.cssText;
+      const font = rule instanceof CSSFontFaceRule;
+      if (font && OTHER_SUBSETS.test(text)) continue;
       const urls = [...text.matchAll(/url\(["']?([^"')]+)["']?\)/g)];
       for (const match of urls) {
         const url = new URL(match[1]!, sheet.href ?? document.baseURI).href;
-        const resolved =
-          rule instanceof CSSFontFaceRule
-            ? await fontData(url)
-            : url.replace(`${location.origin}/api/img/`, `${apiBase || location.origin}/api/img/`);
+        const resolved = font
+          ? await fontData(url)
+          : url.replace(`${location.origin}/api/img/`, `${apiBase || location.origin}/api/img/`);
         text = text.replace(match[0], `url(${JSON.stringify(resolved)})`);
       }
       css.push(text);
     }
   }
-  css.push(runtimeBaseStyle(surface));
+  return css.join("\n");
+}
+
+/** Reuse shipped CSS/fonts and live skin tokens; no model-generated styles enter this copy. */
+export async function runtimeTheme(surface: HTMLElement, apiBase: string) {
+  sheets ??= shippedCss(apiBase);
   return {
     type: "theme",
-    css: css.join("\n"),
+    css: `${await sheets}\n${runtimeBaseStyle(surface)}`,
     className: document.documentElement.className,
     dataset: { ...document.documentElement.dataset },
   };

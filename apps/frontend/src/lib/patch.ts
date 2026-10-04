@@ -1,4 +1,9 @@
-import type { UiRegion } from "@vibeos/shared/protocol";
+import type { UiPatchPayload, UiRegion } from "@vibeos/shared/protocol";
+
+/** A committed patch states its data revision; previews and empty acknowledgements keep the last one. */
+export const carriesDataVersion = (patch: UiPatchPayload): boolean =>
+  !patch.streaming &&
+  (patch.dataVersion !== undefined || patch.mode === "full" || !!patch.regions?.length);
 
 /** Validate the whole batch before touching the live DOM. Missing ids are never appended. */
 export function replaceRegions(root: HTMLElement, regions: UiRegion[]): void {

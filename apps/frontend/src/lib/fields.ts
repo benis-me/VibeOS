@@ -8,6 +8,28 @@ export const fieldKey = (field: Field): string =>
   (field.id ? `#${field.id}` : "");
 export const fieldValue = (field: Field): string =>
   /^(checkbox|radio)$/.test(field.type) ? String((field as HTMLInputElement).checked) : field.value;
+/**
+ * Remember the focused field before a surface is rebuilt; the returned function
+ * refocuses its replacement in `root` (same key) with the caret where it was.
+ */
+export function captureFocus(): (root: HTMLElement) => void {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || !active.matches("input,textarea,select")) return () => {};
+  const key = fieldKey(active as Field);
+  const { selectionStart: start, selectionEnd: end } = active as HTMLInputElement;
+  return (root) => {
+    if (active.isConnected) return;
+    const field = [...root.querySelectorAll<Field>("input,textarea,select")].find(
+      (f) => fieldKey(f) === key,
+    );
+    field?.focus({ preventScroll: true });
+    try {
+      if (field && start != null) (field as HTMLInputElement).setSelectionRange(start, end);
+    } catch {
+      /* Selects and some input types have no selection. */
+    }
+  };
+}
 /** An IME (e.g. pinyin) owns this key; Safari reports that only as keyCode 229. */
 export const isComposing = (e: KeyboardEvent): boolean => e.isComposing || e.keyCode === 229;
 

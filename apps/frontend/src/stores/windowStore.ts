@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import type { WindowState } from "@vibeos/shared";
+import type { Rect, WindowState } from "@vibeos/shared";
 import type { UiPatchPayload } from "@vibeos/shared/protocol";
+import { carriesDataVersion } from "@/lib/patch";
 
 interface WindowStoreState {
   windows: Record<string, WindowState>;
@@ -15,6 +16,9 @@ interface WindowStoreState {
   failed: Record<string, string>;
   /** Recently closed unsaved experiences, newest first (server-maintained). */
   recent: WindowState[];
+  /** Geometry during a drag: only the dragged window re-renders, not every window list. */
+  dragRects: Record<string, Rect>;
+  setDragRect: (id: string, rect?: Rect) => void;
   setRecent: (windows: WindowState[]) => void;
   setAll: (windows: WindowState[], snapshots: Record<string, string>, busyIds?: string[]) => void;
   upsert: (w: WindowState) => void;
@@ -34,7 +38,15 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
   progress: {},
   failed: {},
   recent: [],
+  dragRects: {},
   setRecent: (recent) => set({ recent }),
+  setDragRect: (id, rect) =>
+    set((s) => {
+      const dragRects = { ...s.dragRects };
+      if (rect) dragRects[id] = rect;
+      else delete dragRects[id];
+      return { dragRects };
+    }),
   setAll: (windows, snapshots, busyIds = []) =>
     set((s) => {
       const map: Record<string, WindowState> = {};
@@ -83,9 +95,9 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
     set((s) => {
       const windows = { ...s.windows };
       const maxZ = Math.max(0, ...Object.values(windows).map((w) => w.z));
-      for (const k of Object.keys(windows)) {
-        windows[k] = { ...windows[k]!, focused: k === id };
-      }
+      // Only windows whose focus changes get new objects; the rest stay memoized.
+      for (const [k, w] of Object.entries(windows))
+        if (w.focused && k !== id) windows[k] = { ...w, focused: false };
       const w = windows[id];
       if (w) {
         // Focusing always activates the window — so a minimized one is restored.
@@ -102,9 +114,7 @@ export const useWindowStore = create<WindowStoreState>((set) => ({
     set((s) => ({
       // Keep the committed revision with the snapshot across no-op acknowledgements
       // and iframe reloads, not only in the most recent patch envelope.
-      ...(!patch.streaming &&
-      s.windows[patch.windowId] &&
-      (patch.dataVersion !== undefined || patch.mode === "full" || patch.regions?.length)
+      ...(s.windows[patch.windowId] && carriesDataVersion(patch)
         ? {
             windows: {
               ...s.windows,

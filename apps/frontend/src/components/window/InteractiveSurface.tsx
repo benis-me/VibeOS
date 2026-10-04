@@ -191,14 +191,20 @@ export function InteractiveSurface({ windowId }: { windowId: string }) {
     };
     window.addEventListener("message", ready);
     document.addEventListener("visibilitychange", status);
+    let preview = 0;
     const offStore = useWindowStore.subscribe((s, previous) => {
       if (!port) return;
       if (
         s.snapshots[windowId] !== previous.snapshots[windowId] ||
         s.patches[windowId] !== previous.patches[windowId]
       ) {
-        render(true);
-        if (!s.patches[windowId]?.streaming) refresh();
+        cancelAnimationFrame(preview);
+        // A streaming preview only needs its latest version, at most once a frame.
+        if (s.patches[windowId]?.streaming) preview = requestAnimationFrame(() => render(true));
+        else {
+          render(true);
+          refresh();
+        }
       }
       if (
         s.windows[windowId]?.state !== previous.windows[windowId]?.state ||
@@ -223,6 +229,7 @@ export function InteractiveSurface({ windowId }: { windowId: string }) {
       characterData: true,
     });
     return () => {
+      cancelAnimationFrame(preview);
       clearTimeout(timer);
       clearTimeout(saveTimer);
       clearTimeout(themeTimer);

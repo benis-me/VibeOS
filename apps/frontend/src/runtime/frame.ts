@@ -10,9 +10,9 @@ import {
 import type { AiOp, UiPatchPayload } from "@vibeos/shared/protocol";
 import { installDelegatedEvents } from "../hooks/useDelegatedEvents";
 import { sanitizeAiHtml } from "../lib/sanitize";
-import { replaceRegions } from "../lib/patch";
+import { carriesDataVersion, replaceRegions } from "../lib/patch";
 import { bindCommunication } from "../lib/bindCommunication";
-import { createDrafts, fieldKey, type Field } from "../lib/fields";
+import { captureFocus, createDrafts, fieldKey, type Field } from "../lib/fields";
 import { installImageRetries } from "../lib/imageRetry";
 import { runPrepared, restorePrepared } from "../lib/preparedInteractions";
 
@@ -263,14 +263,7 @@ function render(html: string, patch?: UiPatchPayload) {
   for (const [id, scope] of scopes)
     if (scope.source !== scripts.get(id) || targets.some((target) => target.contains(scope.node)))
       stop(id);
-  const active = document.activeElement as Field | null;
-  const focus = active?.matches("input,textarea,select")
-    ? {
-        key: fieldKey(active),
-        start: (active as HTMLInputElement).selectionStart,
-        end: (active as HTMLInputElement).selectionEnd,
-      }
-    : undefined;
+  const restoreFocus = captureFocus();
   const scroll = root.scrollTop;
   if (patch?.mode === "regions") {
     try {
@@ -291,23 +284,8 @@ function render(html: string, patch?: UiPatchPayload) {
   drafts.restore(root, patch?.done ? patch.operationId : undefined);
   restorePrepared(root, state);
   for (const delivery of deliveries.values()) bindCommunication(root, delivery, (s) => s);
-  if (focus && !active?.isConnected)
-    for (const field of root.querySelectorAll<Field>("input,textarea,select"))
-      if (fieldKey(field) === focus.key) {
-        field.focus({ preventScroll: true });
-        try {
-          (field as HTMLInputElement).setSelectionRange(focus.start, focus.end);
-        } catch {
-          /* selects/numeric fields */
-        }
-        break;
-      }
-  if (
-    patch &&
-    !patch.streaming &&
-    (patch.dataVersion !== undefined || patch.mode === "full" || patch.regions?.length)
-  )
-    dataVersion = patch.dataVersion;
+  restoreFocus(root);
+  if (patch && carriesDataVersion(patch)) dataVersion = patch.dataVersion;
   if (!patch?.streaming)
     for (const [id, source] of scripts) {
       if (scopes.has(id)) continue;

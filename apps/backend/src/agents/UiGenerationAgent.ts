@@ -345,6 +345,7 @@ async function generate(
     if (!canCommit()) return;
     let buffer = "";
     let lastStreamed = "";
+    let lastPreview = 0;
     let status = "";
     // Only broken HTML structure forces a complete body; other repairs keep the mode.
     const fullRequired = renderMode === "force-full" || (attempt > 0 && repairFull);
@@ -375,6 +376,11 @@ async function generate(
         // ponytail: stream only first paint; existing windows commit one validated
         // batch. Streaming edits would need transactional preview + rollback.
         if (snapshot.trim() || attempt > 0) return;
+        // About ten previews a second: rescanning and resending the whole body per
+        // token is quadratic. The final validated patch replaces the last preview.
+        const now = performance.now();
+        if (now - lastPreview < 100) return;
+        lastPreview = now;
         const body = extractStreamingHtml(buffer);
         if (body !== null && body.length > lastStreamed.length) {
           lastStreamed = body;

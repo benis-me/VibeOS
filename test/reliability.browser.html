@@ -46,6 +46,10 @@ try {
   patch(initial, submitted);
   assert(field("title").value === "" && field("body").value === "Unsubmitted newer draft", "Acknowledgement clears its submission, never newer typing");
   assert(document.activeElement === field("body") && field("body").selectionStart === 2 && field("body").selectionEnd === 9, "Full patch restores focus and selection");
+  const withSelect = initial.replace('<p data-vibeos-region="result">', '<select name="mood"><option>a</option><option>b</option></select><p data-vibeos-region="result">');
+  patch(withSelect); field("mood").focus(); patch(withSelect.replace("Ready", "Re-rendered"));
+  assert(document.activeElement === field("mood"), "A focused select keeps focus, as in the interactive runtime");
+  field("body").focus();
   regionPatch([{ region: "editor", html: '<section data-vibeos-region="editor"><textarea name="body"></textarea><button data-vibeos-action="save">Save again</button></section>' }]);
   assert(field("body").value === "Unsubmitted newer draft", "An affected region preserves an unsent draft");
   surface.querySelector("button").click(); const latest = op.id;

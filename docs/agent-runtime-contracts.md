@@ -100,7 +100,8 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   structure (incomplete envelope or region blocks; missing, duplicate or overlapping
   targets) triggers one full repair; other rejections (syscalls, app-state rules,
   scripts) retry once in the same render mode. The rules live in `agents/outputRules.ts`
-  with table-driven tests; rejected output has no syscalls. Only first paint streams; existing windows
+  with table-driven tests; rejected output has no syscalls. Only first paint streams (a preview at
+  most every 100 ms; surfaces draw at most one preview per frame); existing windows
   apply a validated, persisted batch. `regionMerge.ts` is the only merge: a regions
   patch carries the merged snapshot as `html`, the store keeps it, and both surfaces
   replace the named regions' DOM nodes. A region marked `data-vibeos-append` adds its
