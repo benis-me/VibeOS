@@ -12,7 +12,13 @@ import {
   Loader2,
   Palette,
 } from "lucide-react";
-import { MAX_SKIN_PACKAGE_BYTES, skinRequestRunning, type SkinCommand } from "@vibeos/shared";
+import {
+  MAX_SKIN_PACKAGE_BYTES,
+  skinRequestRunning,
+  type SkinCommand,
+  type SkinRecord,
+} from "@vibeos/shared";
+import { API_BASE } from "@/lib/ws";
 import { useSkinStore, sendSkinCommand } from "@/stores/skinStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useConnectionStore } from "@/stores/connectionStore";
@@ -29,6 +35,7 @@ export function SkinsApp() {
   const t = useT();
   const skins = useSkinStore((s) => s.skins);
   const activeId = useSettingsStore((s) => s.settings?.skin ?? "devdock");
+  const dark = useSettingsStore((s) => s.settings?.theme === "dark");
   const [selected, setSelected] = useState(activeId);
   useEffect(() => setSelected(activeId), [activeId]);
   const skin =
@@ -99,10 +106,10 @@ export function SkinsApp() {
             className="min-w-0 flex-1"
             value={skin.id}
             disabled={disabled}
+            // Choosing previews a skin here; Use applies it to the whole system.
             onChange={(value) => {
               setSelected(value as typeof selected);
               setEdit(null);
-              void perform({ action: "activate", id: value });
             }}
           >
             <optgroup label={t("skins.builtin")}>
@@ -141,6 +148,16 @@ export function SkinsApp() {
                 </option>
               ))}
             </Select>
+          )}
+          {skin.id !== activeId && (
+            <button
+              type="button"
+              className={buttonVariants({ variant: "default" })}
+              disabled={disabled || !!skin.loadError}
+              onClick={() => void perform({ action: "activate", id: skin.id })}
+            >
+              {t("skins.use")}
+            </button>
           )}
           {(
             [
@@ -190,6 +207,7 @@ export function SkinsApp() {
             <MoreHorizontal className="size-4" />
           </button>
         </div>
+        <SkinPreview skin={skin} dark={dark} />
         <input
           ref={fileInput}
           type="file"
@@ -409,5 +427,63 @@ export function SkinsApp() {
         </div>
       )}
     </div>
+  );
+}
+
+const SWATCHES = ["background", "card", "foreground", "brand", "accent", "border"] as const;
+
+/** The skin at a glance, from its definition alone: wallpaper, key colors and title font. */
+function SkinPreview({ skin, dark }: { skin: SkinRecord; dark: boolean }) {
+  const t = useT();
+  const { light, dark: darkTokens, rules, assets } = skin.definition;
+  const tokens: Record<string, string | undefined> = dark ? { ...light, ...darkTokens } : light;
+  const css = (value?: string) =>
+    value?.replace(/asset\(([a-z][a-z0-9-]*)\)/g, (_, name: string) =>
+      assets?.[name]?.id ? `url("${API_BASE}/api/img/${assets[name].id}")` : "none",
+    );
+  const desktop = rules.find(
+    (r) =>
+      r.target === "desktop" &&
+      r.state === "default" &&
+      r.mode !== (dark ? "light" : "dark") &&
+      (r.styles.background || r.styles["background-image"]),
+  );
+  const wallpaper = css(desktop?.styles.background ?? desktop?.styles["background-image"]);
+  const swatches = SWATCHES.filter((key) => tokens[key]);
+  if (!wallpaper && !tokens.desktop && !swatches.length) return null;
+  return (
+    <figure
+      aria-label={t("skins.preview")}
+      className="vibe-skinpreview relative mt-3 h-[120px] overflow-hidden rounded-lg border"
+      style={{
+        background: wallpaper ?? css(tokens.desktop) ?? css(tokens.background),
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
+      <figcaption
+        className="absolute left-3 top-3 max-w-[70%] truncate rounded-md px-2 py-1 text-sm font-medium"
+        style={{
+          fontFamily: tokens["font-title"] ?? tokens["font-sans"],
+          color: tokens.foreground,
+          background: css(tokens.card),
+        }}
+      >
+        {skin.name}
+      </figcaption>
+      <div
+        className="absolute bottom-3 left-3 flex gap-1.5 rounded-md p-1.5"
+        style={{ background: css(tokens.card) ?? "rgb(255 255 255 / 0.7)" }}
+      >
+        {swatches.map((key) => (
+          <span
+            key={key}
+            title={key}
+            className="size-5 rounded-sm"
+            style={{ background: css(tokens[key]), boxShadow: "inset 0 0 0 1px rgb(0 0 0 / 0.15)" }}
+          />
+        ))}
+      </div>
+    </figure>
   );
 }

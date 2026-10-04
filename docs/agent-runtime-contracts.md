@@ -50,6 +50,8 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   `SdkManager.run()`. Tasks belong to skins, not windows/sockets; boot marks unfinished
   requests interrupted. Only validated successful output creates and auto-activates
   an immutable version. Selecting an old version changes the next request's base.
+  Choosing a skin in the app previews it (a card built from its definition: wallpaper
+  asset, key color tokens, title font); **Use** applies it to the system.
   `packages/shared/src/domain/skins.ts` is the own token/target/property contract;
   never accept model-supplied selectors, arbitrary CSS or executable content. Optional
   chrome geometry and named image assets extend v1 compatibly. Color tokens cannot

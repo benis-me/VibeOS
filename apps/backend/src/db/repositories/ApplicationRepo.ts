@@ -252,6 +252,7 @@ const requestFromRow = (r: RequestRow): ApplicationRequest => ({
   summary: r.summary,
   error: r.error ?? undefined,
   versionId: r.version_id ?? undefined,
+  sourceWindowId: r.source_window_id ?? undefined,
   createdAt: r.created_at,
 });
 export function getApplicationRequest(id: string) {

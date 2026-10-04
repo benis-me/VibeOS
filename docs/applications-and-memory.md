@@ -21,8 +21,11 @@ There is no publication workflow or new application permission system.
   does not cancel it. Only successfully validated output creates a version and
   activates it. Cancel, failure and restart preserve the previous version.
 - A request starts from the selected version and retains its instructions.
-  Existing windows keep their version. **Open current version** opens alongside
-  an older window, preserving its unsaved fields.
+  Existing windows keep their version. **Open current version** opens in an older
+  window's place, on top of it, preserving the older window's unsaved fields.
+- The sparkle button in a generated window's title bar asks for a change right there.
+  The request becomes a new version (a temporary experience is saved first) and, on
+  success, opens in that window's place, exactly as **Open current version** does.
 - Duplicate creates an independent app with empty shared data. Legacy snapshots
   can contain personal records, so their duplicates regenerate a fresh interface.
 - Versions change application definitions, not user data. Incompatible data schema

@@ -40,12 +40,13 @@ export async function updateApplicationWindow(windowId: string) {
   const definition = readApplicationVersion(app.id)!;
   if (definition.dataSchemaVersion !== getAppData(app.id).schemaVersion)
     throw new Error("applications.error.schema");
-  // A new version opens alongside the old window, retaining every unsaved local field.
+  // A new version opens in the old window's place, on top of it; the old window keeps
+  // every unsaved local field.
   const window = await openWindow({
     appId: app.id,
     title: app.name,
     kind: "app",
-    size: app.manifest.defaultSize,
+    rect: original.rect,
     filePath: original.filePath,
   });
   await ensureMemory(window.id, app.id);

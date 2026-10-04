@@ -10,6 +10,7 @@ import { getApp, installApp, listApps } from "../db/repositories/AppRepo.ts";
 import * as Applications from "../db/repositories/ApplicationRepo.ts";
 import { parseSubscriptions } from "../db/repositories/CommunicationRepo.ts";
 import { getSnapshot } from "../db/repositories/AppMemoryRepo.ts";
+import { getWindow } from "../db/repositories/WindowRepo.ts";
 import { ensureShortcut, createNode } from "../db/repositories/VfsRepo.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { broadcastDiskChanges } from "../server/filesHandlers.ts";
@@ -72,9 +73,19 @@ export async function handleApplicationCommand(
     case "activate":
       await Applications.activateApplicationVersion(command.appId, command.versionId);
       break;
-    case "generate":
-      await startGeneration(command.appId, command.prompt, command.sourceWindowId, command.runtime);
+    case "generate": {
+      // The first change asked from a temporary experience keeps it: it is saved first.
+      if (command.sourceWindowId && !getApp(command.appId)?.isInstalled) {
+        const app = await Applications.saveWindowAsApplication(command.sourceWindowId);
+        const shortcut = await ensureShortcut(app.id, app.name, app.icon);
+        broadcast("s2c.syscall.appInstalled", { app, shortcut: shortcut ?? undefined });
+        const window = getWindow(command.sourceWindowId);
+        if (window) broadcast("s2c.window.stateChanged", { window });
+        appId = app.id;
+      }
+      await startGeneration(appId!, command.prompt, command.sourceWindowId, command.runtime);
       break;
+    }
     case "cancel": {
       jobs.get(command.requestId)?.abort();
       await Applications.updateApplicationRequest(command.requestId, "cancelled");
@@ -199,6 +210,16 @@ async function generate(requestId: string, abort: AbortController) {
         ) {
           await recordSummary(result.runId, output.summary);
           broadcast("s2c.appData.changed", Applications.getAppData(app.id));
+          // The window the change was asked from shows the new version in its place.
+          if (getWindow(request.source_window_id ?? "")?.isOpen)
+            await updateApplicationWindow(request.source_window_id!).catch((error) =>
+              recordStep(
+                "application.windowUpdate",
+                { appId: app.id, error: error instanceof Error ? error.message : String(error) },
+                { id: request.id, runId: result.runId },
+                "warn",
+              ),
+            );
         }
         break;
       } catch (error) {

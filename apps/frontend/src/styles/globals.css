@@ -713,10 +713,14 @@ button:not(:disabled),
 [data-skin="devdock"] .vibe-winbtn-max::after {
   --g: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2010%2010'%20fill='none'%20stroke='%23000'%20stroke-width='1.4'%20stroke-linecap='round'%3E%3Cpath%20d='M5,2.3V7.7M2.3,5H7.7'/%3E%3C/svg%3E");
 }
-/* The save action sits at the right edge, apart from the traffic lights. */
-:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-titlebar-action {
+/* Window actions (edit, save) sit at the right edge, apart from the traffic lights. */
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-titlebar-actions {
   position: absolute;
   right: 8px;
+}
+/* The centered title and progress stay clear of the pinned lights and actions. */
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-titlebar {
+  padding-inline: 72px;
 }
 /* Unselected window → gray traffic lights (both macOS skins). */
 :is([data-skin="devdock"], [data-skin="aqua"]) .vibe-window:not([data-focused]) .vibe-winbtn {

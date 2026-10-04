@@ -140,7 +140,13 @@ export function useBoot(): void {
       ),
     );
 
-    offs.push(wsClient.on("s2c.window.opened", (p) => win.upsert(p.window)));
+    offs.push(
+      wsClient.on("s2c.window.opened", (p) => {
+        win.upsert(p.window);
+        // The server unfocuses every other window when one opens.
+        if (p.window.focused) win.focus(p.window.id);
+      }),
+    );
     offs.push(wsClient.on("s2c.window.recent", (p) => win.setRecent(p.windows)));
     offs.push(
       wsClient.on("s2c.window.closed", (p) => {

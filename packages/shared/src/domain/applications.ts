@@ -112,6 +112,8 @@ export interface ApplicationRequest {
   summary: string;
   error?: string;
   versionId?: string;
+  /** The window the change was asked from; it shows the new version on success. */
+  sourceWindowId?: string;
   createdAt: number;
 }
 export interface ApplicationDetail {

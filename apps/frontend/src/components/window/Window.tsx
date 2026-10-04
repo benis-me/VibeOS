@@ -1,12 +1,13 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Minus, Square, X, Copy, Save, Loader2 } from "lucide-react";
+import { Minus, Square, X, Copy, Save, Loader2, Sparkles } from "lucide-react";
 import type { WindowState } from "@vibeos/shared";
 import { wsClient } from "@/lib/ws";
 import { useAppStore } from "@/stores/appStore";
 import { useWindowStore } from "@/stores/windowStore";
 import { useWindowDrag } from "@/hooks/useWindowDrag";
 import { AiHtmlSurface } from "./AiHtmlSurface";
+import { AppEditBar } from "./AppEditBar";
 import { InteractiveSurface } from "./InteractiveSurface";
 import { NATIVE_APPS } from "./nativeApps";
 import { CHROMES } from "./chromes";
@@ -31,6 +32,8 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
   // Where to fly to when minimizing: the delta from the window centre to this
   // window's Dock/taskbar item, so it shrinks INTO its icon (genie).
   const [minTarget, setMinTarget] = useState<{ x: number; y: number } | null>(null);
+  const [editing, setEditing] = useState(false);
+  const closeEdit = useCallback(() => setEditing(false), []);
   // Native (React) apps render their own component; everything else is AI HTML
   // and can be frozen into a reusable app.
   const native = app?.presetId ? NATIVE_APPS[app.presetId] : undefined;
@@ -150,17 +153,30 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
           </span>
           {!native && <GenerationStatus windowId={win.id} />}
           {!native && (
-            // Kept apart from the window controls: saving is not a fourth traffic light.
-            <button
-              type="button"
-              title={t("win.saveAsApp")}
-              aria-label={t("win.saveAsApp")}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => wsClient.send("c2s.app.save", { windowId: win.id })}
-              className="vibe-titlebar-action flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition hover:bg-current/10 hover:opacity-100"
-            >
-              <Save className="size-3.5" />
-            </button>
+            // Kept apart from the window controls: these are not more traffic lights.
+            <div className="vibe-titlebar-actions flex shrink-0 items-center gap-0.5">
+              <button
+                type="button"
+                title={t("win.editApp")}
+                aria-label={t("win.editApp")}
+                aria-expanded={editing}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => setEditing((v) => !v)}
+                className="vibe-titlebar-action flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition hover:bg-current/10 hover:opacity-100"
+              >
+                <Sparkles className="size-3.5" />
+              </button>
+              <button
+                type="button"
+                title={t("win.saveAsApp")}
+                aria-label={t("win.saveAsApp")}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => wsClient.send("c2s.app.save", { windowId: win.id })}
+                className="vibe-titlebar-action flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition hover:bg-current/10 hover:opacity-100"
+              >
+                <Save className="size-3.5" />
+              </button>
+            </div>
           )}
           <div className="vibe-winbtns flex items-center gap-1">
             <TitleButton
@@ -221,6 +237,7 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
         onContextMenu={(e) => openContextMenu(e, appContentMenu({ t, win, native: !!native }))}
       >
         {!native && <GenerationFailure windowId={win.id} />}
+        {!native && editing && <AppEditBar win={win} onClose={closeEdit} />}
         {native ? (
           native(win.id)
         ) : Chrome ? (
