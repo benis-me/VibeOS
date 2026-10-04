@@ -94,7 +94,7 @@ export function GeneralPane() {
           />
         </Row>
         <Row label={t("settings.proactive")} hint={t("settings.proactive.hint")}>
-          <Switch checked={proactive} onChange={setProactive} />
+          <Switch label={t("settings.proactive")} checked={proactive} onChange={setProactive} />
         </Row>
       </Group>
     </Pane>

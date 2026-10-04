@@ -39,14 +39,22 @@ export function BrowserChrome({ windowId, children }: { windowId: string; childr
     force();
   }, [url]);
 
-  const navigate = (target: string) => {
+  // Back/forward marks the op as history: a page this window already showed comes
+  // back unchanged, without a new generation. Reload always regenerates.
+  const navigate = (target: string, history = false) => {
     const u = target.trim();
     if (!u) return;
     useChromeStore.getState().set(windowId, { url: u }); // optimistic
     useWindowStore.getState().setBusy(windowId, true);
     wsClient.send("c2s.op", {
       windowId,
-      op: { kind: "submit", action: "navigate", value: u, formData: { url: u } },
+      op: {
+        kind: "submit",
+        action: "navigate",
+        value: u,
+        formData: { url: u },
+        ...(history ? { dataset: { history: "1" } } : {}),
+      },
     });
   };
 
@@ -57,7 +65,7 @@ export function BrowserChrome({ windowId, children }: { windowId: string; childr
     h.idx = next;
     skipPush.current = true;
     force();
-    navigate(h.stack[next]!);
+    navigate(h.stack[next]!, true);
   };
 
   const canBack = hist.current.idx > 0;

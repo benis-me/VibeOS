@@ -215,13 +215,32 @@ export function registerUiGenerationAgent(): void {
   bus.on("op.dragdrop", ({ windowId, source }) => {
     if (windowId) dispatch(windowId, { drag: source });
   });
-  bus.on("window.closed", ({ windowId }) => abortWindow(windowId));
+  bus.on("window.closed", ({ windowId }) => {
+    abortWindow(windowId);
+    pages.delete(windowId);
+  });
   bus.on("window.cancel", ({ windowId }) => cancelWindow(windowId));
 }
 
 /** True if this run has been superseded by a newer one for the same window. */
 function isStale(windowId: string, gen: number, abort: AbortController): boolean {
   return abort.signal.aborted || genCounter.get(windowId) !== gen;
+}
+
+// Browser windows remember recently shown pages, so back/forward returns to the same
+// page at once instead of generating a new one. ponytail: in-memory, 20 pages per
+// window; a restart forgets them and the next visit generates again.
+const pages = new Map<string, Map<string, string>>();
+const navigateUrl = (op?: AiOp) =>
+  op?.action === "navigate"
+    ? String(op.formData?.url ?? op.dataset?.url ?? op.value ?? "").trim()
+    : "";
+function rememberPage(windowId: string, url: string, html: string) {
+  const cache = pages.get(windowId) ?? new Map<string, string>();
+  cache.delete(url);
+  cache.set(url, html);
+  if (cache.size > 20) cache.delete(cache.keys().next().value!);
+  pages.set(windowId, cache);
 }
 
 async function generate(
@@ -260,6 +279,24 @@ async function generate(
   }
 
   const snapshot = memory?.htmlSnapshot ?? "";
+  // Back/forward to a page this window already showed: commit it without a model call.
+  const revisit = trigger.op?.dataset?.history ? navigateUrl(trigger.op) : "";
+  const cached = revisit ? pages.get(windowId)?.get(revisit) : undefined;
+  if (cached !== undefined) {
+    const current = () => !isStale(windowId, gen, abort);
+    if (!(await saveSnapshot(windowId, cached, current, sharedData.version)) || !current()) return;
+    broadcast("s2c.ui.patch", {
+      windowId,
+      dataVersion: sharedData.version,
+      operationId: trigger.op?.id,
+      mode: "full",
+      html: cached,
+      done: true,
+    });
+    broadcast("s2c.chrome.set", { windowId, patch: { url: revisit } });
+    if (interactionId) await saveInteractionResult(interactionId, `Revisited ${revisit}`, current);
+    return;
+  }
   const workflowInput =
     trigger.message?.trace.interaction?.windowId === windowId
       ? (interactionInput(windowId, trigger.message.trace.interaction.id) as AiOp | undefined)
@@ -541,6 +578,11 @@ async function generate(
         { ...trace, runId: result.runId },
       );
       if (!canPublish()) return;
+      if (app.presetId === "browser") {
+        const chrome = parsed.syscalls.find((call) => call.type === "chrome");
+        const url = (chrome?.type === "chrome" && chrome.set.url) || navigateUrl(trigger.op);
+        if (url) rememberPage(windowId, url, html);
+      }
       broadcast(
         "s2c.ui.patch",
         regions?.length

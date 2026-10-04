@@ -170,6 +170,9 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   directory as `data-cwd`, each generation gets that directory's listing as
   `[SYSTEM DISK]` (data, no extra model call), and file commands go through files
   requests. Commands unrelated to files may stay imaginative.
+- **Browser** back/forward returns a page that window already showed (its last 20
+  pages, in memory) through the normal commit path, without a model call; Reload
+  always regenerates.
 - **Native Files**: `files/disk.ts` confines real file operations to the system disk.
   Files and desktop file opens dispatch through `filesHandlers.openDiskFile` to native
   text/media viewers. `windows.file_path` persists their file; Files mutations update

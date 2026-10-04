@@ -67,9 +67,9 @@ next — as if it were a real program responding.
   notifications, the user profile and agent runs live in SQLite and survive restarts.
 - **Multi-agent runtime** — several agents drive the system concurrently:
   - **UI-Generation Agent** (strong model) — renders/patches windows on user actions.
-  - **System-Event Agent** (fast model, on a timer) — invents ambient notifications so
-    the OS feels alive, without being user-triggered; it is idle while no client is
-    connected. Each step's own summary feeds later prompts, so memory needs no
+  - **System-Event Agent** (fast model, on a timer) — one of your apps with records
+    reports what moved on in its world while you were away; clicking the notification
+    opens that app. It is idle while no client is connected or no app has records. Each step's own summary feeds later prompts, so memory needs no
     background model calls.
 - **Desktop shell** — desktop, draggable/resizable multi-window manager, taskbar,
   start menu (split into *system* and *generated* apps), notifications (toasts + center).

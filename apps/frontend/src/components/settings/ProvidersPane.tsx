@@ -261,6 +261,7 @@ export function ProvidersPane() {
             <h2 className="text-[15px] font-semibold">{cat?.label}</h2>
             {cat?.kind === "api" && (
               <Switch
+                label={cat?.label}
                 checked={cfg.enabled !== false}
                 onChange={(v) => patch(selected, { enabled: v })}
               />
