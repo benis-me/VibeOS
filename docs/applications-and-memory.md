@@ -84,7 +84,11 @@ from a saved interface shows it at once and then updates it in place from the
 current records. A minimized window's AI refresh waits until it is shown again.
 
 Definitions declare `fileTypes` (extensions or MIME patterns) and `operations`
-(topic plus description). Files' **Open with** lists suitable generated apps.
+(topic plus description). Files' **Open with** lists the viewers and apps declaring
+the file's type first, then every other generated app; its AI decides how to handle
+the file. A file dropped onto a generated window from the host is stored in
+`Documents/` first (a numbered name avoids clashes) and the app receives its real
+path. Only real user drops count: an iframe script's synthetic drop is ignored.
 For `file.open`, the model receives a real disk path, requests the actual bytes
 from Files, interprets them, writes through the file service and replies only
 after confirmation. Read/write continuations retain the complete initiating

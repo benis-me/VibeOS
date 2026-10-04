@@ -34,7 +34,7 @@ import {
   type FileRequestCommand,
   type DiskEntry,
 } from "@vibeos/shared";
-import { requestFiles, fileDownloadUrl } from "@/lib/files";
+import { requestFiles, fileDownloadUrl, fileBase64 } from "@/lib/files";
 import { sendCommunication } from "@/lib/communication";
 import { openContextMenu, type MenuItem } from "@/components/contextmenu/ContextMenu";
 import { buttonVariants } from "@/components/ui/button";
@@ -294,12 +294,7 @@ export function FilesApp({
     try {
       for (const file of Array.from(files)) {
         if (file.size > FILE_UPLOAD_LIMIT) throw new Error("uploadSize");
-        const content = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-          reader.onerror = () => reject(new Error("failed"));
-          reader.readAsDataURL(file);
-        });
+        const content = await fileBase64(file);
         await requestFiles({
           action: "write",
           path: child(path, file.name),
@@ -359,42 +354,48 @@ export function FilesApp({
     link.download = "";
     link.click();
   };
-  const openWith = (e: DiskEntry): MenuItem[] => [
-    ...Object.values(apps)
-      .filter(
-        (a) =>
-          a.isInstalled &&
-          (a.presetId
-            ? ["text-viewer", "media-viewer"].includes(a.presetId)
-            : supportsFile(a.manifest.fileTypes, e.path, fileMediaType(e.path))),
-      )
-      .map((app) => ({
-        type: "item" as const,
-        label: appLabel(t, app),
-        icon: (
-          <AppIcon
-            name={app.icon}
-            presetId={app.presetId}
-            label={appLabel(t, app)}
-            className="size-4"
-          />
-        ),
-        onSelect: () =>
-          void sendFile(e, { appId: app.id, open: true, newWindow: !app.manifest.singleInstance }),
-      })),
-    { type: "separator" },
-    {
-      type: "submenu",
-      label: t("communication.sendWindow"),
-      items: Object.values(useWindowStore.getState().windows)
-        .filter((w) => w.isOpen && w.id !== windowId && !apps[w.appId]?.presetId)
-        .map((w) => ({
-          type: "item" as const,
-          label: w.title,
-          onSelect: () => void sendFile(e, { windowId: w.id }),
-        })),
-    },
-  ];
+  const openWith = (e: DiskEntry): MenuItem[] => {
+    // Viewers and apps declaring this type come first; any other generated app can
+    // still take the file, and its AI decides what to do with it.
+    const candidates = Object.values(apps).filter(
+      (a) => a.isInstalled && (!a.presetId || ["text-viewer", "media-viewer"].includes(a.presetId)),
+    );
+    const fits = (a: (typeof candidates)[number]) =>
+      !!a.presetId || supportsFile(a.manifest.fileTypes, e.path, fileMediaType(e.path));
+    const item = (app: (typeof candidates)[number]): MenuItem => ({
+      type: "item",
+      label: appLabel(t, app),
+      icon: (
+        <AppIcon
+          name={app.icon}
+          presetId={app.presetId}
+          label={appLabel(t, app)}
+          className="size-4"
+        />
+      ),
+      onSelect: () =>
+        void sendFile(e, { appId: app.id, open: true, newWindow: !app.manifest.singleInstance }),
+    });
+    const recommended = candidates.filter(fits);
+    const others = candidates.filter((a) => !fits(a));
+    return [
+      ...recommended.map(item),
+      ...(recommended.length && others.length ? [{ type: "separator" as const }] : []),
+      ...others.map(item),
+      { type: "separator" },
+      {
+        type: "submenu",
+        label: t("communication.sendWindow"),
+        items: Object.values(useWindowStore.getState().windows)
+          .filter((w) => w.isOpen && w.id !== windowId && !apps[w.appId]?.presetId)
+          .map((w) => ({
+            type: "item" as const,
+            label: w.title,
+            onSelect: () => void sendFile(e, { windowId: w.id }),
+          })),
+      },
+    ];
+  };
   /** One entry's actions: its context menu and the toolbar's "⋯" button. */
   const entryMenu = (e: DiskEntry): MenuItem[] =>
     trash

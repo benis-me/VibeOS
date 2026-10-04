@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { runtimeMessageSchema } from "@vibeos/shared/protocol";
 import { viewStateSchema, type ViewState } from "@vibeos/shared";
 import { sendCommunication } from "@/lib/communication";
+import { importHostFile } from "@/lib/files";
 import { wsClient, API_BASE } from "@/lib/ws";
 import { useWindowStore } from "@/stores/windowStore";
 import { useT } from "@/lib/i18n";
@@ -166,11 +167,22 @@ export function InteractiveSurface({ windowId }: { windowId: string }) {
             }),
           );
         } else if (message.type === "drop") {
-          wsClient.send("c2s.op.dragdrop", {
-            windowId,
-            source: message.source,
-            target: { windowId },
-          });
+          const drop = (source: typeof message.source) => {
+            if (wsClient.send("c2s.op.dragdrop", { windowId, source, target: { windowId } }))
+              useWindowStore.getState().setBusy(windowId, true);
+          };
+          if (!message.file) drop(message.source);
+          else {
+            // The app gets the real bytes: store the file, then drop its disk path.
+            const file = message.file;
+            setRequests((n) => n + 1);
+            void importHostFile(file)
+              .then((path) => drop({ kind: "file", ref: path, label: file.name }))
+              .catch((e: Error) => setError(translate.current(`files.error.${e.message}`)))
+              .finally(() => {
+                if (!disposed) setRequests((n) => n - 1);
+              });
+          }
         } else if (message.type === "error") setError(translate.current(message.message));
       };
       port.start();

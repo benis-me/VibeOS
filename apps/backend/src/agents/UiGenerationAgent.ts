@@ -28,6 +28,7 @@ import * as Syscalls from "../syscall/SyscallInterpreter.ts";
 import { extractRegionIds } from "./regionMerge.ts";
 import { OutputRejected, validateOutput } from "./outputRules.ts";
 import { rewriteImages } from "../ai/imageCache.ts";
+import { diskError, executeDisk } from "../files/disk.ts";
 import { logger } from "../util/log.ts";
 
 const log = logger("ui-gen");
@@ -321,6 +322,13 @@ async function generate(
         ? interactionInput(windowId, trigger.message.trace.interaction.id)
         : undefined,
     pendingReplies: pendingReplies(windowId, trigger.message?.trace),
+    // The Terminal works on the real disk; its working directory travels as data-cwd.
+    systemDisk:
+      app.presetId === "command-line"
+        ? terminalDisk(
+            trigger.op?.dataset?.cwd ?? /\bdata-cwd=["']([^"']*)["']/.exec(snapshot)?.[1] ?? "",
+          )
+        : undefined,
   });
 
   const reason = firstRender
@@ -612,5 +620,17 @@ async function generate(
       if (values.length) learnFromUser(values.join("\n"), app.name);
     }
     return;
+  }
+}
+
+function terminalDisk(cwd: string) {
+  try {
+    const entries = executeDisk({ action: "list", path: cwd }).entries ?? [];
+    return {
+      cwd,
+      entries: entries.slice(0, 200).map(({ name, kind, size }) => ({ name, kind, size })),
+    };
+  } catch (error) {
+    return { cwd, error: diskError(error) };
   }
 }

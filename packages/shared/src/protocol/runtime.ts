@@ -38,6 +38,8 @@ export const runtimeMessageSchema = z.discriminatedUnion("type", [
         ref: z.string().max(16384),
         label: z.string().max(500).optional(),
       }),
+      /** A file from the host; the parent stores it on the system disk first. */
+      file: z.instanceof(File).optional(),
     })
     .strict(),
   z.object({ type: z.literal("error"), message: z.string().max(1000) }).strict(),

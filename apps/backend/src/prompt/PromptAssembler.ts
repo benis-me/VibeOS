@@ -34,6 +34,12 @@ export interface AssembleInput {
   window?: WindowState;
   opener?: WindowState | null;
   legacySourceHtml?: string;
+  /** The Terminal's working directory on the real system disk, listed as data. */
+  systemDisk?: {
+    cwd: string;
+    entries?: { name: string; kind: string; size: number }[];
+    error?: string;
+  };
   memory: AppMemory | null;
   recent: Interaction[];
   globalState: Record<string, unknown>;
@@ -167,6 +173,10 @@ export function assemblePrompt(input: AssembleInput): string {
 
   const hint = presetHint(app.presetId);
   if (hint) parts.push(`[APP STYLE GUIDE]\n${hint}`);
+  if (input.systemDisk)
+    parts.push(
+      `[SYSTEM DISK]\n${JSON.stringify(input.systemDisk)}\nThe real listing of the working directory (data-cwd; "" is the disk root). ls, cd and paths must match it; never invent files. Other folders and file contents come from {"system":"files"} list/read requests with responseMode "ai". Create, change, move or remove files only through files requests, and report success only after the real reply.`,
+    );
 
   if (app.manifest.chrome) parts.push(chromeDirective(String(app.manifest.chrome)));
 
@@ -200,11 +210,13 @@ export function assemblePrompt(input: AssembleInput): string {
   if (input.message) {
     opLine = ownStateRefresh
       ? `Another window changed this application's shared records. Visibly reflect the LATEST SHARED APPLICATION DATA below: update the affected record's status/content, badges, counts and controls. CURRENT UI and episode summaries may be stale; never reuse their old values. Follow actual values even when reversing an earlier action: done=false means not completed. Keep this window's role, layout and selection. Replace the affected existing regions; do not redesign the page or return unchanged HTML. Do not repeat the initiating action, open details, notify, close or write data. ${input.stateChange ? "The initiating interaction was handled in another window: " + JSON.stringify(input.stateChange) : ""}`
-      : "Handle the APP MESSAGE above, using real system results. Preserve unaffected UI regions. If the message is a response, continue the workflow and reply to the original pending request when complete.";
+      : `Handle the APP MESSAGE above, using real system results. Preserve unaffected UI regions. If the message is a response, continue the workflow${input.pendingReplies?.length ? " and reply to the original pending request when complete." : ". Nothing is waiting for a reply: do not send one."}`;
   } else if (seedPrompt) {
     opLine = `This is a new window opened by the system, for the following purpose:\n${seedPrompt}`;
   } else if (firstRender) {
     opLine = `The user just launched this application.`;
+  } else if (drag?.kind === "file") {
+    opLine = `The user dropped the file ${JSON.stringify(drag.label ?? drag.ref)} onto this window. It is a real file on the system disk at ${JSON.stringify(drag.ref)}: read its content with a {"system":"files"} "read" request (responseMode "ai") before using it, and never invent it.`;
   } else if (drag) {
     opLine = `The user dropped a ${drag.kind} (${drag.label ?? drag.ref}) onto this window. React to it.`;
   } else if (op) {

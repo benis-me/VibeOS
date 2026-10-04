@@ -12,6 +12,7 @@ import type { AiOp, DragPayload } from "@vibeos/shared/protocol";
 import { sanitizeAiHtml } from "@/lib/sanitize";
 import { carriesDataVersion, replaceRegions } from "@/lib/patch";
 import { wsClient, API_BASE } from "@/lib/ws";
+import { importHostFile } from "@/lib/files";
 import { useDelegatedEvents } from "@/hooks/useDelegatedEvents";
 import { useWindowStore } from "@/stores/windowStore";
 import { captureFocus, createDrafts } from "@/lib/fields";
@@ -246,24 +247,26 @@ export function AiHtmlSurface({ windowId }: Props) {
           /* ignore */
         }
       }
+      const drop = (source: DragPayload) => {
+        if (wsClient.send("c2s.op.dragdrop", { windowId, source, target: { windowId } }))
+          useWindowStore.getState().setBusy(windowId, true);
+        else showError(new Error("communication.disconnected"));
+      };
       if (!source && dt.files.length) {
-        const f = dt.files[0]!;
-        source = { kind: "file", ref: f.name, label: f.name };
+        // The app gets the real bytes: store the file, then drop its disk path.
+        const file = dt.files[0]!;
+        setRequests((n) => n + 1);
+        void importHostFile(file)
+          .then((path) => drop({ kind: "file", ref: path, label: file.name }))
+          .catch((e: Error) => showError(new Error(`files.error.${e.message}`)))
+          .finally(() => setRequests((n) => n - 1));
+        return;
       }
       if (!source) {
         const val = (dt.getData("text/uri-list") || dt.getData("text/plain")).trim();
         if (val) source = { kind: "text", ref: val, label: val.slice(0, 80) };
       }
-      if (!source?.ref) return;
-      if (
-        wsClient.send("c2s.op.dragdrop", {
-          windowId,
-          source,
-          target: { windowId },
-        })
-      )
-        useWindowStore.getState().setBusy(windowId, true);
-      else showError(new Error("communication.disconnected"));
+      if (source?.ref) drop(source);
     },
     [windowId, showError],
   );

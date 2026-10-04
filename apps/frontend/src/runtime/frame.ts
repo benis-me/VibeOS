@@ -367,17 +367,18 @@ document.addEventListener(
 root.addEventListener("dragover", (e) => e.preventDefault());
 root.addEventListener("drop", (e) => {
   e.preventDefault();
+  // Only a real user drop reaches the parent: a script's synthetic drop must not
+  // start paid generations or put files on the system disk.
+  if (!e.isTrusted) return;
   const raw = e.dataTransfer?.getData("application/x-vibeos-drag");
   try {
     const text = e.dataTransfer?.getData("text/uri-list") || e.dataTransfer?.getData("text/plain");
-    const source = raw
-      ? JSON.parse(raw)
-      : text
-        ? { kind: "text", ref: text, label: text.slice(0, 80) }
-        : e.dataTransfer?.files[0]
-          ? { kind: "file", ref: e.dataTransfer.files[0].name }
-          : null;
-    if (source) send({ type: "drop", source });
+    const file = e.dataTransfer?.files[0];
+    if (raw) send({ type: "drop", source: JSON.parse(raw) });
+    else if (text)
+      send({ type: "drop", source: { kind: "text", ref: text, label: text.slice(0, 80) } });
+    else if (file)
+      send({ type: "drop", source: { kind: "file", ref: file.name, label: file.name }, file });
   } catch (error) {
     report(error);
   }
