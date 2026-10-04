@@ -337,6 +337,8 @@ const zh: Dict = {
   "settings.providers.models": "模型",
   "settings.providers.fetch": "获取模型列表",
   "settings.providers.fetching": "获取中…",
+  "settings.providers.fetched": "已换成服务方提供的最新列表。",
+  "settings.providers.fetchEmpty": "没有获取到模型，暂时显示内置列表。请检查 Key、网络或登录状态。",
   "settings.providers.noModels": "暂无模型，点击「获取模型列表」",
   "settings.providers.addModel": "添加自定义模型 ID…",
   "settings.providers.add": "添加",
@@ -901,6 +903,9 @@ const en: Dict = {
   "settings.providers.models": "Models",
   "settings.providers.fetch": "Fetch models",
   "settings.providers.fetching": "Fetching…",
+  "settings.providers.fetched": "Now showing the provider's latest list.",
+  "settings.providers.fetchEmpty":
+    "No models came back, so the built-in list is shown. Check the key, network or sign-in.",
   "settings.providers.noModels": 'No models yet — click "Fetch models"',
   "settings.providers.addModel": "Add custom model id…",
   "settings.providers.add": "Add",

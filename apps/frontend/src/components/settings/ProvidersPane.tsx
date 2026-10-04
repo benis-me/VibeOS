@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RefreshCw, Plus, Pencil, X } from "lucide-react";
 import type { ProviderId, ApiProviderConfig, ProviderModel, ModelCapability } from "@vibeos/shared";
-import { AI_PROVIDERS } from "@vibeos/shared";
+import { AI_PROVIDERS, providerModelList } from "@vibeos/shared";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { wsClient } from "@/lib/ws";
@@ -16,7 +16,6 @@ import {
   KeyInput,
   TextInput,
   Caps,
-  mergeModels,
   CAPS,
 } from "@/components/ui/primitives";
 
@@ -30,14 +29,17 @@ export function ProvidersPane() {
   const apiProviders = AI_PROVIDERS.filter((p) => p.kind === "api");
   const [selected, setSelected] = useState<ProviderId>(apiProviders[0]?.id ?? "openai");
   const [fetching, setFetching] = useState<ProviderId | null>(null);
+  // The outcome of the last explicit fetch, so a click visibly says what came back.
+  const [fetched, setFetched] = useState<{ id: ProviderId; count: number } | null>(null);
+  const before = useRef<ProviderModel[] | undefined>(undefined);
   type Draft = { original?: string; id: string; name: string; caps: ModelCapability[] };
   const [draft, setDraft] = useState<Draft | null>(null);
 
   const cat = AI_PROVIDERS.find((p) => p.id === selected);
   const cfg = settings.apiProviders[selected] ?? {};
   const custom = cfg.models ?? []; // user-added; only these are editable/removable
-  // Displayed list = catalog seed + live-discovered + user custom (deduped).
-  const models = mergeModels(cat?.seedModels, providerModels[selected], custom);
+  // Displayed list = the provider's fetched list (else the catalog) + user custom.
+  const models = providerModelList(cat?.seedModels, providerModels[selected], custom);
   const isCustom = (id: string) => custom.some((m) => m.id === id);
 
   // Safety net to clear the fetching spinner if the result broadcast never
@@ -49,8 +51,12 @@ export function ProvidersPane() {
     const tmo = setTimeout(() => setFetching(null), 60000);
     return () => clearTimeout(tmo);
   }, [fetching]);
-  // …or the moment fresh models land (discovered, or a saved custom model).
-  useEffect(() => setFetching(null), [providerModels, settings.apiProviders]);
+  // …or the moment this provider's answer lands.
+  useEffect(() => {
+    if (!fetching || providerModels[fetching] === before.current) return;
+    setFetched({ id: fetching, count: providerModels[fetching]?.length ?? 0 });
+    setFetching(null);
+  }, [providerModels, fetching]);
   // Drop any in-progress model edit when switching providers.
   useEffect(() => setDraft(null), [selected]);
 
@@ -116,6 +122,8 @@ export function ProvidersPane() {
         {(cat?.modelsEndpoint || cat?.kind === "cli") && (
           <button
             onClick={() => {
+              before.current = providerModels[selected];
+              setFetched(null);
               setFetching(selected);
               wsClient.send("c2s.provider.fetchModels", { providerId: selected });
             }}
@@ -126,6 +134,17 @@ export function ProvidersPane() {
           </button>
         )}
       </div>
+      {fetched?.id === selected && (
+        <p
+          role="status"
+          className={cn(
+            "mb-2 ml-1 text-2xs",
+            fetched.count ? "text-muted-foreground" : "text-destructive",
+          )}
+        >
+          {t(fetched.count ? "settings.providers.fetched" : "settings.providers.fetchEmpty")}
+        </p>
+      )}
       {models.length > 0 && (
         <Group>
           {models.map((m) => (

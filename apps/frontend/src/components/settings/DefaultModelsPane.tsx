@@ -1,5 +1,5 @@
 import type { AgentRole, Effort, ThinkingMode, RoleConfig } from "@vibeos/shared";
-import { AI_PROVIDERS } from "@vibeos/shared";
+import { AI_PROVIDERS, providerModelList } from "@vibeos/shared";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { wsClient } from "@/lib/ws";
@@ -12,7 +12,6 @@ import {
   Select,
   Combobox,
   type ComboOption,
-  mergeModels,
   ROLES,
   EFFORTS,
   THINKING_MODES,
@@ -35,14 +34,14 @@ export function DefaultModelsPane() {
   };
   const providerLabel = (id?: string) => AI_PROVIDERS.find((p) => p.id === id)?.label ?? id ?? "";
 
-  // Every model across all enabled providers (seed + discovered + custom),
+  // Every model across all enabled providers (fetched, else catalog; plus custom),
   // grouped by provider. The option value encodes provider+model.
   const buildOptions = (imageOnly: boolean): ComboOption[] => {
     const out: ComboOption[] = [];
     for (const p of AI_PROVIDERS) {
       if (imageOnly ? !p.imageCapable : p.textCapable === false) continue;
       if (!isEnabled(p)) continue;
-      const merged = mergeModels(
+      const merged = providerModelList(
         p.seedModels,
         providerModels[p.id],
         settings.apiProviders[p.id]?.models,

@@ -312,6 +312,26 @@ export const AI_PROVIDERS: readonly ProviderCatalogEntry[] = [
 
 export const DEFAULT_PROVIDER: ProviderId = "claude";
 
+/**
+ * A provider's models: its fetched list replaces the built-in catalog, which only
+ * stands in until something was discovered. Catalog image models stay when the
+ * fetched list has none (CodeBuddy's ImageGen is not in its chat model list).
+ * User-added models are always kept; later lists win on the same id.
+ */
+export function providerModelList(
+  catalog: readonly ProviderModel[] | undefined,
+  fetched: readonly ProviderModel[] | undefined,
+  custom: readonly ProviderModel[] | undefined,
+): ProviderModel[] {
+  const image = (m: ProviderModel) => !!m.capabilities?.includes("image");
+  const base = fetched?.length
+    ? [...fetched, ...(fetched.some(image) ? [] : (catalog ?? []).filter(image))]
+    : (catalog ?? []);
+  const byId = new Map<string, ProviderModel>();
+  for (const m of [...base, ...(custom ?? [])]) byId.set(m.id, m);
+  return [...byId.values()];
+}
+
 export type Effort = "low" | "medium" | "high" | "xhigh";
 export type ThinkingMode = "disabled" | "adaptive" | "enabled";
 

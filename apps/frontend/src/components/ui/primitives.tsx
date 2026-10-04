@@ -23,12 +23,6 @@ export const ROLES: AgentRole[] = [
 export const CAPS: ModelCapability[] = ["text", "vision", "image", "reasoning", "tools"];
 
 /** Merge model lists (seed + discovered + custom); later entries win by id. */
-export function mergeModels(...lists: (ProviderModel[] | undefined)[]): ProviderModel[] {
-  const map = new Map<string, ProviderModel>();
-  for (const list of lists) for (const m of list ?? []) map.set(m.id, m);
-  return [...map.values()];
-}
-
 // — macOS-style building blocks ————————————————————————————————————————
 
 export function Pane({
