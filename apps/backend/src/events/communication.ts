@@ -226,7 +226,7 @@ async function resolveTarget(
   return job;
 }
 
-async function systemCall(
+export async function systemCall(
   system: string,
   topic: string,
   data: MessageData,

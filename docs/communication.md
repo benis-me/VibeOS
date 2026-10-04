@@ -8,8 +8,13 @@ AI 通过 `communication` syscall 调用；身份和请求链由系统填写。
 
 搜索框输入 `>` 进入“让 AI 执行命令”。这个入口将自然语言翻译成 VibeOS syscall，
 支持打开应用、生成新窗口、安装本地应用、创建文件、关闭或聚焦窗口、发送通知，
-以及单个或批量最小化、最大化、还原窗口。它尚未接入应用通信的多轮读写流程，
-也不执行宿主机的任意 Shell 命令。
+以及单个或批量最小化、最大化、还原窗口。它不执行宿主机的任意 Shell 命令。
+
+命令最多三轮：一轮里可以先发只读请求——`{system:"files"}` 的 list、stat、read，
+`{system:"apps"}` 的 list、windows，`{system:"settings"}` 的 get——结果连同已执行的
+调用交给下一轮再决定；`files` 的 open 把文件交给对应查看器打开给用户看。
+写入（修改或移走文件、改设置）不对命令开放，会作为 `communication.unsupported`
+结果告诉模型。第三轮仍要读取时命令以 `command.tooManySteps` 结束。
 
 例如“最小化所有窗口”对应一个 `window-state` 调用：
 

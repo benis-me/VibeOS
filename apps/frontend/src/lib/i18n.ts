@@ -268,6 +268,7 @@ const zh: Dict = {
   "spotlight.cmdHint": "例如：打开计算器、新建便签、最小化所有窗口、还原所有窗口",
   "spotlight.cmdMode": "让 AI 执行系统命令（窗口 / 应用 / 新建文件…）",
   "spotlight.cmdFailed": "命令没有执行成功。可以再试一次，或检查模型服务。",
+  "command.tooManySteps": "这个命令需要的步骤太多，请拆成几句分别执行。",
   "settings.open": "打开设置",
   "welcome.noProvider": "还没有可用的模型服务。先在设置里连接一个，再来生成应用。",
   // Notifications
@@ -825,6 +826,7 @@ const en: Dict = {
     "Try: open a calculator, make a note, minimize all windows, restore all windows",
   "spotlight.cmdMode": "Run an AI system command (windows / apps / new files…)",
   "spotlight.cmdFailed": "The command didn't run. Try again, or check your model services.",
+  "command.tooManySteps": "This command needs too many steps. Try splitting it into smaller ones.",
   "settings.open": "Open Settings",
   "welcome.noProvider":
     "No model service is available yet. Connect one in Settings, then generate apps.",

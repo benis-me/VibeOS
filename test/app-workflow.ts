@@ -23,7 +23,11 @@ import {
   setActiveProvider,
   availableProviderIds,
 } from "../apps/backend/src/ai/providers/index.ts";
-import { registerCommunication, communicate } from "../apps/backend/src/events/communication.ts";
+import {
+  registerCommunication,
+  communicate,
+  systemCall,
+} from "../apps/backend/src/events/communication.ts";
 import { registerUiGenerationAgent } from "../apps/backend/src/agents/UiGenerationAgent.ts";
 import { bus } from "../apps/backend/src/events/bus.ts";
 import * as Agents from "../apps/backend/src/db/repositories/AgentRepo.ts";
@@ -355,7 +359,7 @@ const command = async (text: string, calls: unknown[]) => {
     assert(systemPrompt?.includes('"state":'), "window state is available to command planning");
     return { ok: true, text: block(calls) };
   };
-  await Syscalls.execute(await runCommand(text), { source: "syscall" });
+  await runCommand(text);
 };
 const changedAt = frames.length;
 await command("最小化所有窗口", [{ type: "window-state", state: "minimized", windowIds: "all" }]);
@@ -402,6 +406,49 @@ assert.equal(
   savedHtml,
   "window commands never regenerate app content",
 );
+// Multi-step commands read real data first and act on it in the next round.
+await Syscalls.execute([{ type: "create-file", name: "command-notes.txt", content: "buy milk" }], {
+  source: "system",
+});
+const request = (system: string, topic: string, data?: unknown) => ({
+  type: "communication",
+  command: { action: "request", target: { system }, topic, data },
+});
+const notes = { path: "Desktop/command-notes.txt" };
+const prompts: string[] = [];
+fake = async ({ prompt }) => {
+  prompts.push(prompt);
+  return {
+    ok: true,
+    text: block(
+      prompts.length === 1
+        ? [request("files", "read", notes), request("files", "trash", notes)]
+        : [
+            { type: "create-file", name: "command-summary.txt", content: "1 item" },
+            { type: "notify", title: "Summarized" },
+          ],
+    ),
+  };
+};
+assert.equal(await runCommand("总结桌面上的笔记"), 3);
+assert.equal(prompts.length, 2);
+assert(
+  prompts[1]!.includes("[ROUND 1 RESULTS]") && prompts[1]!.includes("buy milk"),
+  "read results feed the next round",
+);
+assert(prompts[1]!.includes("communication.unsupported"), "writes are refused and reported");
+assert.equal(
+  ((await systemCall("files", "read", notes)) as { content: string }).content,
+  "buy milk",
+  "a refused trash leaves the file",
+);
+let rounds = 0;
+fake = async () => {
+  rounds++;
+  return { ok: true, text: block([request("apps", "list")]) };
+};
+await assert.rejects(runCommand("一直读取"), /command.tooManySteps/);
+assert.equal(rounds, 3, "a command stops after three rounds");
 // A minimized view skips the model until it is shown again, then refreshes once.
 let restored = 0;
 fake = async ({ prompt }) => {
