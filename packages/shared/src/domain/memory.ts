@@ -5,8 +5,6 @@ export interface AppMemory {
   htmlSnapshot: string;
   /** Rolling one-paragraph episode summary, maintained by the AI. */
   episodeSummary: string;
-  /** SDK session id used to resume the per-window conversation. */
-  sdkSessionId?: string;
   updatedAt: number;
 }
 

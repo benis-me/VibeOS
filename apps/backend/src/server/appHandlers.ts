@@ -4,7 +4,7 @@ import { getWindow as currentWindow } from "../db/repositories/WindowRepo.ts";
 import type { ClientToServerPayload } from "@vibeos/shared/protocol";
 import { broadcast } from "./wsGateway.ts";
 import { bus } from "../events/bus.ts";
-import { getApp, installApp } from "../db/repositories/AppRepo.ts";
+import { installApp } from "../db/repositories/AppRepo.ts";
 import { openWindow } from "../db/repositories/WindowRepo.ts";
 import { ensureMemory } from "../db/repositories/AppMemoryRepo.ts";
 import { ensureShortcut } from "../db/repositories/VfsRepo.ts";
@@ -13,16 +13,6 @@ import * as NotificationRepo from "../db/repositories/NotificationRepo.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 
 const log = logger("router");
-
-export async function handleAppShortcut(
-  p: ClientToServerPayload<"c2s.app.shortcut">,
-): Promise<void> {
-  const app = getApp(p.appId);
-  if (!app?.isInstalled) return;
-  const node = await ensureShortcut(app.id, app.name, app.icon);
-  if (node) broadcast("s2c.vfs.changed", { node });
-  broadcast("s2c.files.changed", {});
-}
 
 /** Spawn a fresh window (or desktop widget) and generate its content live. */
 export async function handleAppLaunch(p: ClientToServerPayload<"c2s.app.launch">): Promise<void> {
@@ -85,9 +75,4 @@ export async function handleAppSave(p: ClientToServerPayload<"c2s.app.save">): P
 /** Export an installed app to a shareable .vibeapp file on the desktop. */
 export async function handleAppExport(p: ClientToServerPayload<"c2s.app.export">): Promise<void> {
   await handleApplicationCommand({ action: "export", appId: p.appId });
-}
-
-/** Import an app from a .vibeapp JSON string. */
-export async function handleAppImport(p: ClientToServerPayload<"c2s.app.import">): Promise<void> {
-  await handleApplicationCommand({ action: "import", json: p.json });
 }

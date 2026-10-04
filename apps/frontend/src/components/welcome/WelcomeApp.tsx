@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef } from "react";
 import {
   RocketLaunch,
-  CloudSun,
-  GameController,
-  Waveform,
+  Wallet,
+  BookOpenText,
+  PawPrint,
   CaretRight,
   ArrowRight,
 } from "@phosphor-icons/react";
@@ -18,12 +18,12 @@ const CONTENT_WIDTH = 460;
 /** Titlebar (h-9 = 36px) + the window's top/bottom borders (2px). */
 const CHROME_H = 38;
 
-// Each example carries its own fitting icon — showcases that the AI generates
-// real, visually rich apps (not toy calculators / to-do lists).
+// Each example shows what lasts beyond one generation: records it remembers,
+// real files it writes, and a world that moves on while you are away.
 const EXAMPLES = [
-  { key: "welcome.example.weather", Icon: CloudSun },
-  { key: "welcome.example.game", Icon: GameController },
-  { key: "welcome.example.music", Icon: Waveform },
+  { key: "welcome.example.ledger", Icon: Wallet },
+  { key: "welcome.example.journal", Icon: BookOpenText },
+  { key: "welcome.example.pet", Icon: PawPrint },
 ];
 
 /**
@@ -84,7 +84,10 @@ export function WelcomeApp({ windowId }: { windowId: string }) {
               return (
                 <button
                   key={key}
-                  onClick={() => requestSpotlight(`> ${text}`)}
+                  // Generate straight away, without a command-model hop first.
+                  onClick={() =>
+                    wsClient.send("c2s.app.launch", { name: t(`${key}.name`), description: text })
+                  }
                   className="group flex items-center gap-2.5 rounded-lg border bg-card px-3 py-3 text-left text-sm transition-colors hover:bg-accent"
                 >
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">

@@ -1,6 +1,6 @@
 import type { AppSearchResult } from "@vibeos/shared/protocol";
 import { windowSizeSchema } from "@vibeos/shared/protocol";
-import { stripEmoji } from "@vibeos/shared/util";
+import { emojiFreeLine } from "@vibeos/shared/util";
 import { run, recordSummary } from "./SdkManager.ts";
 import { logger } from "../util/log.ts";
 
@@ -118,13 +118,13 @@ export function parseAppSearchResults(text: string): AppSearchResult[] {
         if (!r || typeof r !== "object") return null;
         const o = r as Record<string, unknown>;
         if (typeof o.name !== "string") return null;
-        const name = stripEmoji(o.name).slice(0, 40);
+        const name = emojiFreeLine(o.name).slice(0, 40);
         if (!name) return null;
-        const rawIcon = typeof o.icon === "string" ? stripEmoji(o.icon).trim() : "";
+        const rawIcon = typeof o.icon === "string" ? emojiFreeLine(o.icon) : "";
         return {
           name,
           description:
-            typeof o.description === "string" ? stripEmoji(o.description).slice(0, 80) : "",
+            typeof o.description === "string" ? emojiFreeLine(o.description).slice(0, 80) : "",
           // lucide icon name; default to a generic app icon
           icon: rawIcon || "app-window",
           kind: o.kind === "widget" ? "widget" : "app",

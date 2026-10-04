@@ -39,8 +39,6 @@ export interface RunOptions {
   role: AgentRole;
   trigger: AgentTrigger;
   prompt: string;
-  /** Resume a prior session (per-window continuity). Provider-native id. */
-  sessionId?: string;
   /** Called with incremental assistant text. */
   onDelta?: (text: string) => void;
   abort?: AbortController;
@@ -198,7 +196,6 @@ export async function run(opts: RunOptions): Promise<RunResult> {
         fallbackModel: cfg.fallbackModel,
         effort: cfg.effort,
         thinking: cfg.thinking,
-        sessionId: stream ? opts.sessionId : undefined,
         abort,
         onDelta:
           stream && opts.onDelta
@@ -236,7 +233,7 @@ export async function run(opts: RunOptions): Promise<RunResult> {
   try {
     const provider = await getProvider(cfg.providerId ?? activeProviderId());
     log.debug(
-      `query ${opts.role} via ${provider.id} model=${cfg.model ?? "(default)"} effort=${cfg.effort} thinking=${cfg.thinking?.type} locale=${locale}${opts.sessionId ? " resume" : ""}`,
+      `query ${opts.role} via ${provider.id} model=${cfg.model ?? "(default)"} effort=${cfg.effort} thinking=${cfg.thinking?.type} locale=${locale}`,
     );
 
     let { result, timedOut } = await attempt(provider, cfg.model, true);

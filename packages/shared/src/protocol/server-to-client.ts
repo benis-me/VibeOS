@@ -6,7 +6,7 @@ import type { AppDescriptor } from "../domain/app.ts";
 import type { VfsNode } from "../domain/vfs.ts";
 import type { Notification } from "../domain/notification.ts";
 import type { Settings, ProviderId, ProviderModel } from "../domain/settings.ts";
-import type { AgentRole, AgentRun, ActivityDetails } from "../domain/agent.ts";
+import type { AgentRun, ActivityDetails } from "../domain/agent.ts";
 import type { DiskResult } from "../domain/files.ts";
 
 export type BootPhase = "connecting" | "restoring" | "ready";
@@ -122,10 +122,6 @@ export type ServerToClient =
   | { type: "s2c.window.reordered"; payload: { ids: string[] } }
   /** Update a window's native chrome (e.g. browser address bar) — AI → shell. */
   | { type: "s2c.chrome.set"; payload: { windowId: string; patch: Record<string, string> } }
-  | {
-      type: "s2c.agent.event";
-      payload: { role: AgentRole; kind: string; data?: unknown };
-    }
   | { type: "s2c.agent.run"; payload: { run: AgentRun } }
   | {
       type: "s2c.activity.page";

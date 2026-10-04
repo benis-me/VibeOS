@@ -152,38 +152,6 @@ export function moveNode(input: {
   });
 }
 
-/** Permanently delete a node. Returns true if a row was removed. */
-export function deleteNode(nodeId: string): Promise<boolean> {
-  return enqueue(() => {
-    const db = getDb();
-    const node = getNode(nodeId);
-    if (node?.meta.diskTrashId) {
-      applyDiskMutation({ action: "delete", path: String(node.meta.diskTrashId) });
-      return true;
-    }
-    const r = db.query("DELETE FROM vfs_nodes WHERE id = ?").run(nodeId);
-    return r.changes > 0;
-  });
-}
-
-/** Permanently delete every node in the recycle bin. Returns the removed ids. */
-export function emptyRecycleBin(): Promise<string[]> {
-  return enqueue(() => {
-    const db = getDb();
-    const ids = db
-      .query<{ id: string }, []>("SELECT id FROM vfs_nodes WHERE location = 'recyclebin'")
-      .all()
-      .map((r) => r.id);
-    for (const id of ids) {
-      const node = getNode(id);
-      if (node?.meta.diskTrashId)
-        applyDiskMutation({ action: "delete", path: String(node.meta.diskTrashId) });
-    }
-    db.query("DELETE FROM vfs_nodes WHERE location = 'recyclebin'").run();
-    return ids;
-  });
-}
-
 /** Create an app shortcut on the desktop (idempotent by target app). */
 export function ensureShortcut(
   appId: string,

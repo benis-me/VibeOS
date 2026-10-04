@@ -8,7 +8,6 @@ import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 import { hasClients } from "../server/wsGateway.ts";
 
 let started = false;
-const timers: ReturnType<typeof setTimeout>[] = [];
 
 export function startAgents(): void {
   if (started) return;
@@ -26,7 +25,7 @@ export function startAgents(): void {
 function scheduleTimer(agent: TimerAgent, enabled: () => boolean): void {
   const loop = () => {
     const jitter = agent.intervalMs * (0.5 + Math.random());
-    const t = setTimeout(async () => {
+    setTimeout(async () => {
       if (enabled()) {
         try {
           await agent.tick();
@@ -36,13 +35,6 @@ function scheduleTimer(agent: TimerAgent, enabled: () => boolean): void {
       }
       loop();
     }, jitter);
-    timers.push(t);
   };
   loop();
-}
-
-export function stopAgents(): void {
-  for (const t of timers) clearTimeout(t);
-  timers.length = 0;
-  started = false;
 }

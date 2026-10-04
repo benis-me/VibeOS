@@ -37,7 +37,6 @@ interface MapState {
   text: string;
   succeeded?: boolean;
   streamed: boolean;
-  sessionId?: string;
   error?: string;
   usage?: TokenUsage;
 }
@@ -95,7 +94,6 @@ export class AnthropicCliProvider implements AiProvider {
     if (opts.model) args.push("--model", opts.model);
     if (opts.fallbackModel) args.push("--fallback-model", opts.fallbackModel);
     if (opts.effort) args.push("--effort", opts.effort);
-    if (opts.sessionId) args.push("--resume", opts.sessionId);
 
     const state: MapState = { text: "", streamed: false };
     const res = await streamJsonl({
@@ -106,16 +104,15 @@ export class AnthropicCliProvider implements AiProvider {
       onObject: (o) => mapAnthropic(o, state, opts.onDelta),
     });
 
-    if (opts.abort?.signal.aborted)
-      return { text: state.text, sessionId: state.sessionId, ok: false };
+    if (opts.abort?.signal.aborted) return { text: state.text, ok: false };
     if (state.text.trim() && state.succeeded && !state.error && res.code === 0) {
-      return { text: state.text, sessionId: state.sessionId, ok: true, usage: state.usage };
+      return { text: state.text, ok: true, usage: state.usage };
     }
 
     const error =
       state.error || res.stderr || `${this.bin} did not complete successfully (exit ${res.code})`;
     this.log.error(`run failed: ${error}`);
-    return { text: "", sessionId: state.sessionId, ok: false, error, usage: state.usage };
+    return { text: "", ok: false, error, usage: state.usage };
   }
 
   async discoverModels(): Promise<DiscoveredModel[]> {
@@ -173,8 +170,6 @@ function mapAnthropic(
   state: MapState,
   onDelta?: (t: string) => void,
 ): void {
-  if (typeof m.session_id === "string") state.sessionId = m.session_id;
-
   if (m.type === "stream_event") {
     const delta = extractStreamTextDelta(m);
     if (delta) {

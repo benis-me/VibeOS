@@ -5,7 +5,7 @@ import { broadcastSkins } from "../ai/skins.ts";
 import type { ServerWebSocket } from "bun";
 import type { ClientToServerPayload } from "@vibeos/shared/protocol";
 import { broadcast, sendTo, type WsData } from "./wsGateway.ts";
-import { inferCapabilities, discoverAllProviders } from "../ai/modelDiscovery.ts";
+import { publishModels } from "../ai/modelDiscovery.ts";
 import { ModelPolicy } from "../ai/ModelPolicy.ts";
 import {
   setActiveProvider,
@@ -60,21 +60,6 @@ export async function handleSettingsUpdate(
   }
 }
 
-export function handleProviderScan(): void {
-  // On-demand: re-detect which CLIs are installed and re-discover the active
-  // provider's models. Availability is instant; models discover in the
-  // background (clear the list first so Settings shows the scanning state).
-  broadcast("s2c.providers.updated", { availableProviders: availableProviderIds() });
-  if (!env.aiStub) {
-    broadcast("s2c.models.updated", { models: [] });
-    void ModelPolicy.discover(loadSettings().modelOverrides)
-      .then(() => broadcast("s2c.models.updated", { models: ModelPolicy.available() }))
-      .catch((e) => log.warn(`scan discovery failed: ${e instanceof Error ? e.message : e}`));
-    // An explicit scan re-discovers every provider's models for the picker.
-    discoverAllProviders(true);
-  }
-}
-
 export async function handleProviderFetchModels(
   p: ClientToServerPayload<"c2s.provider.fetchModels">,
 ): Promise<void> {
@@ -86,15 +71,7 @@ export async function handleProviderFetchModels(
     // This is the explicit, user-triggered fetch — prefer heavyweight live
     // discovery (e.g. CodeBuddy's PTY `/model list` scrape) when the provider
     // offers it; it never runs on boot/scan.
-    const discovered = await (provider.discoverModelsLive?.() ?? provider.discoverModels());
-    broadcast("s2c.provider.models", {
-      providerId,
-      models: discovered.map((m) => ({
-        id: m.modelId,
-        name: m.name,
-        capabilities: inferCapabilities(m.modelId),
-      })),
-    });
+    publishModels(providerId, await (provider.discoverModelsLive?.() ?? provider.discoverModels()));
   } catch (e) {
     log.warn(`fetchModels(${providerId}) failed: ${e instanceof Error ? e.message : e}`);
     broadcast("s2c.provider.models", { providerId, models: [] });

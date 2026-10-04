@@ -1,7 +1,7 @@
 import { validateRuntimeScripts } from "./ApplicationPackageRepo.ts";
 import { initializeApplication, readApplicationVersion } from "./ApplicationRepo.ts";
 import type { AppDescriptor, AppManifest, PresetAppId } from "@vibeos/shared/domain";
-import { ulid, stripEmoji } from "@vibeos/shared/util";
+import { ulid, emojiFreeLine } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
 import { existsSync } from "node:fs";
 import { diskPath } from "../../files/disk.ts";
@@ -254,9 +254,9 @@ export async function installApp(input: {
     const db = getDb();
     const now = Date.now();
     const id = ulid(now);
-    const name = stripEmoji(input.name) || "App";
+    const name = emojiFreeLine(input.name) || "App";
     // icon should be a lucide icon name; strip emoji, default to a generic app icon.
-    const icon = (input.icon ? stripEmoji(input.icon).trim() : "") || "app-window";
+    const icon = (input.icon ? emojiFreeLine(input.icon) : "") || "app-window";
     db.query(
       `INSERT INTO apps (id, name, kind, preset_id, icon, manifest_json, is_installed, created_at, updated_at)
        VALUES (?, ?, 'virtual', NULL, ?, ?, ?, ?, ?)`,

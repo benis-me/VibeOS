@@ -24,6 +24,7 @@ import {
 } from "../db/repositories/ApplicationPackageRepo.ts";
 import { learnFromUser } from "./systemMemory.ts";
 import { uninstallApplication, updateApplicationWindow } from "../server/applicationLifecycle.ts";
+import { errorText } from "../util/log.ts";
 
 const jobs = new Map<string, AbortController>();
 export function broadcastApplications() {
@@ -223,10 +224,7 @@ async function generate(requestId: string, abort: AbortController) {
         }
         break;
       } catch (error) {
-        const reason =
-          error instanceof Error
-            ? `${error.message}${error.cause ? `: ${String(error.cause)}` : ""}`
-            : "invalid output";
+        const reason = `${errorText(error)}${error instanceof Error && error.cause ? `: ${String(error.cause)}` : ""}`;
         await recordStep(
           "application.rejected",
           { appId: app.id, error: reason },

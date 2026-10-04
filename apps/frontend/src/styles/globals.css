@@ -23,8 +23,9 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
 
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  /* One emphasis color: primary follows brand in every skin. */
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -77,8 +78,6 @@
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
 
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -145,8 +144,6 @@
   --popover: oklch(0.97 0.008 95);
   --popover-foreground: oklch(0.18 0 0);
 
-  --primary: oklch(0.45 0.15 255);
-  --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.9 0.015 95);
   --secondary-foreground: oklch(0.2 0 0);
   --muted: oklch(0.9 0.01 95);
@@ -180,8 +177,6 @@
   --popover: oklch(0.99 0 0);
   --popover-foreground: oklch(0.2 0 0);
 
-  --primary: oklch(0.55 0.17 255);
-  --primary-foreground: oklch(0.99 0 0);
   --secondary: oklch(0.95 0 0);
   --secondary-foreground: oklch(0.2 0 0);
   --muted: oklch(0.95 0 0);
@@ -374,9 +369,6 @@ button:not(:disabled),
   background-color: color-mix(in oklab, var(--card) 55%, transparent);
   backdrop-filter: blur(18px) saturate(160%);
   -webkit-backdrop-filter: blur(18px) saturate(160%);
-}
-.win-glass-content {
-  background-color: color-mix(in oklab, var(--background) 45%, transparent);
 }
 
 .no-scrollbar {

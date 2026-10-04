@@ -1,12 +1,13 @@
 import { applicationCommandSchema } from "../domain/applications.ts";
 import { viewStateSchema } from "../domain/runtime.ts";
 import { memoryCommandSchema } from "../domain/systemMemory.ts";
-import { skinCommandSchema } from "../domain/skins.ts";
+import { skinCommandSchema, skinIdSchema } from "../domain/skins.ts";
+import { AI_PROVIDERS, type ProviderId } from "../domain/settings.ts";
 import { communicationCommandSchema } from "../domain/communication.ts";
 import { z } from "zod";
 import type { ClientToServer } from "./client-to-server.ts";
 import { FILE_UPLOAD_LIMIT } from "../domain/files.ts";
-import { activityFilterSchema } from "../domain/agent.ts";
+import { activityFilterSchema, agentRoleSchema } from "../domain/agent.ts";
 
 /**
  * Runtime validation for inbound client→server messages. The WS boundary is the
@@ -78,6 +79,67 @@ export const windowSizeSchema = z.object({
   h: z.number().int().min(160).max(1400),
 });
 
+const providerIdSchema = z.enum(AI_PROVIDERS.map((p) => p.id) as [ProviderId, ...ProviderId[]]);
+const roleConfigSchema = z
+  .object({
+    provider: z.string().max(80),
+    model: z.string().max(300),
+    effort: z.enum(["low", "medium", "high", "xhigh"]),
+    thinking: z.enum(["disabled", "adaptive", "enabled"]),
+    thinkingBudget: z.number().int().min(0).max(1_000_000),
+  })
+  .partial()
+  .strict();
+/** What Settings may change; a malformed or unknown field never reaches stored settings. */
+export const settingsPartialSchema = z
+  .object({
+    theme: z.enum(["light", "dark"]),
+    skin: skinIdSchema,
+    provider: providerIdSchema,
+    locale: z.enum(["zh", "en"]),
+    modelOverrides: z.partialRecord(agentRoleSchema, roleConfigSchema),
+    apiProviders: z.partialRecord(
+      providerIdSchema,
+      z
+        .object({
+          enabled: z.boolean(),
+          apiKey: z.string().max(4096),
+          baseUrl: z.string().max(2048),
+          models: z
+            .array(
+              z
+                .object({
+                  id: z.string().min(1).max(300),
+                  name: z.string().max(300),
+                  capabilities: z
+                    .array(z.enum(["text", "vision", "image", "reasoning", "tools"]))
+                    .optional(),
+                  enabled: z.boolean().optional(),
+                })
+                .strict(),
+            )
+            .max(1000),
+          extra: z.record(z.string().max(100), z.string().max(2048)),
+        })
+        .partial()
+        .strict(),
+    ),
+    prefs: z
+      .object({
+        memoryEnabled: z.boolean(),
+        proactiveAgents: z.boolean(),
+        wallpaper: z.string().max(2048),
+        imageModel: z
+          .object({ provider: z.string().max(80), model: z.string().max(300) })
+          .partial()
+          .strict(),
+      })
+      .partial()
+      .strict(),
+  })
+  .partial()
+  .strict();
+
 /** Build a `{ type: <literal>, payload }` message schema, preserving the literal. */
 const msg = <T extends string, P extends z.ZodTypeAny>(type: T, payload: P) =>
   z.object({ type: z.literal(type), payload });
@@ -146,17 +208,8 @@ export const clientToServerSchema = z.discriminatedUnion("type", [
     }),
   ),
   msg("c2s.vfs.open", z.object({ nodeId: z.string() })),
-  msg("c2s.vfs.delete", z.object({ nodeId: z.string() })),
-  msg("c2s.vfs.empty", empty),
-  // Settings is large and deep-merged server-side; validate only that it's an
-  // object (each handler reads the fields it needs).
-  msg(
-    "c2s.settings.update",
-    z.object({
-      // Profile changes use validated, per-entry intents below, never a stale list replacement.
-      partial: z.record(z.string(), z.unknown()).refine((p) => !("profileEntries" in p)),
-    }),
-  ),
+  // Profile changes use validated, per-entry intents below, never a stale list replacement.
+  msg("c2s.settings.update", z.object({ partial: settingsPartialSchema })),
   msg(
     "c2s.profile.update",
     z.discriminatedUnion("action", [
@@ -172,7 +225,6 @@ export const clientToServerSchema = z.discriminatedUnion("type", [
   ),
   msg("c2s.wallpaper.upload", z.object({ dataUrl: z.string() })),
   msg("c2s.wallpaper.generate", z.object({ prompt: z.string() })),
-  msg("c2s.provider.scan", empty),
   msg("c2s.provider.fetchModels", z.object({ providerId: z.string() })),
   msg("c2s.notification.read", z.object({ id: z.string() })),
   msg("c2s.notification.click", z.object({ id: z.string() })),
@@ -191,9 +243,7 @@ export const clientToServerSchema = z.discriminatedUnion("type", [
     "c2s.app.save",
     z.object({ windowId: z.string(), name: z.string().optional(), icon: z.string().optional() }),
   ),
-  msg("c2s.app.shortcut", z.object({ appId: z.string().min(1) })),
   msg("c2s.app.export", z.object({ appId: z.string() })),
-  msg("c2s.app.import", z.object({ json: z.string() })),
   msg(
     "c2s.activity.fetch",
     z.object({

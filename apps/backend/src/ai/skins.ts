@@ -1,5 +1,6 @@
 import {
   SKIN_TOKENS,
+  UNUSED_SKIN_TOKENS,
   SKIN_TARGETS,
   SKIN_PROPERTIES,
   skinOutputSchema,
@@ -18,6 +19,7 @@ import { DEVDOCK_TOKENS, skinContrastIssues } from "./contrast.ts";
 import { hasImage } from "../db/repositories/ImagesRepo.ts";
 import { createNode } from "../db/repositories/VfsRepo.ts";
 import { broadcast } from "../server/wsGateway.ts";
+import { errorText } from "../util/log.ts";
 
 const jobs = new Map<string, { abort: AbortController; request?: SkinRequest }>();
 const systemPrompt = `You are the art director and implementer of VibeOS skins using our OWN SkinDefinition v1 contract. Deliver a complete, distinctive desktop skin, crafted to the user's actual brief. Return only JSON: {"summary":"one short sentence describing the visible appearance only, never JSON, CSS syntax, validation errors, retries or implementation details","definition":{"format":1,"intent":"durable visual brief","light":{},"dark":{},"chrome":{},"assets":{},"rules":[]}}.
@@ -31,7 +33,7 @@ Design the whole family: desktop composition; framed windows and titlebars; clos
 Preserve the original intent and constraints through follow-up edits. The current selected version is authoritative after a rollback. Update intent as a concise cumulative brief; retain details the latest request did not revoke. Do not assume that "more detailed" changes the requested theme. Blank skins have no built-in foundation. A duplicate may override all its packaged foundation's appearance but cannot modify the original.
 
 CONTRACT
-Token keys (without --): ${SKIN_TOKENS.join(", ")}. Every token except radius, taskbar-h, font-sans and font-title MUST be a CSS COLOR, never a gradient or image. Those color tokens are also used in background-color and color-mix. Put gradients/images in rule background or background-image instead. radius: 0–32px, taskbar-h: 28–72px (chrome calculates its reserved space when supplied). Use hex/rgb/oklch and var(--token); define paired foregrounds whenever changing a background.
+Token keys (without --): ${SKIN_TOKENS.filter((t) => !UNUSED_SKIN_TOKENS.includes(t)).join(", ")}. Every token except radius, taskbar-h, font-sans and font-title MUST be a CSS COLOR, never a gradient or image. Those color tokens are also used in background-color and color-mix. Put gradients/images in rule background or background-image instead. radius: 0–32px, taskbar-h: 28–72px (chrome calculates its reserved space when supplied). Use hex/rgb/oklch and var(--token); when changing a background, also define its listed *-foreground pair. Only the listed keys exist (there is no destructive-foreground).
 Color roles: background/foreground = desktop surfaces and body text; card/card-foreground = windows and panels; accent/accent-foreground = the SUBTLE hover and selected fill (close to card, never a vivid brand color) and the text on it; muted/muted-foreground = quiet fills and secondary text; brand/brand-foreground = the emphasis color for primary actions and the text on it. In BOTH modes foreground/background, card-foreground/card, accent-foreground/accent and brand-foreground/brand must each reach 4.5:1 contrast; output is checked.
 Fonts bundled: "Geist Variable", "JetBrains Mono Variable". System alternatives: Georgia, Times New Roman, Palatino, Courier New, Arial, Trebuchet MS; for Chinese use Songti SC/serif or PingFang SC/sans-serif. Use a working system fallback. Never invent a font or assume franchise/web fonts are installed. Use font-title for the shared window title, taskbar app names and start button family; font-sans for readable body text. These should form one intentional type system. Do not change only the title rule and forget task names.
 Optional chrome (all sizes in px): {titlebarHeight:28..56,controlSize:16..32,controlGap:2..12,controlsSide:"left"|"right",titleAlign:"left"|"center",taskbarStyle:"bar"|"dock",taskbarHeight:36..64,taskbarInset:0..16,taskSize:28..52}. Controls/tasks must be at least 4px smaller than their bar height. Choose proportions for the design instead of copying these defaults. This changes only chrome geometry, never app layout or window coordinates.
@@ -217,7 +219,7 @@ async function generate(
             throw new Error(`Low-contrast color tokens: ${unreadable.join("; ")}.`);
         } catch (error) {
           if (attempt === 1 || job.abort.signal.aborted) throw error;
-          prompt += `\nYour output could not be validated. Correct it and return the complete JSON. Keep the summary about visible design only; do not mention this validation repair.\nERROR: ${String(error).slice(0, 4000)}\nINVALID OUTPUT:\n${result.text.slice(0, 48000)}`;
+          prompt += `\nYour output could not be validated. Correct it and return the complete JSON. Keep the summary about visible design only; do not mention this validation repair.\nERROR: ${errorText(error).slice(0, 4000)}\nINVALID OUTPUT:\n${result.text.slice(0, 48000)}`;
           continue;
         }
         break;
@@ -256,7 +258,7 @@ async function generate(
       request.id,
       job.abort.signal.aborted ? "cancelled" : "failed",
       chars,
-      job.abort.signal.aborted ? "" : error instanceof Error ? error.message : String(error),
+      job.abort.signal.aborted ? "" : errorText(error),
     );
   } finally {
     broadcastSkins();

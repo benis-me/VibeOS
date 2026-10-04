@@ -27,13 +27,6 @@ export interface ProviderRunOptions {
   fallbackModel?: string;
   effort?: Effort;
   thinking?: ThinkingConfig;
-  /**
-   * Resume a prior conversation, when a caller wants continuity. The value is a
-   * provider-native id. UI generation runs stateless (never sets this); the seam
-   * still supports it for other/future callers. API providers without sessions
-   * ignore it.
-   */
-  sessionId?: string;
   /** Incremental visible-text callback for live streaming. */
   onDelta?: (text: string) => void;
   abort?: AbortController;
@@ -47,8 +40,6 @@ export interface TokenUsage {
 
 export interface RunResult {
   text: string;
-  /** Provider-native session id, if the provider supports resumable sessions. */
-  sessionId?: string;
   ok: boolean;
   /** Failure detail, recorded against the agent run. */
   error?: string;

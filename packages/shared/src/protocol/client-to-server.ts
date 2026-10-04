@@ -98,7 +98,6 @@ export type ClientToServer =
   | { type: "c2s.wallpaper.upload"; payload: { dataUrl: string } }
   /** Generate a desktop wallpaper with the configured image model. */
   | { type: "c2s.wallpaper.generate"; payload: { prompt: string } }
-  | { type: "c2s.provider.scan"; payload: Record<string, never> }
   /** Refresh one API provider's model list from its models endpoint. */
   | { type: "c2s.provider.fetchModels"; payload: { providerId: ProviderId } }
   | { type: "c2s.notification.read"; payload: { id: string | "all" } }
@@ -121,11 +120,9 @@ export type ClientToServer =
   /** Freeze a window's current UI as a reusable installed app (+ desktop shortcut). */
   | { type: "c2s.app.save"; payload: { windowId: string; name?: string; icon?: string } }
   /** Create a desktop shortcut for an installed app. */
-  | { type: "c2s.app.shortcut"; payload: { appId: string } }
   /** Export an installed app to a shareable .vibeapp file on the desktop. */
   | { type: "c2s.app.export"; payload: { appId: string } }
   /** Import an app from a .vibeapp JSON string. */
-  | { type: "c2s.app.import"; payload: { json: string } }
   | {
       type: "c2s.activity.fetch";
       payload: {
@@ -138,8 +135,6 @@ export type ClientToServer =
     }
   | { type: "c2s.activity.details"; payload: { runId: string; requestId: string } }
   | { type: "c2s.activity.stop"; payload: { runId: string } }
-  | { type: "c2s.vfs.delete"; payload: { nodeId: string } }
-  | { type: "c2s.vfs.empty"; payload: Record<string, never> }
   | { type: "c2s.window.reorder"; payload: { ids: string[] } };
 
 export type ClientToServerType = ClientToServer["type"];

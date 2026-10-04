@@ -14,7 +14,6 @@ interface MemoryRow {
   html_snapshot: string;
   snapshot_path: string | null;
   episode_summary: string;
-  sdk_session_id: string | null;
   updated_at: number;
 }
 
@@ -45,7 +44,6 @@ export function getMemory(windowId: string): AppMemory | null {
         : ""
       : row.html_snapshot,
     episodeSummary: row.episode_summary,
-    sdkSessionId: row.sdk_session_id ?? undefined,
     updatedAt: row.updated_at,
   };
 }
@@ -128,17 +126,6 @@ export function saveInteractionResult(
   return enqueue(() => {
     if (!canWrite()) return;
     getDb().query("UPDATE interactions SET result_summary = ? WHERE id = ?").run(summary, id);
-  });
-}
-
-export function saveSessionId(windowId: string, sessionId: string): Promise<void> {
-  return enqueue(() => {
-    const db = getDb();
-    db.query("UPDATE app_memory SET sdk_session_id = ?, updated_at = ? WHERE window_id = ?").run(
-      sessionId,
-      Date.now(),
-      windowId,
-    );
   });
 }
 

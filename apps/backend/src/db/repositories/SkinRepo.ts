@@ -19,7 +19,7 @@ import {
   type SkinState,
   type SkinVersion,
 } from "@vibeos/shared/domain";
-import { stripEmoji, ulid } from "@vibeos/shared/util";
+import { ulid, stripEmoji, emojiFreeLine } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
 import { hasImage, getImage, putImage } from "./ImagesRepo.ts";
 import { enqueue } from "./writeQueue.ts";
@@ -133,7 +133,7 @@ export async function createSkin(
   return id;
 }
 function cleanName(name: string): string {
-  const value = stripEmoji(name).trim();
+  const value = emojiFreeLine(name);
   if (!value || value.length > 80) throw new Error("skins.error.name");
   return value;
 }

@@ -1,3 +1,4 @@
+import { z } from "zod";
 /**
  * Tiny structured logger with millisecond timestamps and a tag. Set
  * VIBEOS_LOG_LEVEL=debug for verbose output (default: info).
@@ -45,4 +46,10 @@ export function logger(tag: string) {
     warn: (m: string, e?: unknown) => emit("warn", tag, m, e),
     error: (m: string, e?: unknown) => emit("error", tag, m, e),
   };
+}
+
+/** A readable reason: a schema failure names the offending path instead of dumping every allowed value. */
+export function errorText(error: unknown): string {
+  if (error instanceof z.ZodError) return z.prettifyError(error);
+  return error instanceof Error ? error.message : String(error);
 }

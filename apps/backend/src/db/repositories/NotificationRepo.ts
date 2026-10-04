@@ -4,7 +4,7 @@ import type {
   NotificationSource,
   NotificationAction,
 } from "@vibeos/shared/domain";
-import { ulid, stripEmoji } from "@vibeos/shared/util";
+import { ulid, stripEmoji, emojiFreeLine } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
 import { enqueue } from "./writeQueue.ts";
 
@@ -60,8 +60,8 @@ export function create(input: {
     const db = getDb();
     const now = Date.now();
     const id = ulid(now);
-    const title = stripEmoji(input.title);
-    const body = input.body ? stripEmoji(input.body) : undefined;
+    const title = emojiFreeLine(input.title);
+    const body = input.body ? stripEmoji(input.body).trim() : undefined;
     db.query(
       `INSERT INTO notifications (id, kind, title, body, app_id, source, read, action_json, created_at)
        VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,

@@ -20,13 +20,7 @@ import { searchApps } from "../ai/appSearch.ts";
 import { runCommand } from "../ai/commandPalette.ts";
 import { generatingWindowIds } from "../agents/UiGenerationAgent.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
-import {
-  handleAppLaunch,
-  handleAppSave,
-  handleAppExport,
-  handleAppImport,
-  handleAppShortcut,
-} from "./appHandlers.ts";
+import { handleAppLaunch, handleAppSave, handleAppExport } from "./appHandlers.ts";
 import {
   handleFilesRequest,
   openDiskFile,
@@ -36,7 +30,6 @@ import {
 import {
   handleSettingsUpdate,
   handleProfileUpdate,
-  handleProviderScan,
   handleProviderFetchModels,
   handleWallpaperUpload,
   handleWallpaperGenerate,
@@ -64,13 +57,7 @@ import {
 } from "../db/repositories/CommunicationRepo.ts";
 import { enqueue } from "../db/repositories/writeQueue.ts";
 import { ensureMemory, getSnapshot, getMemory } from "../db/repositories/AppMemoryRepo.ts";
-import {
-  listByLocation,
-  moveNode,
-  getNode,
-  deleteNode,
-  emptyRecycleBin,
-} from "../db/repositories/VfsRepo.ts";
+import { listByLocation, moveNode, getNode } from "../db/repositories/VfsRepo.ts";
 import { renderInitialWindow } from "../kernel/windowInit.ts";
 import {
   listRecent,
@@ -287,21 +274,6 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
       return;
     }
 
-    case "c2s.vfs.delete": {
-      if (await deleteNode(msg.payload.nodeId)) {
-        broadcast("s2c.vfs.removed", { ids: [msg.payload.nodeId] });
-        await broadcastDiskChanges();
-      }
-      return;
-    }
-
-    case "c2s.vfs.empty": {
-      const ids = await emptyRecycleBin();
-      if (ids.length) broadcast("s2c.vfs.removed", { ids });
-      await broadcastDiskChanges();
-      return;
-    }
-
     case "c2s.vfs.open": {
       const node = getNode(msg.payload.nodeId);
       if (node?.location === "recyclebin") return;
@@ -342,9 +314,6 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
 
     case "c2s.wallpaper.generate":
       return handleWallpaperGenerate(ws, msg.payload);
-
-    case "c2s.provider.scan":
-      return handleProviderScan();
 
     case "c2s.provider.fetchModels":
       return handleProviderFetchModels(msg.payload);
@@ -454,12 +423,6 @@ async function dispatch(ws: ServerWebSocket<WsData>, msg: ClientToServer): Promi
 
     case "c2s.app.export":
       return handleAppExport(msg.payload);
-    case "c2s.app.shortcut":
-      return handleAppShortcut(msg.payload);
-
-    case "c2s.app.import":
-      return handleAppImport(msg.payload);
-
     case "c2s.activity.fetch": {
       const limit = Math.min(Math.max(msg.payload.limit ?? 40, 1), 100);
       const rows = recentRuns(

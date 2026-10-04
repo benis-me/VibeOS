@@ -17,6 +17,22 @@ next — as if it were a real program responding.
 > The OS is real (kernel, windows, persistence, agents, context menus). The
 > *contents* are hallucinated.
 
+## What makes it different
+
+Generating a window from a sentence is only the start. In VibeOS what the AI makes
+lasts and connects:
+
+- **Generate** — describe an app or open one; its screen is generated live, and
+  Interactive versions run small local scripts in an isolated frame.
+- **Remember** — apps keep their records in shared data, saved apps keep versions, and
+  optional system memory carries your preferences into every app.
+- **Connect** — windows of one app update together, apps message each other, and real
+  files flow in and out: Open with, files dropped from your computer, the Terminal and
+  the `>` command all work on the actual system disk.
+- **Reshape** — ask for a change from the app's own window; the new version opens in place.
+- **Re-skin** — generate a whole-OS skin (chrome, wallpaper, type) and preview it before
+  applying it.
+
 ## Features
 
 - **AI dynamic UI** — app windows are HTML fragments generated/patched live by the
@@ -69,8 +85,9 @@ next — as if it were a real program responding.
   - **UI-Generation Agent** (strong model) — renders/patches windows on user actions.
   - **System-Event Agent** (fast model, on a timer) — one of your apps with records
     reports what moved on in its world while you were away; clicking the notification
-    opens that app. It is idle while no client is connected or no app has records. Each step's own summary feeds later prompts, so memory needs no
-    background model calls.
+    opens that app. It is idle while no client is connected or no app has records.
+    Each step's own summary feeds later prompts, so memory needs no background model
+    calls.
 - **Desktop shell** — desktop, draggable/resizable multi-window manager, taskbar,
   start menu (split into *system* and *generated* apps), notifications (toasts + center).
 - **Global user profile** — a profile/memory the user writes once; every generated app

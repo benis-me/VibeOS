@@ -8,7 +8,9 @@ test("accepts well-formed messages", () => {
   expect(
     parseClientMessage({ type: "c2s.command.run", payload: { text: "open calc", requestId: "1" } }),
   ).not.toBeNull();
-  expect(parseClientMessage({ type: "c2s.provider.scan", payload: {} })).not.toBeNull();
+  expect(
+    parseClientMessage({ type: "c2s.window.reopen", payload: { windowId: "w" } }),
+  ).not.toBeNull();
   expect(
     parseClientMessage({
       type: "c2s.window.move",
@@ -45,4 +47,20 @@ test("returns the parsed message for valid input", () => {
     payload: { name: "Clock", widget: true },
   });
   expect(msg?.type).toBe("c2s.app.launch");
+});
+
+test("settings updates accept only known, well-formed fields", () => {
+  const update = (partial: unknown) =>
+    parseClientMessage({ type: "c2s.settings.update", payload: { partial } });
+  expect(update({ theme: "dark", prefs: { proactiveAgents: false } })).not.toBeNull();
+  expect(
+    update({ modelOverrides: { "ui-interaction": { provider: "", model: "" } } }),
+  ).not.toBeNull();
+  expect(
+    update({ apiProviders: { openai: { apiKey: "k", models: [{ id: "m", name: "M" }] } } }),
+  ).not.toBeNull();
+  expect(update({ theme: "blue" })).toBeNull();
+  expect(update({ prefs: { proactiveAgents: "yes" } })).toBeNull();
+  expect(update({ profileEntries: [] })).toBeNull();
+  expect(update({ apiProviders: { nowhere: { apiKey: "k" } } })).toBeNull();
 });

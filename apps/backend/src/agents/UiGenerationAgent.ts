@@ -1,4 +1,4 @@
-import { ulid, stripEmoji } from "@vibeos/shared/util";
+import { ulid, emojiFreeLine } from "@vibeos/shared/util";
 import { getAppData, readApplicationVersion } from "../db/repositories/ApplicationRepo.ts";
 import { isDeepStrictEqual } from "node:util";
 import { learnFromUser } from "../ai/systemMemory.ts";
@@ -415,7 +415,7 @@ async function generate(
         buffer += text;
         // Every window gets early progress: the summary block is output first.
         if (!status && buffer.includes("</vibeos-summary>")) {
-          status = stripEmoji(extractSummary(buffer)).slice(0, 140);
+          status = emojiFreeLine(extractSummary(buffer)).slice(0, 140);
           if (status) broadcast("s2c.ui.busy", { windowId, busy: true, status });
         }
         // ponytail: stream only first paint; existing windows commit one validated

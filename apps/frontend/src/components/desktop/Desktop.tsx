@@ -32,8 +32,7 @@ export function Desktop() {
   const wallpaper = useSettingsStore((s) => s.settings?.prefs.wallpaper);
   const wallpaperUrl = wallpaper ? `${API_BASE}${wallpaper}` : null;
 
-  // Open Spotlight, optionally seeded with a query (e.g. a welcome example
-  // arrives as "> make a calculator" so it lands straight in command mode).
+  // Open Spotlight, optionally seeded with a query ("> …" lands in command mode).
   const openSpotlight = (query = "") => {
     setSpotlightQuery(query);
     setSpotlightOpen(true);

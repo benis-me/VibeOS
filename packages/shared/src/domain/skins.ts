@@ -56,6 +56,31 @@ export const SKIN_TOKENS = [
   "sidebar-ring",
 ] as const;
 
+/**
+ * Still accepted so stored and imported skins stay valid, but the shell never reads
+ * them (primary follows brand), so skin generation no longer asks for them.
+ */
+export const UNUSED_SKIN_TOKENS: readonly string[] = [
+  "primary",
+  "primary-foreground",
+  "secondary",
+  "secondary-foreground",
+  "idle",
+  "chart-1",
+  "chart-2",
+  "chart-3",
+  "chart-4",
+  "chart-5",
+  "sidebar",
+  "sidebar-foreground",
+  "sidebar-primary",
+  "sidebar-primary-foreground",
+  "sidebar-accent",
+  "sidebar-accent-foreground",
+  "sidebar-border",
+  "sidebar-ring",
+];
+
 /** Own chrome hooks, never model-supplied selectors or executable stylesheets. */
 export const SKIN_TARGETS = {
   window: [".vibe-window"],
@@ -95,6 +120,15 @@ export const SKIN_PROPERTIES = [
   "border-width",
   "border-style",
   "border-radius",
+  // Per-side edges and corners: a titlebar hairline or rounded top corners.
+  "border-top",
+  "border-right",
+  "border-bottom",
+  "border-left",
+  "border-top-left-radius",
+  "border-top-right-radius",
+  "border-bottom-right-radius",
+  "border-bottom-left-radius",
   "border-image-source",
   "border-image-slice",
   "border-image-width",

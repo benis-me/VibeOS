@@ -42,8 +42,8 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   place of the CLI's coding-agent prompt; they never bypass permissions. Roles:
   `ui-generation` (first screens, seeds, skins, app versions), `ui-interaction` (updates
   after clicks and data refreshes; follows `ui-generation` until given its own model),
-  `system-event` and `maintenance`. Model discovery results are reused for five minutes;
-  Settings → Scan forces a refresh.
+  `system-event` and `maintenance`. Model discovery results are reused for five minutes
+  across reconnects; fetching a provider's models in Settings refreshes its list.
 - **Host CSP.** `vite.config.ts` gives `index.html` a resource-only policy: images,
   media and frames load only from the shell, the backend API origin, `data:` and
   `blob:`. Generated HTML therefore cannot send context out through external images,

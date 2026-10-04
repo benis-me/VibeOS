@@ -34,7 +34,6 @@ interface CodexDebugModel {
 interface MapState {
   text: string;
   completed?: boolean;
-  sessionId?: string;
   error?: string;
   usage?: TokenUsage;
   curId: string;
@@ -45,7 +44,7 @@ interface MapState {
  * Codex — drives the `codex exec --json` CLI directly (no SDK). Codex has no
  * system-prompt flag, so the OS system prompt is prepended to the user prompt.
  * Pinned to a read-only sandbox in a scratch dir so it just returns the
- * assistant message. Resumes via `codex exec resume <thread-id>`.
+ * assistant message. Every run is a fresh conversation.
  */
 class CodexProvider implements AiProvider {
   readonly id = "codex" as const;
@@ -60,7 +59,7 @@ class CodexProvider implements AiProvider {
     const effort = mapEffort(opts.effort);
     if (effort) flags.push("-c", `model_reasoning_effort="${effort}"`);
 
-    const args = opts.sessionId ? ["exec", "resume", opts.sessionId, ...flags] : ["exec", ...flags];
+    const args = ["exec", ...flags];
     // No system-prompt flag in Codex → prepend it (with the anti-agent preamble)
     // to the prompt.
     const stdin = `${CODEX_PREAMBLE}\n\n${opts.systemPrompt}\n\n${opts.prompt}`;
@@ -74,15 +73,14 @@ class CodexProvider implements AiProvider {
       onObject: (o) => mapCodex(o, state, opts.onDelta),
     });
 
-    if (opts.abort?.signal.aborted)
-      return { text: state.text, sessionId: state.sessionId, ok: false };
+    if (opts.abort?.signal.aborted) return { text: state.text, ok: false };
     if (state.text.trim() && state.completed && !state.error && res.code === 0) {
-      return { text: state.text, sessionId: state.sessionId, ok: true, usage: state.usage };
+      return { text: state.text, ok: true, usage: state.usage };
     }
     const error =
       state.error || res.stderr || `codex did not complete successfully (exit ${res.code})`;
     log.error(`run failed: ${error}`);
-    return { text: "", sessionId: state.sessionId, ok: false, error, usage: state.usage };
+    return { text: "", ok: false, error, usage: state.usage };
   }
 
   async discoverModels(): Promise<DiscoveredModel[]> {
@@ -96,9 +94,7 @@ function mapCodex(
   onDelta?: (t: string) => void,
 ): void {
   const type = o.type;
-  if (type === "thread.started" && typeof o.thread_id === "string") {
-    state.sessionId = o.thread_id;
-  } else if (type === "item.completed" || type === "item.updated") {
+  if (type === "item.completed" || type === "item.updated") {
     const item = o.item as Record<string, unknown> | undefined;
     if (item?.type !== "agent_message" || typeof item.text !== "string") return;
     const text = item.text;

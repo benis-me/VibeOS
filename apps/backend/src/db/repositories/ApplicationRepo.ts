@@ -14,7 +14,7 @@ import {
   type AppDataSnapshot,
   type MessageData,
 } from "@vibeos/shared/domain";
-import { ulid, stripEmoji } from "@vibeos/shared/util";
+import { ulid, stripEmoji, emojiFreeLine } from "@vibeos/shared/util";
 import { getDb } from "../database.ts";
 import { enqueue } from "./writeQueue.ts";
 import { getApp, installApp, listApps } from "./AppRepo.ts";
@@ -389,9 +389,9 @@ export function renameApplication(appId: string, name: string): Promise<void> {
     const root = dirname(row.content_path);
     const target = `${dirname(root)}/${contentName(name, app.id)}.vibeapp`;
     if (root !== target && existsSync(diskPath(target))) throw new Error("exists");
-    if (!stripEmoji(name).trim()) throw new Error("applications.error.name");
+    if (!emojiFreeLine(name)) throw new Error("applications.error.name");
     const meta = JSON.parse(readFileSync(diskPath(row.content_path), "utf8"));
-    meta.name = stripEmoji(name);
+    meta.name = emojiFreeLine(name);
     meta.updatedAt = Date.now();
     writeContent(row.content_path, JSON.stringify(meta, null, 2));
     if (root !== target) applyDiskMutation({ action: "move", path: root, destination: target });

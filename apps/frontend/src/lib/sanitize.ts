@@ -1,4 +1,6 @@
 import DOMPurify from "dompurify";
+// The last-line emoji enforcement if a model slips one through the prompt rules.
+import { stripEmoji } from "@vibeos/shared/util";
 
 // Preserve semantic field identity without disabling DOMPurify's clobbering protection.
 DOMPurify.addHook("beforeSanitizeAttributes", (node) => {
@@ -49,18 +51,6 @@ function scopedStyles(sheet: CSSStyleSheet, scope: string, names: Map<string, st
       })
       .join("\n");
   return rules(sheet.cssRules);
-}
-
-/**
- * Matches emoji / pictographs (and common modifiers/ZWJ/variation selectors).
- * VibeOS forbids emoji in any generated UI — this is the last-line enforcement
- * if a model slips one through despite the prompt rules.
- */
-const EMOJI_RE =
-  /[\u{1F000}-\u{1FAFF}\u{1F300}-\u{1F9FF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}\u{20E3}\u{2122}\u{2139}]/gu;
-
-export function stripEmoji(text: string): string {
-  return text.replace(EMOJI_RE, "");
 }
 
 /**

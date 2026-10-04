@@ -14,7 +14,7 @@ import {
   MAX_RUNTIME_SCRIPT,
   localActionSchema,
 } from "@vibeos/shared/domain";
-import { stripEmoji } from "@vibeos/shared/util";
+import { emojiFreeLine } from "@vibeos/shared/util";
 import { getApp, installApp } from "./AppRepo.ts";
 import { getAppData, readApplicationVersion } from "./ApplicationRepo.ts";
 import { getImage, putImage } from "./ImagesRepo.ts";
@@ -246,7 +246,7 @@ export async function importApplication(json: string) {
     bytes: decodeImage(image.mime, image.data),
   }));
   // All validation and decoding above precede ANY writes.
-  const name = stripEmoji(input.name).trim();
+  const name = emojiFreeLine(input.name);
   if (!name) throw new Error("applications.error.name");
   const mapping = Object.fromEntries(
     decoded.map((image) => [
