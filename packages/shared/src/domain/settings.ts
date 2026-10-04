@@ -17,7 +17,16 @@ export type Locale = "zh" | "en";
 
 export const DEFAULT_LOCALE: Locale = "zh";
 
-export type AgentRole = "ui-generation" | "system-event" | "maintenance" | "image-generation";
+/**
+ * `ui-generation` creates (first screens, skins, app versions); `ui-interaction`
+ * answers clicks and refreshes and follows ui-generation unless set separately.
+ */
+export type AgentRole =
+  | "ui-generation"
+  | "ui-interaction"
+  | "system-event"
+  | "maintenance"
+  | "image-generation";
 
 /**
  * The AI backend driving generation. `codebuddy`/`claude`/`codex` spawn a local

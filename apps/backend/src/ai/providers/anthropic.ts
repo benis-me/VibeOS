@@ -27,8 +27,19 @@ class AnthropicProvider implements AiProvider {
     try {
       const result = streamText({
         model: client(apiKey, `${baseUrl}/v1`)(opts.model || DEFAULT_MODEL),
-        system: opts.systemPrompt,
-        prompt: opts.prompt,
+        // The long system prompt repeats across calls: let Anthropic cache it.
+        messages: [
+          ...(opts.systemPrompt
+            ? [
+                {
+                  role: "system" as const,
+                  content: opts.systemPrompt,
+                  providerOptions: { anthropic: { cacheControl: { type: "ephemeral" as const } } },
+                },
+              ]
+            : []),
+          { role: "user" as const, content: opts.prompt },
+        ],
         abortSignal: opts.abort?.signal,
         maxRetries: 2,
       });

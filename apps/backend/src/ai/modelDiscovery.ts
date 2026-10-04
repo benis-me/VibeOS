@@ -1,4 +1,4 @@
-import { AI_PROVIDERS, type ModelCapability } from "@vibeos/shared/domain";
+import { AI_PROVIDERS, type ModelCapability, type ProviderModel } from "@vibeos/shared/domain";
 import { availableProviderIds, getProvider } from "./providers/index.ts";
 import { broadcast } from "../server/wsGateway.ts";
 import { logger } from "../util/log.ts";
@@ -23,20 +23,28 @@ export function inferCapabilities(id: string): ModelCapability[] {
  * all configured providers + all installed CLIs. Discovered lists are ephemeral
  * (re-discovered each boot) — they never clobber user-added custom models.
  */
-export function discoverAllProviders(): void {
+// Reconnects reuse a recent list instead of spawning CLIs and calling /models again.
+const TTL = 5 * 60_000;
+const recent = new Map<string, { at: number; models: ProviderModel[] }>();
+
+export function discoverAllProviders(force = false): void {
   for (const id of availableProviderIds()) {
+    const hit = recent.get(id);
+    if (!force && hit && Date.now() - hit.at < TTL) {
+      broadcast("s2c.provider.models", { providerId: id, models: hit.models });
+      continue;
+    }
     void getProvider(id)
       .then((p) => p.discoverModels())
       .then((ms) => {
         if (!ms.length) return;
-        broadcast("s2c.provider.models", {
-          providerId: id,
-          models: ms.map((m) => ({
-            id: m.modelId,
-            name: m.name,
-            capabilities: inferCapabilities(m.modelId),
-          })),
-        });
+        const models: ProviderModel[] = ms.map((m) => ({
+          id: m.modelId,
+          name: m.name,
+          capabilities: inferCapabilities(m.modelId),
+        }));
+        recent.set(id, { at: Date.now(), models });
+        broadcast("s2c.provider.models", { providerId: id, models });
       })
       .catch((e) => log.warn(`discover ${id} failed: ${e instanceof Error ? e.message : e}`));
   }

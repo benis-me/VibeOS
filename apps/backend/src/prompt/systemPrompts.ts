@@ -88,6 +88,7 @@ const MAINTENANCE_ROLE = `You are the memory-consolidation daemon of VibeOS. Giv
 export function systemPromptFor(role: AgentRole): string {
   switch (role) {
     case "ui-generation":
+    case "ui-interaction":
       return `${UI_ROLE}\n${OUTPUT_CONTRACT}`;
     case "system-event":
       return SYSTEM_EVENT_ROLE;

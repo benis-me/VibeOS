@@ -14,7 +14,12 @@ import { cn } from "@/lib/utils";
 
 export const EFFORTS: Effort[] = ["low", "medium", "high", "xhigh"];
 export const THINKING_MODES: ThinkingMode[] = ["disabled", "adaptive", "enabled"];
-export const ROLES: AgentRole[] = ["ui-generation", "system-event", "maintenance"];
+export const ROLES: AgentRole[] = [
+  "ui-generation",
+  "ui-interaction",
+  "system-event",
+  "maintenance",
+];
 export const CAPS: ModelCapability[] = ["text", "vision", "image", "reasoning", "tools"];
 
 /** Merge model lists (seed + discovered + custom); later entries win by id. */

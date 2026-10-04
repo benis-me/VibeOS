@@ -77,7 +77,8 @@ export function DefaultModelsPane() {
   };
 
   const parse = (v: string): { provider?: string; model?: string } => {
-    if (!v) return { provider: undefined, model: undefined };
+    // Empty strings, not undefined: JSON drops undefined and the old choice would stay.
+    if (!v) return { provider: "", model: "" };
     const i = v.indexOf("::");
     return { provider: v.slice(0, i), model: v.slice(i + 2) };
   };
@@ -98,11 +99,19 @@ export function DefaultModelsPane() {
     <Pane title={t("settings.cat.models")}>
       {ROLES.map((role) => {
         const cfg: RoleConfig = settings.modelOverrides[role] ?? {};
-        const pick = withCurrent(textOptions, cfg.provider, cfg.model);
+        const pick = withCurrent(
+          textOptions,
+          cfg.provider,
+          cfg.model,
+          role === "ui-interaction" ? t("settings.model.followUi") : undefined,
+        );
         return (
           <Group key={role} className="mb-2.5">
             <div className="px-3.5 py-2.5">
               <div className="text-[13px] font-medium">{t(`settings.role.${role}.label`)}</div>
+              <div className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
+                {t(`settings.role.${role}.hint`)}
+              </div>
             </div>
             <Row label={t("settings.role.model")}>
               <Combobox

@@ -70,8 +70,8 @@ export function handleProviderScan(): void {
     void ModelPolicy.discover(loadSettings().modelOverrides)
       .then(() => broadcast("s2c.models.updated", { models: ModelPolicy.available() }))
       .catch((e) => log.warn(`scan discovery failed: ${e instanceof Error ? e.message : e}`));
-    // Re-discover every provider's models for the picker.
-    discoverAllProviders();
+    // An explicit scan re-discovers every provider's models for the picker.
+    discoverAllProviders(true);
   }
 }
 

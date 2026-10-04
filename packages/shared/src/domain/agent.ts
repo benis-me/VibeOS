@@ -41,7 +41,9 @@ export interface AgentLog {
 export const activityFilterSchema = z.object({
   query: z.string().max(200).optional(),
   status: z.enum(["running", "ok", "error", "aborted"]).optional(),
-  role: z.enum(["ui-generation", "maintenance", "system-event", "image-generation"]).optional(),
+  role: z
+    .enum(["ui-generation", "ui-interaction", "maintenance", "system-event", "image-generation"])
+    .optional(),
 });
 export type ActivityFilter = z.infer<typeof activityFilterSchema>;
 export interface ActivityDetails {

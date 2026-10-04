@@ -148,7 +148,7 @@ export async function run(opts: RunOptions): Promise<RunResult> {
   const locale = settings.locale ?? DEFAULT_LOCALE;
   const imageOn =
     !opts.systemPromptOverride &&
-    opts.role === "ui-generation" &&
+    (opts.role === "ui-generation" || opts.role === "ui-interaction") &&
     !!settings.prefs.imageModel?.provider &&
     !!settings.prefs.imageModel?.model;
   const systemPrompt =
@@ -309,7 +309,7 @@ function stubResponse(role: AgentRole, prompt: string): string {
         ],
       },
     });
-  if (role === "ui-generation") {
+  if (role === "ui-generation" || role === "ui-interaction") {
     const isFirst = prompt.includes("just launched");
     if (isFirst) {
       return `<vibeos-html>

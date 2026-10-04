@@ -349,7 +349,8 @@ async function generate(
     // Only broken HTML structure forces a complete body; other repairs keep the mode.
     const fullRequired = renderMode === "force-full" || (attempt > 0 && repairFull);
     const result = await run({
-      role: "ui-generation",
+      // Creating a screen and answering a click can run on different models.
+      role: firstRender || trigger.seedPrompt ? "ui-generation" : "ui-interaction",
       trigger: firstRender ? "user" : "event",
       prompt:
         attempt === 0

@@ -90,7 +90,8 @@ export function assemblePrompt(input: AssembleInput): string {
     "appId" in input.message.source &&
     input.message.source.appId === app.id;
   const parts: string[] = [];
-  parts.push(runtimeGuide(app.manifest.runtime ?? "html"));
+  // Fixed guides first: an identical prefix lets providers with prompt caching reuse it.
+  parts.push(runtimeGuide(app.manifest.runtime ?? "html"), COMMUNICATION_GUIDE, APP_STATE_GUIDE);
   parts.push(
     "[LOCAL VIEW STATE]\n" +
       JSON.stringify(op?.viewState ?? input.window?.viewState ?? {}) +
@@ -117,7 +118,6 @@ export function assemblePrompt(input: AssembleInput): string {
         '\nThese identities and this window\'s purpose are supplied by the runtime. Keep its role (e.g. task details) across interactions. Selection/launch data identifies the shared record; do not create a second independent copy. Closing is optional: use {"type":"close"} only when this interaction should dismiss this OS window. Changing a page inside it does not close the window. Completing a task does not inherently require closing it.',
     );
   }
-  parts.push(COMMUNICATION_GUIDE);
   if (input.message)
     parts.push(
       "[APP MESSAGE]\n" +
@@ -236,7 +236,6 @@ export function assemblePrompt(input: AssembleInput): string {
 - If the action structurally replaces the screen (page navigation, switching to a totally different view) → use <vibeos-html mode="full"> with the FULL body instead.
 Choose deliberately before you write: do not re-emit the whole window for a small change, and do not emit a fragment when the layout truly changed.`;
 
-  parts.push(APP_STATE_GUIDE);
   // Put the authoritative state after historical HTML/memory. A queued change
   // event can carry an older snapshot; only this freshly read revision wins.
   if (input.appData)

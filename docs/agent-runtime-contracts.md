@@ -38,7 +38,12 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   (`ai/pricing.ts`) so codebuddy / codex / openrouter still show cost. A failed run is
   never re-sent to a provider the user did not choose; only a CLI failure that is not
   auth/quota/missing-binary is retried once (API SDKs retry themselves). CLI providers
-  run from the OS temp directory, deny every tool and never bypass permissions.
+  run from the OS temp directory with no tool definitions and our own system prompt in
+  place of the CLI's coding-agent prompt; they never bypass permissions. Roles:
+  `ui-generation` (first screens, seeds, skins, app versions), `ui-interaction` (updates
+  after clicks and data refreshes; follows `ui-generation` until given its own model),
+  `system-event` and `maintenance`. Model discovery results are reused for five minutes;
+  Settings → Scan forces a refresh.
 - **Skins.** Built-ins (`devdock` / `xp` / `aqua`) are immutable. The native **Skins**
   app creates blank custom skins (no built-in foundation), duplicates a selected
   skin's active appearance, and generates versions through `ai/skins.ts` and

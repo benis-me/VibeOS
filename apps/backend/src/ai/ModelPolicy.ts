@@ -29,6 +29,7 @@ const FAST_HINTS = ["flash", "mini", "haiku", "lite", "fast", "small", "turbo", 
 // for snappy, direct output.
 const DEFAULTS: Record<AgentRole, { effort: RoleModelConfig["effort"]; thinking: ThinkingMode }> = {
   "ui-generation": { effort: "medium", thinking: "disabled" },
+  "ui-interaction": { effort: "medium", thinking: "disabled" },
   "system-event": { effort: "low", thinking: "disabled" },
   maintenance: { effort: "low", thinking: "disabled" },
   // Image generation doesn't use ModelPolicy (it reads prefs.imageModel); this
@@ -41,6 +42,7 @@ class ModelPolicyImpl {
   private overrides: ModelPolicyOverrides = {};
   private roleConfig: Record<AgentRole, RoleModelConfig> = {
     "ui-generation": { effort: "medium", thinking: { type: "disabled" } },
+    "ui-interaction": { effort: "medium", thinking: { type: "disabled" } },
     "system-event": { effort: "low", thinking: { type: "disabled" } },
     maintenance: { effort: "low", thinking: { type: "disabled" } },
     "image-generation": { effort: "low", thinking: { type: "disabled" } },
@@ -63,18 +65,21 @@ class ModelPolicyImpl {
 
     const auto: Record<AgentRole, string | undefined> = {
       "ui-generation": strong,
+      "ui-interaction": strong,
       "system-event": fast,
       maintenance: fast,
       "image-generation": undefined,
     };
     const envOverride: Record<AgentRole, string | undefined> = {
       "ui-generation": env.modelUiOverride,
+      "ui-interaction": env.modelUiOverride,
       "system-event": env.modelFastOverride,
       maintenance: env.modelFastOverride,
       "image-generation": undefined,
     };
     const fallback: Record<AgentRole, string | undefined> = {
       "ui-generation": fast,
+      "ui-interaction": fast,
       "system-event": strong,
       maintenance: strong,
       "image-generation": undefined,
@@ -99,6 +104,15 @@ class ModelPolicyImpl {
   for(role: AgentRole): RoleModelConfig {
     const defaultProvider = activeProviderId();
     const o: RoleConfig = this.overrides[role] ?? {};
+    // Interaction follows creation until it gets its own provider/model.
+    if (role === "ui-interaction" && !o.provider && !o.model) {
+      const creation = this.for("ui-generation");
+      return {
+        ...creation,
+        effort: o.effort ?? creation.effort,
+        thinking: o.thinking ? toThinking(o.thinking, o.thinkingBudget) : creation.thinking,
+      };
+    }
     const providerId = (o.provider as ProviderId) || defaultProvider;
     // An explicit non-default provider bypasses the default-provider auto-pick:
     // honor the user's exact model choice for that provider (its own model list

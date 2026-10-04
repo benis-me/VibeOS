@@ -219,7 +219,13 @@ export function ActivityMonitorApp() {
             }
           >
             <option value="">{t("activity.allRoles")}</option>
-            {["ui-generation", "system-event", "maintenance", "image-generation"].map((role) => (
+            {[
+              "ui-generation",
+              "ui-interaction",
+              "system-event",
+              "maintenance",
+              "image-generation",
+            ].map((role) => (
               <option key={role} value={role}>
                 {t(`activity.role.${role}`)}
               </option>

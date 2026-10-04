@@ -79,14 +79,16 @@ export class AnthropicCliProvider implements AiProvider {
       "--verbose",
       "--setting-sources",
       "",
-      // Every tool is denied and permissions are not bypassed, so a gate failure
-      // fails instead of executing. (`--tools ""` is omitted: codebuddy ignores it
-      // and, without bypassed permissions, can stall for minutes.)
+      // No tools and our prompt instead of the CLI's coding-agent prompt: tool
+      // definitions alone were ~40k input tokens per call, and that agent prompt
+      // nudged the model toward tool calls. Permissions stay unbypassed.
       "--max-turns",
       "6",
+      "--tools",
+      "",
       "--disallowedTools",
       "*",
-      "--append-system-prompt",
+      "--system-prompt",
       opts.systemPrompt,
     ];
     if (opts.onDelta) args.push("--include-partial-messages");
