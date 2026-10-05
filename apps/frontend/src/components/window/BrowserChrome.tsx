@@ -68,6 +68,24 @@ export function BrowserChrome({ windowId, children }: { windowId: string; childr
     navigate(h.stack[next]!, true);
   };
 
+  // ⌘L / Ctrl+L puts the cursor in the address bar, as in Files and real browsers.
+  const address = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const key = (event: KeyboardEvent) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "l" &&
+        address.current?.closest('.vibe-window[data-focused="true"]')
+      ) {
+        event.preventDefault();
+        address.current.focus();
+        address.current.select();
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
+
   const canBack = hist.current.idx > 0;
   const canFwd = hist.current.idx < hist.current.stack.length - 1;
   const btn =
@@ -77,24 +95,31 @@ export function BrowserChrome({ windowId, children }: { windowId: string; childr
     <div className="flex h-full w-full flex-col">
       <div className="vibe-browser-bar flex shrink-0 items-center gap-1 border-b bg-card px-2 py-1.5">
         <button
+          type="button"
           onClick={() => step(-1)}
           disabled={!canBack}
           title={t("browser.back")}
+          aria-label={t("browser.back")}
           className={btn}
         >
           <ArrowLeft className="size-4" />
         </button>
         <button
+          type="button"
           onClick={() => step(1)}
           disabled={!canFwd}
           title={t("browser.forward")}
+          aria-label={t("browser.forward")}
           className={btn}
         >
           <ArrowRight className="size-4" />
         </button>
         <button
+          type="button"
           onClick={() => url && navigate(url)}
+          disabled={!url}
           title={t("browser.reload")}
+          aria-label={t("browser.reload")}
           className={cn(btn, "mr-1")}
         >
           <RotateCw className="size-3.5" />
@@ -108,8 +133,11 @@ export function BrowserChrome({ windowId, children }: { windowId: string; childr
           }}
         >
           <input
+            ref={address}
+            aria-label={t("browser.address")}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
             placeholder={t("browser.address")}
             spellCheck={false}
             className="vibe-browser-url h-7 w-full rounded-full border bg-background px-3 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40"

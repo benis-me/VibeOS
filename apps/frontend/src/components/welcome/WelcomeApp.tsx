@@ -12,6 +12,7 @@ import { requestSpotlight } from "@/lib/uiEvents";
 import { wsClient } from "@/lib/ws";
 import { useWindowStore } from "@/stores/windowStore";
 import { useConnectionStore } from "@/stores/connectionStore";
+import { buttonVariants } from "@/components/ui/button";
 
 /** Fixed content column width; the height fits the content (see below). */
 const CONTENT_WIDTH = 460;
@@ -58,7 +59,10 @@ export function WelcomeApp({ windowId }: { windowId: string }) {
         <span className="flex size-10 items-center justify-center rounded-xl bg-brand/15 text-brand">
           <RocketLaunch weight="duotone" className="size-5" />
         </span>
-        Vibe<span className="text-muted-foreground">OS</span>
+        {/* One word in two tones; the row's gap must not split it. */}
+        <span>
+          Vibe<span className="text-muted-foreground">OS</span>
+        </span>
       </div>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{t("welcome.subtitle")}</p>
 
@@ -67,8 +71,9 @@ export function WelcomeApp({ windowId }: { windowId: string }) {
         <div role="status" className="mt-7 rounded-lg border bg-card px-3 py-3 text-sm">
           <p className="text-muted-foreground">{t("welcome.noProvider")}</p>
           <button
+            type="button"
             onClick={() => wsClient.send("c2s.window.open", { appId: "settings" })}
-            className="mt-2.5 rounded-lg border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+            className={`${buttonVariants()} mt-2.5`}
           >
             {t("settings.open")}
           </button>
@@ -84,6 +89,8 @@ export function WelcomeApp({ windowId }: { windowId: string }) {
               return (
                 <button
                   key={key}
+                  type="button"
+                  title={text}
                   // Generate straight away, without a command-model hop first.
                   onClick={() =>
                     wsClient.send("c2s.app.launch", { name: t(`${key}.name`), description: text })
@@ -106,8 +113,9 @@ export function WelcomeApp({ windowId }: { windowId: string }) {
       )}
 
       <button
+        type="button"
         onClick={() => requestSpotlight()}
-        className="mt-7 flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+        className="mt-7 flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2.5 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         {t("welcome.start")}
         <ArrowRight weight="bold" className="size-4" />
