@@ -160,12 +160,17 @@ export function SkinsApp() {
               {t("skins.use")}
             </button>
           )}
+          {/* Built-in skins cannot be renamed or deleted, so those buttons are not shown. */}
           {(
             [
               ["create", Plus, false],
               ["duplicate", Copy, !!skin.loadError],
-              ["rename", Pencil, skin.builtIn],
-              ["delete", Trash2, skin.builtIn],
+              ...(skin.builtIn
+                ? []
+                : ([
+                    ["rename", Pencil, false],
+                    ["delete", Trash2, false],
+                  ] as const)),
             ] as const
           ).map(([action, Icon, unavailable]) => (
             <button
@@ -258,7 +263,7 @@ export function SkinsApp() {
               </>
             )}
             <button
-              className={button}
+              className={buttonVariants({ variant: "ghost" })}
               type="button"
               disabled={pending}
               onClick={() => setEdit(null)}
@@ -266,10 +271,16 @@ export function SkinsApp() {
               {t("files.cancel")}
             </button>
             <button
-              className={buttonVariants({ variant: edit === "delete" ? "destructive" : "outline" })}
+              className={buttonVariants({ variant: edit === "delete" ? "destructive" : "default" })}
               disabled={disabled || (edit !== "delete" && !name.trim())}
             >
-              {t("files.confirm")}
+              {t(
+                edit === "create"
+                  ? "files.create"
+                  : edit === "duplicate"
+                    ? "files.copy"
+                    : `skins.${edit}`,
+              )}
             </button>
           </form>
         )}
@@ -332,11 +343,22 @@ export function SkinsApp() {
                           ` · ${running.chars.toLocaleString()} ${t("skins.chars")}`}
                       </p>
                     )}
-                    {!!request.error && (
-                      <p className="mt-1 whitespace-pre-wrap break-words text-xs text-destructive">
-                        {t(request.error)}
-                      </p>
-                    )}
+                    {!!request.error &&
+                      (t(request.error) !== request.error ? (
+                        <p className="mt-1 whitespace-pre-wrap break-words text-xs text-destructive">
+                          {t(request.error)}
+                        </p>
+                      ) : (
+                        // A validator's raw output is for whoever debugs it, not the reader.
+                        <details className="mt-1 text-xs text-muted-foreground">
+                          <summary className="cursor-pointer hover:text-foreground">
+                            {t("skins.errorDetails")}
+                          </summary>
+                          <pre className="mt-1.5 max-h-40 select-text overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-2 font-mono text-2xs">
+                            {request.error}
+                          </pre>
+                        </details>
+                      ))}
                     {v && (
                       <button
                         className="mt-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:no-underline"
