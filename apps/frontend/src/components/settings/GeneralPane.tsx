@@ -1,12 +1,13 @@
 import { useSkinStore } from "@/stores/skinStore";
 import { useEffect, useRef, useState } from "react";
-import { Sun, Moon, Languages, Upload, Sparkles, Loader2 } from "lucide-react";
+import { Sun, Moon, Upload, Sparkles, Loader2 } from "lucide-react";
 import type { Locale, Skin } from "@vibeos/shared";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { wsClient, API_BASE } from "@/lib/ws";
 import { fileToWallpaperDataUrl } from "@/lib/image";
 import { isComposing } from "@/lib/fields";
 import { useT, useLocale } from "@/lib/i18n";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Pane,
   GroupLabel,
@@ -72,7 +73,8 @@ export function GeneralPane() {
             ))}
           </Select>
           <button
-            className="vibe-btn ml-2 rounded-md border px-2 py-1 text-xs hover:bg-accent"
+            type="button"
+            className={`${buttonVariants()} ml-2`}
             onClick={() => wsClient.send("c2s.window.open", { appId: "skins" })}
           >
             {t("skins.manage")}
@@ -88,8 +90,8 @@ export function GeneralPane() {
             value={locale}
             onChange={setLocale}
             options={[
-              { value: "zh", label: "中文", icon: <Languages className="size-3.5" /> },
-              { value: "en", label: "English", icon: <Languages className="size-3.5" /> },
+              { value: "zh", label: "中文" },
+              { value: "en", label: "English" },
             ]}
           />
         </Row>
@@ -196,7 +198,7 @@ function WallpaperRow() {
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={!!busy}
-              className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-xs text-foreground/80 transition-colors hover:bg-accent disabled:opacity-50"
+              className={buttonVariants()}
             >
               <Upload className="size-3.5" />
               {t("settings.wallpaper.upload")}
@@ -206,7 +208,7 @@ function WallpaperRow() {
                 type="button"
                 onClick={onReset}
                 disabled={!!busy}
-                className="vibe-btn rounded-lg border bg-card px-2.5 py-1.5 text-xs text-foreground/80 transition-colors hover:bg-accent disabled:opacity-50"
+                className={buttonVariants()}
               >
                 {t("settings.wallpaper.reset")}
               </button>
@@ -226,14 +228,15 @@ function WallpaperRow() {
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !isComposing(e.nativeEvent) && onGenerate()}
               disabled={!imageOn || !!busy}
+              aria-label={t("settings.wallpaper.prompt")}
               placeholder={t("settings.wallpaper.promptPlaceholder")}
-              className="vibe-input min-w-0 flex-1 rounded-lg border bg-background px-2.5 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
+              className="vibe-input h-8 min-w-0 flex-1 rounded-md border bg-background px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
             />
             <button
               type="button"
               onClick={onGenerate}
               disabled={!imageOn || !prompt.trim() || !!busy}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-xs font-medium text-brand-foreground transition-colors hover:bg-brand/90 disabled:opacity-50"
+              className={buttonVariants({ variant: "default" })}
             >
               {busy === "generate" ? (
                 <Loader2 className="size-3.5 animate-spin" />

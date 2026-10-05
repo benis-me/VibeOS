@@ -106,26 +106,29 @@ export function ProfilePane() {
               disabled={!draft.content.trim() || !!pending}
               className={buttonVariants()}
             >
-              {t(pending ? "settings.profile.saving" : "settings.profile.save")}
+              {t("settings.profile.save")}
             </button>
           </div>
         </form>
       )}
 
-      <div className="mb-3 flex items-center justify-between gap-3 text-xs">
-        <span className="text-muted-foreground" aria-live="polite">
-          {enabledCount
-            ? `${t("settings.profile.enabled")} · ${enabledCount} / ${entries.length}`
-            : t("settings.profile.off")}
-        </span>
-        <button
-          disabled={!enabledCount}
-          onClick={() => change({ action: "disable-all" })}
-          className={buttonVariants({ variant: "ghost", size: "sm" })}
-        >
-          {t("settings.profile.disableAll")}
-        </button>
-      </div>
+      {entries.length > 0 && (
+        <div className="mb-3 flex items-center justify-between gap-3 text-xs">
+          <span className="text-muted-foreground" aria-live="polite">
+            {enabledCount
+              ? `${t("settings.profile.enabled")} · ${enabledCount} / ${entries.length}`
+              : t("settings.profile.off")}
+          </span>
+          <button
+            type="button"
+            disabled={!enabledCount}
+            onClick={() => change({ action: "disable-all" })}
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+          >
+            {t("settings.profile.disableAll")}
+          </button>
+        </div>
+      )}
       {entries.length > 0 && (
         <input
           type="search"

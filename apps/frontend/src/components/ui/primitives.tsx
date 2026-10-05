@@ -1,14 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronDown, Search, Check, Eye, EyeOff } from "lucide-react";
-import type {
-  Effort,
-  ThinkingMode,
-  AgentRole,
-  ModelCapability,
-  ProviderModel,
-} from "@vibeos/shared";
+import type { Effort, ThinkingMode, AgentRole, ModelCapability } from "@vibeos/shared";
 import { usePopoverMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +39,11 @@ export function Pane({
 }
 
 export function GroupLabel({ children }: { children: React.ReactNode }) {
-  return <h2 className="mb-2 ml-1 mt-7 text-[13px] font-medium text-foreground/70">{children}</h2>;
+  return (
+    <h2 className="mb-2 ml-1 mt-7 text-[13px] font-medium text-foreground/70 first:mt-0">
+      {children}
+    </h2>
+  );
 }
 
 export function Group({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -61,6 +59,10 @@ export function Group({ children, className }: { children: React.ReactNode; clas
   );
 }
 
+/** A Row's label and hint ids, so the control inside is named by the visible label. */
+const RowLabel = createContext<{ label: string; hint?: string } | null>(null);
+const useRowLabel = () => useContext(RowLabel);
+
 export function Row({
   label,
   hint,
@@ -70,15 +72,25 @@ export function Row({
   hint?: string;
   children: React.ReactNode;
 }) {
+  const id = useId();
   return (
-    <div className="flex min-h-[2.5rem] items-center justify-between gap-4 px-3.5 py-2">
-      <div className="min-w-0">
-        <div className="text-[13px]">{label}</div>
+    // In a narrow window the control drops below its label instead of crushing it.
+    <div className="flex min-h-[2.5rem] flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3.5 py-2">
+      <div className="min-w-28 flex-1">
+        <div id={id} className="text-[13px]">
+          {label}
+        </div>
         {hint && (
-          <div className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">{hint}</div>
+          <div id={`${id}-hint`} className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
+            {hint}
+          </div>
         )}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="max-w-full shrink-0">
+        <RowLabel.Provider value={{ label: id, hint: hint ? `${id}-hint` : undefined }}>
+          {children}
+        </RowLabel.Provider>
+      </div>
     </div>
   );
 }
@@ -96,9 +108,12 @@ export function Select({
   children: React.ReactNode;
   className?: string;
 } & Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "value" | "onChange" | "className">) {
+  const row = useRowLabel();
   return (
     <div className={cn("relative inline-flex", className)}>
       <select
+        aria-labelledby={props["aria-label"] ? undefined : row?.label}
+        aria-describedby={row?.hint}
         {...props}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -122,8 +137,11 @@ export function Segmented<T extends string>({
   options: { value: T; label: string; icon?: React.ReactNode }[];
   disabled?: boolean;
 }) {
+  const row = useRowLabel();
   return (
     <div
+      role="group"
+      aria-labelledby={row?.label}
       className={cn(
         "vibe-segmented inline-flex rounded-lg bg-muted/60 p-0.5 ring-1 ring-border",
         disabled && "opacity-50",
@@ -132,8 +150,10 @@ export function Segmented<T extends string>({
       {options.map((o) => (
         <button
           key={o.value}
+          type="button"
           disabled={disabled}
           onClick={() => onChange(o.value)}
+          aria-pressed={value === o.value}
           data-active={value === o.value ? "true" : undefined}
           className={cn(
             "vibe-seg-btn flex items-center gap-1.5 rounded-[7px] px-2.5 py-1 text-[13px] transition-colors",
@@ -161,10 +181,13 @@ export function Switch({
   label?: string;
   disabled?: boolean;
 }) {
+  const row = useRowLabel();
   return (
     <button
+      type="button"
       role="switch"
       aria-label={label}
+      aria-labelledby={label ? undefined : row?.label}
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
@@ -207,15 +230,21 @@ export function KeyInput({
   value,
   onSave,
   placeholder,
+  revealLabel,
 }: {
   value: string;
   onSave: (v: string) => void;
   placeholder: string;
+  /** Name of the show-key toggle, e.g. "Show key". */
+  revealLabel: string;
 }) {
   const [show, setShow] = useState(false);
+  const row = useRowLabel();
   return (
-    <div className="relative inline-flex w-[16rem]">
+    <div className="relative inline-flex w-[16rem] max-w-full">
       <input
+        aria-labelledby={row?.label}
+        aria-describedby={row?.hint}
         key={value}
         type={show ? "text" : "password"}
         defaultValue={value}
@@ -229,8 +258,11 @@ export function KeyInput({
       />
       <button
         type="button"
+        aria-label={revealLabel}
+        aria-pressed={show}
+        title={revealLabel}
         onClick={() => setShow((s) => !s)}
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+        className="absolute right-1 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         {show ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
       </button>
@@ -247,8 +279,11 @@ export function TextInput({
   onSave: (v: string) => void;
   placeholder: string;
 }) {
+  const row = useRowLabel();
   return (
     <input
+      aria-labelledby={row?.label}
+      aria-describedby={row?.hint}
       key={value}
       defaultValue={value}
       autoComplete="off"
@@ -257,7 +292,7 @@ export function TextInput({
         if (e.target.value !== value) onSave(e.target.value.trim());
       }}
       placeholder={placeholder}
-      className="vibe-input w-[16rem] rounded-lg border bg-background py-1.5 px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40"
+      className="vibe-input w-[16rem] max-w-full rounded-lg border bg-background py-1.5 px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40"
     />
   );
 }
@@ -297,6 +332,32 @@ export function Combobox({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const pop = usePopoverMotion();
+  const row = useRowLabel();
+  const valueId = useId();
+  const close = () => {
+    setOpen(false);
+    setQ("");
+    triggerRef.current?.focus();
+  };
+  // ↑/↓ move between the search field and the options; Esc closes.
+  const onPopoverKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+      return;
+    }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const items = [
+      ...(popRef.current?.querySelectorAll<HTMLElement>("input, [data-option]") ?? []),
+    ];
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const next =
+      items[Math.min(items.length - 1, Math.max(0, at + (e.key === "ArrowDown" ? 1 : -1)))];
+    if (next) {
+      e.preventDefault();
+      next.focus();
+    }
+  };
 
   // Position the portal'd popover near the trigger, flipping above + clamping to
   // the viewport so it never spills off-screen. Recomputes on scroll/resize.
@@ -357,13 +418,19 @@ export function Combobox({
   }
 
   return (
-    <div className="inline-flex w-[15rem]">
+    <div className="inline-flex w-[15rem] max-w-full">
       <button
         ref={triggerRef}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-labelledby={row ? `${row.label} ${valueId}` : undefined}
         onClick={() => setOpen((v) => !v)}
-        className="vibe-combo flex w-full items-center gap-1.5 rounded-lg border bg-background py-1.5 pl-2.5 pr-2 text-left text-[13px] transition-colors hover:bg-accent/40"
+        className="vibe-combo flex w-full items-center gap-1.5 rounded-lg border bg-background py-1.5 pl-2.5 pr-2 text-left text-[13px] transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
-        <span className="flex-1 truncate">{selected?.label ?? value}</span>
+        <span id={valueId} className="flex-1 truncate" title={selected?.label ?? value}>
+          {selected?.label ?? value}
+        </span>
         <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
       </button>
       {createPortal(
@@ -372,6 +439,7 @@ export function Combobox({
             <motion.div
               ref={popRef}
               {...pop}
+              onKeyDown={onPopoverKey}
               style={{
                 position: "fixed",
                 left: coords.left,
@@ -385,6 +453,9 @@ export function Combobox({
               <div className="flex shrink-0 items-center gap-2 border-b px-2.5">
                 <Search className="size-3.5 shrink-0 text-muted-foreground" />
                 <input
+                  // biome-ignore lint/a11y/noAutofocus: opening the picker is an explicit request to search it.
+                  autoFocus
+                  aria-label={searchPlaceholder}
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   placeholder={searchPlaceholder}
@@ -407,10 +478,12 @@ export function Combobox({
                       {g.items.map((o) => (
                         <button
                           key={o.value || "_auto"}
+                          type="button"
+                          data-option
+                          aria-current={o.value === value || undefined}
                           onClick={() => {
                             onChange(o.value);
-                            setOpen(false);
-                            setQ("");
+                            close();
                           }}
                           className={cn(
                             "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",

@@ -105,7 +105,7 @@ export function DefaultModelsPane() {
           role === "ui-interaction" ? t("settings.model.followUi") : undefined,
         );
         return (
-          <Group key={role} className="mb-2.5">
+          <Group key={role} className="mb-4">
             <div className="px-3.5 py-2.5">
               <div className="text-[13px] font-medium">{t(`settings.role.${role}.label`)}</div>
               <div className="mt-0.5 text-2xs leading-relaxed text-muted-foreground">
@@ -131,7 +131,7 @@ export function DefaultModelsPane() {
                 <option value="">{t("settings.effort.default")}</option>
                 {EFFORTS.map((ef) => (
                   <option key={ef} value={ef}>
-                    {ef}
+                    {t(`settings.effort.${ef}`)}
                   </option>
                 ))}
               </Select>
@@ -157,10 +157,7 @@ export function DefaultModelsPane() {
 
       <GroupLabel>{t("settings.models.image")}</GroupLabel>
       <Group>
-        <div className="px-3.5 pt-2.5 text-2xs leading-relaxed text-muted-foreground">
-          {t("settings.models.imageHint")}
-        </div>
-        <Row label={t("settings.role.model")}>
+        <Row label={t("settings.role.model")} hint={t("settings.models.imageHint")}>
           {imageOptions.length === 0 ? (
             <span className="text-xs text-muted-foreground">
               {t("settings.models.noImageProvider")}

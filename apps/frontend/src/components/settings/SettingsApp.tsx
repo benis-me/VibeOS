@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { SlidersHorizontal, Server, Boxes, Info, User, Brain } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useT } from "@/lib/i18n";
-import { EASE_OUT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { GeneralPane } from "./GeneralPane";
 import { ProvidersPane } from "./ProvidersPane";
@@ -39,17 +37,24 @@ export function SettingsApp() {
     { id: "about", icon: <Info className="size-3.5" />, label: t("settings.cat.about") },
   ];
 
+  // A narrow window keeps only the category icons, so the pane keeps its room.
   return (
-    <div className="flex h-full bg-background text-foreground">
-      <nav className="flex w-52 shrink-0 flex-col gap-0.5 overflow-auto border-r bg-muted/30 px-2.5 py-4">
+    <div className="@container flex h-full bg-background text-foreground">
+      <nav
+        aria-label={t("settings.title")}
+        className="flex w-52 shrink-0 flex-col gap-0.5 overflow-auto border-r bg-muted/30 px-2.5 py-4 @max-2xl:w-14 @max-2xl:px-2"
+      >
         {CATEGORIES.map((c) => {
           const active = category === c.id;
           return (
             <button
               key={c.id}
+              type="button"
+              aria-current={active ? "page" : undefined}
+              title={c.label}
               onClick={() => setCategory(c.id)}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors",
+                "flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors @max-2xl:justify-center @max-2xl:px-0",
                 active
                   ? "bg-accent text-accent-foreground"
                   : "text-foreground/80 hover:bg-accent/50",
@@ -65,30 +70,21 @@ export function SettingsApp() {
               >
                 {c.icon}
               </span>
-              {c.label}
+              <span className="truncate @max-2xl:sr-only">{c.label}</span>
             </button>
           );
         })}
       </nav>
 
-      <div className="flex-1 overflow-auto">
-        <div className="px-7 py-6">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={category}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.15, ease: EASE_OUT }}
-            >
-              {category === "providers" && <ProvidersPane />}
-              {category === "models" && <DefaultModelsPane />}
-              {category === "general" && <GeneralPane />}
-              {category === "profile" && <ProfilePane />}
-              {category === "memory" && <MemoryPane />}
-              {category === "about" && <AboutPane />}
-            </motion.div>
-          </AnimatePresence>
+      {/* Switching categories is frequent, so the pane swaps instantly. */}
+      <div className="min-w-0 flex-1 overflow-auto">
+        <div className="px-7 py-6 @max-2xl:px-4 @max-2xl:py-4">
+          {category === "providers" && <ProvidersPane />}
+          {category === "models" && <DefaultModelsPane />}
+          {category === "general" && <GeneralPane />}
+          {category === "profile" && <ProfilePane />}
+          {category === "memory" && <MemoryPane />}
+          {category === "about" && <AboutPane />}
         </div>
       </div>
     </div>

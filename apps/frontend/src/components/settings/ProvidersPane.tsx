@@ -90,6 +90,8 @@ export function ProvidersPane() {
     const on = isOn(id);
     return (
       <button
+        type="button"
+        aria-current={selected === id || undefined}
         onClick={() => setSelected(id)}
         className={cn(
           "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors",
@@ -98,10 +100,18 @@ export function ProvidersPane() {
             : "text-foreground/80 hover:bg-accent/50",
         )}
       >
+        {/* On is a filled dot, off a hollow ring, so the state never rests on color alone. */}
         <span
-          className={cn("size-1.5 shrink-0 rounded-full", on ? "bg-run" : "bg-muted-foreground/30")}
+          aria-hidden
+          className={cn(
+            "size-1.5 shrink-0 rounded-full",
+            on ? "bg-run" : "ring-1 ring-inset ring-muted-foreground/60",
+          )}
         />
         <span className="flex-1 truncate">{label}</span>
+        <span className="sr-only">
+          {t(on ? "settings.providers.on" : "settings.providers.off")}
+        </span>
       </button>
     );
   };
@@ -240,90 +250,94 @@ export function ProvidersPane() {
 
   return (
     <Pane title={t("settings.cat.providers")}>
-      <div className="flex gap-5">
-        <div className="w-44 shrink-0 space-y-4">
-          <div>
-            <GroupLabel>{t("settings.providers.local")}</GroupLabel>
-            <div className="space-y-0.5">
-              {cliProviders.map((p) => (
-                <ProviderButton key={p.id} id={p.id} label={p.label} />
-              ))}
+      {/* Narrow panes stack the provider list above its details. */}
+      <div className="@container">
+        <div className="flex gap-5 @max-xl:flex-col">
+          <div className="w-44 shrink-0 space-y-6 @max-xl:w-full">
+            <div>
+              <GroupLabel>{t("settings.providers.local")}</GroupLabel>
+              <div className="space-y-0.5 @max-xl:grid @max-xl:grid-cols-2 @max-xl:gap-0.5 @max-xl:space-y-0">
+                {cliProviders.map((p) => (
+                  <ProviderButton key={p.id} id={p.id} label={p.label} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <GroupLabel>{t("settings.providers.api")}</GroupLabel>
+              <div className="space-y-0.5 @max-xl:grid @max-xl:grid-cols-2 @max-xl:gap-0.5 @max-xl:space-y-0">
+                {apiProviders.map((p) => (
+                  <ProviderButton key={p.id} id={p.id} label={p.label} />
+                ))}
+              </div>
             </div>
           </div>
-          <div>
-            <GroupLabel>{t("settings.providers.api")}</GroupLabel>
-            <div className="space-y-0.5">
-              {apiProviders.map((p) => (
-                <ProviderButton key={p.id} id={p.id} label={p.label} />
-              ))}
-            </div>
-          </div>
-        </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-[15px] font-semibold">{cat?.label}</h2>
-            {cat?.kind === "api" && (
-              <Switch
-                label={cat?.label}
-                checked={isOn(selected)}
-                disabled={!hasKey(selected)}
-                onChange={(v) => patch(selected, { enabled: v })}
-              />
+          <div className="min-w-0 flex-1">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-[15px] font-semibold">{cat?.label}</h2>
+              {cat?.kind === "api" && (
+                <Switch
+                  label={cat?.label}
+                  checked={isOn(selected)}
+                  disabled={!hasKey(selected)}
+                  onChange={(v) => patch(selected, { enabled: v })}
+                />
+              )}
+            </div>
+
+            {cat?.kind === "cli" ? (
+              <>
+                <Group>
+                  <Row label={t("settings.providers.status")}>
+                    <span className="flex items-center gap-1.5 text-[13px]">
+                      <span
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          available.includes(selected) ? "bg-run" : "bg-muted-foreground/40",
+                        )}
+                      />
+                      {t(
+                        available.includes(selected)
+                          ? "settings.providers.installed"
+                          : "settings.providers.notFound",
+                      )}
+                    </span>
+                  </Row>
+                  <div className="px-3.5 py-2.5 text-2xs leading-relaxed text-muted-foreground">
+                    {t("settings.providers.cliHint")}
+                  </div>
+                </Group>
+
+                {available.includes(selected) && modelsManager}
+              </>
+            ) : (
+              <>
+                <Group>
+                  {cat?.fields?.includes("apiKey") && (
+                    <Row label={t("settings.providers.apiKey")}>
+                      <KeyInput
+                        value={cfg.apiKey ?? ""}
+                        onSave={(v) => patch(selected, { apiKey: v || undefined })}
+                        placeholder={t("settings.providers.apiKey.placeholder")}
+                        revealLabel={t("settings.providers.showKey")}
+                      />
+                    </Row>
+                  )}
+                  {cat?.fields?.includes("baseUrl") && (
+                    <Row label={t("settings.providers.baseUrl")}>
+                      <TextInput
+                        value={cfg.baseUrl ?? ""}
+                        onSave={(v) => patch(selected, { baseUrl: v || undefined })}
+                        placeholder={cat?.defaultBaseUrl ?? ""}
+                      />
+                    </Row>
+                  )}
+                </Group>
+
+                {modelsManager}
+              </>
             )}
           </div>
-
-          {cat?.kind === "cli" ? (
-            <>
-              <Group>
-                <Row label={t("settings.providers.status")}>
-                  <span className="flex items-center gap-1.5 text-[13px]">
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full",
-                        available.includes(selected) ? "bg-run" : "bg-muted-foreground/40",
-                      )}
-                    />
-                    {t(
-                      available.includes(selected)
-                        ? "settings.providers.installed"
-                        : "settings.providers.notFound",
-                    )}
-                  </span>
-                </Row>
-                <div className="px-3.5 py-2.5 text-2xs leading-relaxed text-muted-foreground">
-                  {t("settings.providers.cliHint")}
-                </div>
-              </Group>
-
-              {available.includes(selected) && modelsManager}
-            </>
-          ) : (
-            <>
-              <Group>
-                {cat?.fields?.includes("apiKey") && (
-                  <Row label={t("settings.providers.apiKey")}>
-                    <KeyInput
-                      value={cfg.apiKey ?? ""}
-                      onSave={(v) => patch(selected, { apiKey: v || undefined })}
-                      placeholder={t("settings.providers.apiKey.placeholder")}
-                    />
-                  </Row>
-                )}
-                {cat?.fields?.includes("baseUrl") && (
-                  <Row label={t("settings.providers.baseUrl")}>
-                    <TextInput
-                      value={cfg.baseUrl ?? ""}
-                      onSave={(v) => patch(selected, { baseUrl: v || undefined })}
-                      placeholder={cat?.defaultBaseUrl ?? ""}
-                    />
-                  </Row>
-                )}
-              </Group>
-
-              {modelsManager}
-            </>
-          )}
         </div>
       </div>
     </Pane>

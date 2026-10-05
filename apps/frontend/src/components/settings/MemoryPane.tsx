@@ -5,6 +5,7 @@ import { requestMemory } from "@/lib/nativeCommands";
 import { useT } from "@/lib/i18n";
 import type { MemoryCommand } from "@vibeos/shared";
 import { Pane, Switch } from "@/components/ui/primitives";
+import { buttonVariants } from "@/components/ui/button";
 
 export function MemoryPane() {
   const t = useT();
@@ -31,8 +32,31 @@ export function MemoryPane() {
       setBusy(false);
     }
   }
-  const button =
-    "vibe-btn rounded-md border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-40";
+  const filtered = entries.filter((e) => e.content.toLowerCase().includes(query.toLowerCase()));
+  // Confirming happens beside what it removes: one entry in place, all of them by the toolbar.
+  const confirm = (all: boolean) => (
+    <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+      <span className="mr-auto text-muted-foreground">
+        {t(all ? "memory.clearPrompt" : "memory.removePrompt")}
+      </span>
+      <button
+        type="button"
+        className={buttonVariants({ variant: "ghost", size: "sm" })}
+        disabled={busy}
+        onClick={() => setRemoving(null)}
+      >
+        {t("settings.profile.cancel")}
+      </button>
+      <button
+        type="button"
+        className={buttonVariants({ variant: "destructive", size: "sm" })}
+        disabled={busy}
+        onClick={() => void run(all ? { action: "clear" } : { action: "remove", id: removing! })}
+      >
+        {t(all ? "memory.clearConfirm" : "settings.profile.confirmRemove")}
+      </button>
+    </div>
+  );
   return (
     <Pane
       title={t("memory.title")}
@@ -44,7 +68,7 @@ export function MemoryPane() {
         />
       }
     >
-      <p className="mb-4 text-[13px] leading-relaxed text-muted-foreground">
+      <p className="mb-4 max-w-prose text-[13px] leading-relaxed text-muted-foreground">
         {t(enabled ? "memory.hint" : "memory.off")}
       </p>
       <div className="mb-3 flex gap-2">
@@ -54,27 +78,32 @@ export function MemoryPane() {
           onChange={(e) => setQuery(e.target.value)}
           aria-label={t("memory.search")}
           placeholder={t("memory.search")}
-          className="vibe-input min-w-0 flex-1 rounded-md border bg-card px-3 py-1.5 text-[13px]"
+          className="vibe-input h-8 min-w-0 flex-1 rounded-md border bg-card px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         />
         <button
-          className={button}
+          type="button"
+          className={buttonVariants()}
           disabled={busy || !!draft}
           onClick={() => setDraft({ content: "" })}
         >
-          <Plus className="mr-1 inline size-3.5" />
+          <Plus className="size-3.5" />
           {t("memory.add")}
         </button>
         <button
-          className={button}
+          type="button"
+          className={buttonVariants()}
           disabled={busy || !entries.length}
           onClick={() => setRemoving("all")}
         >
           {t("memory.clear")}
         </button>
       </div>
+      {removing === "all" && (
+        <div className="mb-3 rounded-lg border bg-card p-3">{confirm(true)}</div>
+      )}
       {draft && (
         <form
-          className="vibe-group mb-3 rounded-lg border bg-card p-3"
+          className="vibe-group mb-3 rounded-xl border bg-card p-3.5"
           onSubmit={(e) => {
             e.preventDefault();
             void run({ action: "save", ...draft });
@@ -87,80 +116,70 @@ export function MemoryPane() {
             rows={4}
             value={draft.content}
             onChange={(e) => setDraft({ ...draft, content: e.target.value })}
-            className="vibe-input w-full resize-y rounded-md border bg-background p-2 text-[13px]"
+            className="vibe-input w-full resize-y rounded-lg border bg-background p-3 text-[13px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
           />
-          <div className="mt-2 flex justify-end gap-2">
-            <button type="button" className={button} disabled={busy} onClick={() => setDraft(null)}>
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              className={buttonVariants({ variant: "ghost" })}
+              disabled={busy}
+              onClick={() => setDraft(null)}
+            >
               {t("settings.profile.cancel")}
             </button>
-            <button className={button} disabled={busy || !draft.content.trim()}>
+            <button className={buttonVariants()} disabled={busy || !draft.content.trim()}>
               {t("settings.profile.save")}
             </button>
           </div>
         </form>
-      )}
-      {removing && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border p-3 text-xs">
-          <span className="mr-auto">
-            {t(removing === "all" ? "memory.clearPrompt" : "settings.profile.removePrompt")}
-          </span>
-          <button className={button} disabled={busy} onClick={() => setRemoving(null)}>
-            {t("settings.profile.cancel")}
-          </button>
-          <button
-            className={button}
-            disabled={busy}
-            onClick={() =>
-              void run(
-                removing === "all" ? { action: "clear" } : { action: "remove", id: removing },
-              )
-            }
-          >
-            {t("settings.profile.confirmRemove")}
-          </button>
-        </div>
       )}
       {error && (
         <p role="alert" className="mb-3 text-xs text-destructive">
           {error}
         </p>
       )}
-      <ul className="vibe-group divide-y rounded-lg border bg-card">
-        {entries
-          .filter((e) => e.content.toLowerCase().includes(query.toLowerCase()))
-          .map((entry) => (
-            <li key={entry.id} className="flex items-start gap-2 p-3">
-              <div className="min-w-0 flex-1">
-                <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">
-                  {entry.content}
-                </p>
-                <time className="mt-1 block text-2xs text-muted-foreground">
-                  {new Date(entry.updatedAt).toLocaleString()}
-                </time>
+      {filtered.length > 0 ? (
+        <ul className="vibe-group divide-y divide-border overflow-hidden rounded-xl border bg-card">
+          {filtered.map((entry) => (
+            <li key={entry.id} className="px-3.5 py-3">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="whitespace-pre-wrap break-words text-[13px] leading-relaxed">
+                    {entry.content}
+                  </p>
+                  <time className="mt-1.5 block text-2xs text-muted-foreground">
+                    {new Date(entry.updatedAt).toLocaleString()}
+                  </time>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  className={buttonVariants({ variant: "ghost", size: "icon" })}
+                  title={t("memory.edit")}
+                  aria-label={t("memory.edit")}
+                  onClick={() => setDraft({ id: entry.id, content: entry.content })}
+                >
+                  <Pencil className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  className={buttonVariants({ variant: "ghost", size: "icon" })}
+                  title={t("memory.remove")}
+                  aria-label={t("memory.remove")}
+                  onClick={() => setRemoving(entry.id)}
+                >
+                  <Trash2 className="size-4" />
+                </button>
               </div>
-              <button
-                disabled={busy}
-                className="rounded p-1.5 hover:bg-accent"
-                title={t("memory.edit")}
-                aria-label={t("memory.edit")}
-                onClick={() => setDraft({ id: entry.id, content: entry.content })}
-              >
-                <Pencil className="size-3.5" />
-              </button>
-              <button
-                disabled={busy}
-                className="rounded p-1.5 hover:bg-accent"
-                title={t("memory.remove")}
-                aria-label={t("memory.remove")}
-                onClick={() => setRemoving(entry.id)}
-              >
-                <Trash2 className="size-3.5" />
-              </button>
+              {removing === entry.id && <div className="mt-3 border-t pt-3">{confirm(false)}</div>}
             </li>
           ))}
-      </ul>
-      {!entries.length && (
-        <p className="py-8 text-center text-[13px] text-muted-foreground">{t("memory.empty")}</p>
+        </ul>
+      ) : (
+        <div className="rounded-xl border border-dashed px-5 py-10 text-center text-[13px] text-muted-foreground">
+          {t(entries.length ? "memory.noResults" : "memory.empty")}
+        </div>
       )}
     </Pane>
   );
