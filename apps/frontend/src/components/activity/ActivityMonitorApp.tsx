@@ -93,7 +93,7 @@ export function ActivityMonitorApp() {
   };
 
   return (
-    <div className="vibe-activity relative isolate flex h-full flex-col overflow-hidden bg-background text-foreground">
+    <div className="vibe-activity @container relative isolate flex h-full flex-col overflow-hidden bg-background text-foreground">
       <div ref={content} className="flex min-h-0 flex-1 flex-col overflow-auto">
         {/* ---- dashboard ---- */}
         <div className="shrink-0 border-b">
@@ -122,7 +122,8 @@ export function ActivityMonitorApp() {
             />
           </div>
 
-          <div className="grid grid-cols-[1.7fr_1fr] gap-5 px-5 pb-4">
+          {/* The two panels stack once the window is too narrow for both. */}
+          <div className="grid grid-cols-[1.7fr_1fr] gap-5 px-5 pb-4 @max-2xl:grid-cols-1">
             <Panel
               title={t("activity.tokenUsage")}
               aside={
@@ -358,9 +359,7 @@ function RunRow({ r, t, onSelect }: { r: AgentRun; t: T; onSelect: () => void })
           >
             <Square className="size-2.5" fill="currentColor" /> {t("activity.stop")}
           </button>
-        ) : (
-          <span className="text-2xs text-muted-foreground/40">—</span>
-        )}
+        ) : null}
       </div>
     </div>
   );

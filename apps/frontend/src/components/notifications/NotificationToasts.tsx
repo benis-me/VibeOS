@@ -19,10 +19,13 @@ function Toast({ n }: { n: Notification }) {
   const dismiss = useNotificationStore((s) => s.dismissToast);
   const reduced = useReducedMotion();
   const t = useT();
+  // Errors and toasts with an action wait to be dismissed, so they cannot be missed.
+  const sticky = n.kind === "error" || !!n.action;
   useEffect(() => {
+    if (sticky) return;
     const timer = setTimeout(() => dismiss(n.id), 5200);
     return () => clearTimeout(timer);
-  }, [n.id, dismiss]);
+  }, [n.id, dismiss, sticky]);
 
   const offset = reduced ? 0 : 16;
   return (
