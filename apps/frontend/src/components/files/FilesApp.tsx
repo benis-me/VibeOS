@@ -5,12 +5,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   CornerUpRight,
-  Check,
   Copy,
   Download,
   File,
+  FileArchive,
+  FileAudio,
+  FileCode,
+  FileImage,
+  FileJson,
   FilePlus,
   FilePenLine,
+  FileSpreadsheet,
+  FileText,
+  FileVideo,
   Folder,
   FolderInput,
   FolderPlus,
@@ -61,7 +68,7 @@ type Editor = {
   error?: string;
 };
 type Form = {
-  action: "mkdir" | "newFile" | "rename" | "move" | "copy" | "delete";
+  action: "mkdir" | "newFile" | "rename" | "move" | "copy" | "delete" | "empty";
   value: string;
   target?: DiskEntry;
 };
@@ -70,6 +77,33 @@ function sizeLabel(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+const CODE =
+  /\.(js|jsx|ts|tsx|html|css|py|sh|rs|go|java|c|cpp|h|rb|php|swift|kt|toml|ya?ml|xml|svg|vibelink)$/i;
+
+/** A file's icon says what it is, so a folder of photos does not read as blank pages. */
+function FileIcon({ name, path }: { name: string; path: string }) {
+  const media = fileMediaType(path)?.split("/")[0];
+  const Icon =
+    media === "image"
+      ? FileImage
+      : media === "video"
+        ? FileVideo
+        : media === "audio"
+          ? FileAudio
+          : /\.json$/i.test(name)
+            ? FileJson
+            : CODE.test(name)
+              ? FileCode
+              : /\.(zip|tar|gz|tgz|rar|7z)$/i.test(name)
+                ? FileArchive
+                : /\.(csv|tsv|xlsx?)$/i.test(name)
+                  ? FileSpreadsheet
+                  : /\.(txt|md|log|rtf|pdf|docx?)$/i.test(name)
+                    ? FileText
+                    : File;
+  return <Icon className="size-4 shrink-0 text-muted-foreground" />;
 }
 
 /** Native Files: all file contents and mutations come from the backend's real disk. */
@@ -100,6 +134,7 @@ export function FilesApp({
   const [refresh, setRefresh] = useState(0);
   const sequence = useRef(0);
   const upload = useRef<HTMLInputElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   const trash = path === "Trash";
   const dirty = !!editor && editor.content !== editor.saved;
   const current = entries.find((e) => e.path === selected);
@@ -114,7 +149,13 @@ export function FilesApp({
       : t(`files.error.${code}`) === `files.error.${code}`
         ? t("files.error.failed")
         : t(`files.error.${code}`);
-  const focusInput = useCallback((node: HTMLInputElement | null) => node?.focus(), []);
+  // Renaming a file selects its name but not its extension.
+  const focusInput = useCallback((node: HTMLInputElement | null) => {
+    if (!node) return;
+    node.focus();
+    const dot = node.dataset.base === undefined ? -1 : node.value.lastIndexOf(".");
+    if (dot > 0) node.setSelectionRange(0, dot);
+  }, []);
 
   useEffect(() => {
     setHistory((value) =>
@@ -251,6 +292,20 @@ export function FilesApp({
   const submitForm = async () => {
     if (!form || busy) return;
     const value = form.value.trim();
+    if (form.action === "empty") {
+      setBusy(true);
+      setError(null);
+      try {
+        for (const entry of entries) await requestFiles({ action: "delete", path: entry.path });
+        setForm(null);
+        setSelected(null);
+      } catch (e) {
+        setError((e as Error).message);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (form.action !== "delete" && !value) return;
     if (
       ["mkdir", "newFile", "rename"].includes(form.action) &&
@@ -439,14 +494,14 @@ export function FilesApp({
           },
           {
             type: "item",
-            label: t("files.move"),
+            label: t("files.moveTo"),
             icon: <FolderInput className="size-4" />,
             disabled: busy,
             onSelect: () => setForm({ action: "move", value: e.path, target: e }),
           },
           {
             type: "item",
-            label: t("files.copy"),
+            label: t("files.copyTo"),
             icon: <Copy className="size-4" />,
             disabled: busy,
             onSelect: () => setForm({ action: "copy", value: e.path, target: e }),
@@ -485,8 +540,40 @@ export function FilesApp({
           },
         ];
 
+  // One tab stop for the list: arrows move the selection, Enter opens, F2 renames,
+  // Delete moves to the Trash (or, in the Trash, asks to delete for good).
+  const focusEntry = (entry?: DiskEntry) => {
+    if (!entry) return;
+    setSelected(entry.path);
+    list.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(entry.path)}"]`)?.focus();
+  };
+  const onListKey = (event: React.KeyboardEvent) => {
+    const at = filtered.findIndex((e) => e.path === selected);
+    const entry = filtered[at];
+    const key = event.key;
+    if (key === "ArrowDown" || key === "ArrowUp") {
+      focusEntry(
+        filtered[
+          at < 0
+            ? 0
+            : Math.min(filtered.length - 1, Math.max(0, at + (key === "ArrowDown" ? 1 : -1)))
+        ],
+      );
+    } else if (key === "Home" || key === "End") {
+      focusEntry(filtered[key === "Home" ? 0 : filtered.length - 1]);
+    } else if (key === "F2" && entry && !trash) {
+      setForm({ action: "rename", value: entry.name, target: entry });
+    } else if ((key === "Delete" || (key === "Backspace" && event.metaKey)) && entry && !busy) {
+      if (trash) setForm({ action: "delete", value: "", target: entry });
+      else void mutate({ action: "trash", path: entry.path }).then((ok) => ok && setSelected(null));
+    } else return;
+    event.preventDefault();
+  };
+  const tabStop =
+    selected && filtered.some((e) => e.path === selected) ? selected : filtered[0]?.path;
+
   return (
-    <div className="vibe-files flex h-full min-w-0 flex-col bg-background text-foreground">
+    <div className="vibe-files @container flex h-full min-w-0 flex-col bg-background text-foreground">
       {handoff && (
         <div
           role="status"
@@ -562,9 +649,20 @@ export function FilesApp({
                     },
                   ])
                 }
+                title={t("files.new")}
               >
                 <Plus className="size-3.5" />
-                {t("files.new")}
+                <span className="@max-2xl:sr-only">{t("files.new")}</span>
+              </button>
+            )}
+            {trash && entries.length > 0 && (
+              <button
+                type="button"
+                className={button}
+                disabled={busy}
+                onClick={() => setForm({ action: "empty", value: "" })}
+              >
+                {t("files.emptyTrash")}
               </button>
             )}
             <button
@@ -580,7 +678,7 @@ export function FilesApp({
             </button>
             <input
               type="search"
-              className={`${input} h-8 w-40 text-xs`}
+              className={`${input} h-8 w-40 text-xs @max-2xl:w-28 @max-xl:hidden`}
               aria-label={t("files.search")}
               placeholder={t("files.search")}
               value={query}
@@ -600,21 +698,25 @@ export function FilesApp({
       <div className="flex min-h-0 flex-1">
         <nav
           aria-label={t("files.locations")}
-          className="flex w-36 shrink-0 flex-col gap-1 overflow-y-auto border-r bg-card/30 p-2 text-xs"
+          className="flex w-36 shrink-0 flex-col gap-1 overflow-y-auto border-r bg-card/30 p-2 text-xs @max-xl:w-12 @max-xl:p-1.5"
         >
           <button
+            type="button"
             aria-current={!path ? "page" : undefined}
-            className={`flex items-center gap-2 rounded-md px-2 py-2 text-left ${!path ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+            title={t("files.disk")}
+            className={`flex items-center gap-2 rounded-md px-2 py-2 text-left @max-xl:justify-center @max-xl:px-0 ${!path ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
             onClick={() => navigate("")}
           >
             <HardDrive className="size-4 shrink-0" />
-            {t("files.disk")}
+            <span className="truncate @max-xl:sr-only">{t("files.disk")}</span>
           </button>
           {SYSTEM_FOLDERS.map((folder) => (
             <button
               key={folder}
+              type="button"
               aria-current={path === folder ? "page" : undefined}
-              className={`flex items-center gap-2 rounded-md px-2 py-2 text-left ${path === folder ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
+              title={folder}
+              className={`flex items-center gap-2 rounded-md px-2 py-2 text-left @max-xl:justify-center @max-xl:px-0 ${path === folder ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"}`}
               onClick={() => navigate(folder)}
             >
               {folder === "Trash" ? (
@@ -622,7 +724,7 @@ export function FilesApp({
               ) : (
                 <Folder className="size-4 shrink-0" />
               )}
-              {folder}
+              <span className="truncate @max-xl:sr-only">{folder}</span>
             </button>
           ))}
         </nav>
@@ -745,15 +847,22 @@ export function FilesApp({
                   }}
                 >
                   <label className="block text-xs font-medium" htmlFor={`${windowId}-file-name`}>
-                    {t(`files.${form.action}`)}
+                    {t(form.action === "empty" ? "files.emptyTrash" : `files.${form.action}`)}
                     {form.target ? ` · ${form.target.name}` : ""}
                   </label>
-                  {form.action === "delete" ? (
-                    <p className="text-xs text-muted-foreground">{t("files.deleteConfirm")}</p>
+                  {form.action === "delete" || form.action === "empty" ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t(
+                        form.action === "empty" ? "files.emptyTrashConfirm" : "files.deleteConfirm",
+                      )}
+                    </p>
                   ) : (
                     <input
                       id={`${windowId}-file-name`}
                       ref={focusInput}
+                      data-base={
+                        form.action === "rename" && form.target?.kind === "file" ? "" : undefined
+                      }
                       className={`${input} w-full`}
                       value={form.value}
                       disabled={busy}
@@ -768,16 +877,29 @@ export function FilesApp({
                   <div className="flex justify-end gap-2">
                     <button
                       type="button"
-                      className={button}
+                      className={buttonVariants({ variant: "ghost" })}
                       disabled={busy}
                       onClick={() => setForm(null)}
                     >
-                      <X className="size-3.5" />
                       {t("files.cancel")}
                     </button>
-                    <button className={button} disabled={busy}>
-                      <Check className="size-3.5" />
-                      {t("files.confirm")}
+                    {/* The button names what happens; deleting for good looks like it. */}
+                    <button
+                      className={buttonVariants({
+                        variant:
+                          form.action === "delete" || form.action === "empty"
+                            ? "destructive"
+                            : "default",
+                      })}
+                      disabled={busy}
+                    >
+                      {t(
+                        form.action === "mkdir" || form.action === "newFile"
+                          ? "files.create"
+                          : form.action === "empty"
+                            ? "files.emptyTrash"
+                            : `files.${form.action}`,
+                      )}
                     </button>
                   </div>
                 </form>
@@ -791,24 +913,29 @@ export function FilesApp({
                 </p>
               )}
               <div
+                ref={list}
                 role="listbox"
                 aria-label={t("files.entries")}
-                className="min-h-0 flex-1 overflow-auto px-2 pb-2"
+                onKeyDown={onListKey}
+                className="min-h-0 flex-1 overflow-auto px-2 py-1"
               >
                 {loading && !entries.length ? (
                   <p role="status" className="p-4 text-center text-xs text-muted-foreground">
                     {t("files.loading")}
                   </p>
                 ) : !filtered.length ? (
-                  <div className="flex h-full min-h-32 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <div className="flex h-full min-h-32 flex-col items-center justify-center gap-2 text-[13px] text-muted-foreground">
                     <Folder className="size-8 opacity-40" />
-                    {t("files.empty")}
+                    {t(query ? "files.noMatch" : trash ? "files.trashEmpty" : "files.emptyFolder")}
                   </div>
                 ) : (
                   filtered.map((e) => (
                     <button
                       key={e.path}
+                      type="button"
                       role="option"
+                      data-path={e.path}
+                      tabIndex={e.path === tabStop ? 0 : -1}
                       aria-selected={selected === e.path}
                       onClick={() => setSelected(e.path)}
                       onDoubleClick={() => openEntry(e)}
@@ -879,7 +1006,7 @@ export function FilesApp({
                           openEntry(e);
                         }
                       }}
-                      className={`grid w-full grid-cols-[minmax(0,1fr)_68px] items-center gap-3 rounded-md px-2.5 py-2 text-left text-[13px] ${selected === e.path ? "bg-accent text-accent-foreground" : "hover:bg-accent/40"}`}
+                      className={`grid w-full grid-cols-[minmax(0,1fr)_68px] items-center gap-3 rounded-md px-2.5 py-2 text-left text-[13px] @2xl:grid-cols-[minmax(0,1fr)_8.5rem_68px] ${selected === e.path ? "bg-accent text-accent-foreground" : "hover:bg-accent/40"}`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         {e.kind === "shortcut" || e.kind === "application" ? (
@@ -897,10 +1024,12 @@ export function FilesApp({
                         ) : e.kind === "directory" ? (
                           <Folder className="size-4 shrink-0 text-muted-foreground" />
                         ) : (
-                          <File className="size-4 shrink-0 text-muted-foreground" />
+                          <FileIcon name={e.name} path={e.path} />
                         )}
                         <span className="min-w-0">
-                          <span className="block truncate">{e.name}</span>
+                          <span className="block truncate" title={e.name}>
+                            {e.name}
+                          </span>
                           {e.originalPath && (
                             <span className="block truncate text-2xs text-muted-foreground">
                               /{e.originalPath}
@@ -908,7 +1037,13 @@ export function FilesApp({
                           )}
                         </span>
                       </span>
-                      <span className="text-right text-2xs text-muted-foreground">
+                      <span className="hidden truncate text-2xs tabular-nums text-muted-foreground @2xl:block">
+                        {new Date(e.modifiedAt).toLocaleString(undefined, {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}
+                      </span>
+                      <span className="text-right text-2xs tabular-nums text-muted-foreground">
                         {e.kind === "directory"
                           ? t("files.folder")
                           : e.kind === "application"

@@ -133,7 +133,8 @@ export function FilesAddressBar({
           <ArrowUp className="size-4" />
         </button>
       </div>
-      <div className="vibe-files-location flex h-9 min-w-0 flex-1 items-center rounded-lg border bg-background/70 shadow-xs focus-within:ring-2 focus-within:ring-ring/30">
+      {/* The location keeps its room; secondary controls give way in a narrow window. */}
+      <div className="vibe-files-location flex h-9 min-w-28 flex-1 items-center rounded-lg border bg-background/70 shadow-xs focus-within:ring-2 focus-within:ring-ring/30">
         {editing ? (
           <form
             className="flex min-w-0 flex-1 items-center"
@@ -220,7 +221,7 @@ export function FilesAddressBar({
       </div>
       <button
         type="button"
-        className={control}
+        className={`${control} @max-lg:hidden`}
         title={t(copied ? "files.pathCopied" : "files.copyPath")}
         disabled={busy}
         onClick={async () => {
