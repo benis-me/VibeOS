@@ -710,9 +710,13 @@ button:not(:disabled),
   position: absolute;
   right: 8px;
 }
-/* The centered title and progress stay clear of the pinned lights and actions. */
+/* The centered title stays clear of the pinned lights and actions. */
 :is([data-skin="devdock"], [data-skin="aqua"]) .vibe-titlebar {
   padding-inline: 72px;
+}
+/* The generation pill widens the actions; the title stays centered with less room. */
+:is([data-skin="devdock"], [data-skin="aqua"]) .vibe-titlebar:has(.vibe-genstatus) {
+  padding-inline: 176px;
 }
 /* Unselected window → gray traffic lights (both macOS skins). */
 :is([data-skin="devdock"], [data-skin="aqua"]) .vibe-window:not([data-focused]) .vibe-winbtn {

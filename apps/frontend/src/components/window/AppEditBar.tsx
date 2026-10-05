@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { Loader2, Sparkles, X } from "lucide-react";
 import type { WindowState } from "@vibeos/shared";
 import { buttonVariants } from "@/components/ui/button";
 import { isComposing } from "@/lib/fields";
@@ -59,10 +59,15 @@ export function AppEditBar({ win, onClose }: { win: WindowState; onClose: () => 
         <button
           type="submit"
           disabled={!prompt.trim() || running}
+          title={running ? t(`applications.status.${latest.status}`) : undefined}
           className={buttonVariants({ variant: "default" })}
         >
-          {running && <Loader2 className="size-3.5 motion-safe:animate-spin" />}
-          {t(running ? `applications.status.${latest.status}` : "win.editSubmit")}
+          {running ? (
+            <Loader2 className="size-3.5 motion-safe:animate-spin" />
+          ) : (
+            <Sparkles className="size-3.5" />
+          )}
+          {t("win.editSubmit")}
         </button>
         <button
           type="button"
@@ -73,12 +78,10 @@ export function AppEditBar({ win, onClose }: { win: WindowState; onClose: () => 
           <X className="size-3.5" />
         </button>
       </div>
-      {message ? (
+      {message && (
         <p role="alert" className="text-destructive">
           {t(message) === message ? t("applications.status.failed") : t(message)}
         </p>
-      ) : (
-        <p className="text-muted-foreground">{t("win.editHint")}</p>
       )}
     </form>
   );

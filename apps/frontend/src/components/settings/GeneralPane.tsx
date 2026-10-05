@@ -240,11 +240,7 @@ function WallpaperRow() {
               ) : (
                 <Sparkles className="size-3.5" />
               )}
-              {t(
-                busy === "generate"
-                  ? "settings.wallpaper.generating"
-                  : "settings.wallpaper.generate",
-              )}
+              {t("settings.wallpaper.generate")}
             </button>
           </div>
           {!imageOn && (

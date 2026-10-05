@@ -304,9 +304,9 @@ export function AppStoreApp() {
         )}
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-4">
-        {!detail?.requests.length && (
+        {!app && (
           <p className="mx-auto my-12 max-w-sm text-center text-[13px] leading-relaxed text-muted-foreground">
-            {t(app ? "applications.promptHint" : "applications.empty")}
+            {t("applications.empty")}
           </p>
         )}
         {detail?.requests

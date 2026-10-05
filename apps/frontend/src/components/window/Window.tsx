@@ -14,7 +14,7 @@ import { CHROMES } from "./chromes";
 import { AppIcon } from "@/components/AppIcon";
 import { appLabel, useT } from "@/lib/i18n";
 import { useWindowMotion, EASE_OUT } from "@/lib/motion";
-import { cn } from "@/lib/utils";
+import { clock, cn } from "@/lib/utils";
 import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { windowMenu, appContentMenu } from "@/components/contextmenu/menus";
 import { closeWindow } from "@/lib/windowClose";
@@ -151,10 +151,11 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
           >
             {title}
           </span>
-          {!native && <GenerationStatus windowId={win.id} />}
           {!native && (
             // Kept apart from the window controls: these are not more traffic lights.
+            // The generation pill leads them, out of the centered title's way.
             <div className="vibe-titlebar-actions flex shrink-0 items-center gap-0.5">
+              <GenerationStatus windowId={win.id} />
               <button
                 type="button"
                 title={t("win.editApp")}
@@ -306,7 +307,10 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
   );
 });
 
-/** While the AI generates this window: its latest progress, elapsed time and Stop. */
+/**
+ * While the AI generates this window: a fixed-width pill with the elapsed time
+ * and Stop. The model's latest summary is its tooltip, so the width never moves.
+ */
 function GenerationStatus({ windowId }: { windowId: string }) {
   const t = useT();
   const progress = useWindowStore((s) => s.progress[windowId]);
@@ -326,23 +330,21 @@ function GenerationStatus({ windowId }: { windowId: string }) {
   };
   return (
     <span
-      className="vibe-genstatus flex min-w-0 shrink items-center gap-1.5 text-2xs text-muted-foreground"
-      title={progress.status}
+      className="vibe-genstatus mr-1 flex h-5 shrink-0 items-center gap-1 rounded-full bg-current/10 pl-1.5 pr-0.5 text-2xs"
+      title={progress.status || t("win.generating")}
     >
-      <Loader2 className="size-3 shrink-0 motion-safe:animate-spin" />
-      <span className="truncate">
-        {progress.status || t("win.generating")} ·{" "}
-        {Math.max(0, Math.floor((now - progress.since) / 1000))}s
-      </span>
+      <Loader2 className="size-3 shrink-0 opacity-70 motion-safe:animate-spin" />
+      <span className="opacity-80">{t("win.generating")}</span>
+      <span className="tabular-nums opacity-60">{clock(now - progress.since)}</span>
       <button
         type="button"
         title={t("win.stop")}
         aria-label={t("win.stop")}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={stop}
-        className="vibe-genstop flex size-5 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-foreground"
+        className="vibe-genstop flex size-4 shrink-0 items-center justify-center rounded-full opacity-70 transition hover:bg-current/15 hover:opacity-100"
       >
-        <Square className="size-2.5 fill-current" />
+        <Square className="size-2 fill-current" />
       </button>
     </span>
   );

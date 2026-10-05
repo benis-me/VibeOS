@@ -126,7 +126,7 @@ export function ProvidersPane() {
             className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-xs text-foreground/80 transition-colors hover:bg-accent"
           >
             <RefreshCw className={cn("size-3.5", fetching === selected && "animate-spin")} />
-            {t(fetching === selected ? "settings.providers.fetching" : "settings.providers.fetch")}
+            {t("settings.providers.fetch")}
           </button>
         )}
       </div>

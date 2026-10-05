@@ -26,6 +26,7 @@ import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { useT } from "@/lib/i18n";
 import { buttonVariants } from "@/components/ui/button";
 import { Select } from "@/components/ui/primitives";
+import { clock } from "@/lib/utils";
 
 const button = buttonVariants();
 const iconButton = buttonVariants({ size: "icon" });
@@ -318,6 +319,19 @@ export function SkinsApp() {
                     <p className={request.status === "failed" ? "text-destructive" : ""}>
                       {request.summary || t(`skins.status.${request.status}`)}
                     </p>
+                    {request.id === running?.id && (
+                      // Live progress stays with its request instead of pushing the composer.
+                      <p
+                        role="status"
+                        className="mt-1 flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground"
+                      >
+                        <Loader2 className="size-3 shrink-0 motion-safe:animate-spin" />
+                        {request.summary && `${t(`skins.status.${running.status}`)} · `}
+                        {clock(now - running.createdAt)}
+                        {running.chars > 0 &&
+                          ` · ${running.chars.toLocaleString()} ${t("skins.chars")}`}
+                      </p>
+                    )}
                     {!!request.error && (
                       <p className="mt-1 whitespace-pre-wrap break-words text-xs text-destructive">
                         {t(request.error)}
@@ -360,21 +374,6 @@ export function SkinsApp() {
               void perform({ action: "generate", id: skin.id, prompt });
           }}
         >
-          {running && (
-            <div
-              role="status"
-              className="mb-2 flex items-center gap-2 text-xs text-muted-foreground"
-            >
-              <Loader2 className="size-3.5 animate-spin" />
-              <span>
-                {t(`skins.status.${running.status}`)} ·{" "}
-                {Math.max(0, Math.floor((now - running.createdAt) / 1000))}s
-                {running.chars > 0
-                  ? ` · ${running.chars.toLocaleString()} ${t("skins.chars")}`
-                  : ""}
-              </span>
-            </div>
-          )}
           <div className="flex items-end gap-2 rounded-lg border bg-card p-2 focus-within:ring-2 focus-within:ring-ring/40">
             <textarea
               aria-label={t("skins.prompt")}
