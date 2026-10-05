@@ -7,7 +7,7 @@ import { diskPath, executeDisk } from "./disk.ts";
 import { migrate } from "../db/migrate.ts";
 import { getDb } from "../db/database.ts";
 import { seedPresets } from "../db/repositories/AppRepo.ts";
-import { getWindow, listOpenWindows } from "../db/repositories/WindowRepo.ts";
+import { getWindow, listOpenWindows, openWindow } from "../db/repositories/WindowRepo.ts";
 import { mutateDisk } from "../db/repositories/VfsRepo.ts";
 import { openDiskFile, serveDiskFile } from "../server/filesHandlers.ts";
 
@@ -29,6 +29,21 @@ test("native viewers dispatch real files, retain paths and follow moves without 
     for (const name of ["photo.PNG", "sound.mp3", "clip.webm"]) {
       expect((await openDiskFile(`${root}/${name}`)).appId).toBe("media-viewer");
     }
+    // An empty viewer takes the next file; previous/next swaps the file in place.
+    const empty = await openWindow({
+      appId: "media-viewer",
+      title: "Media Viewer",
+      kind: "system",
+    });
+    expect((await openDiskFile(`${root}/photo.PNG`)).id).toBe(empty.id);
+    const swapped = await openDiskFile(`${root}/sound.mp3`, empty.id);
+    expect([swapped.id, swapped.filePath, swapped.title]).toEqual([
+      empty.id,
+      `${root}/sound.mp3`,
+      "sound.mp3",
+    ]);
+    expect((await openDiskFile(text, empty.id)).appId).toBe("text-viewer");
+    expect(getWindow(empty.id)?.filePath).toBe(`${root}/sound.mp3`);
     for (const path of [root, `${root}/link.txt`, "../runtime/vibeos.db", `${root}/missing.txt`]) {
       await expect(openDiskFile(path)).rejects.toThrow();
     }

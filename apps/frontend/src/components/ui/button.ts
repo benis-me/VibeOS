@@ -2,7 +2,7 @@ import { cva } from "class-variance-authority";
 
 /** The native apps' one button: four variants, two compact sizes, one focus ring. */
 export const buttonVariants = cva(
-  "vibe-btn inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-40",
+  "vibe-btn inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-accent aria-pressed:text-foreground",
   {
     variants: {
       variant: {

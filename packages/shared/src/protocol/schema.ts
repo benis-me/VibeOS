@@ -47,19 +47,10 @@ const empty = z.object({});
 const filePath = z.string().max(4096);
 export const diskCommandSchema = z.union([
   z.object({
-    action: z.enum([
-      "list",
-      "stat",
-      "read",
-      "mkdir",
-      "trash",
-      "restore",
-      "delete",
-      "open",
-      "reveal",
-    ]),
+    action: z.enum(["list", "stat", "read", "mkdir", "trash", "restore", "delete", "reveal"]),
     path: filePath,
   }),
+  z.object({ action: z.literal("open"), path: filePath, windowId: z.string().max(64).optional() }),
   z.object({ action: z.enum(["move", "copy"]), path: filePath, destination: filePath }),
   z.object({
     action: z.literal("write"),

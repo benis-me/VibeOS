@@ -71,7 +71,8 @@ export function fileMediaType(path: string): string | undefined {
 
 export type FileRequestCommand =
   | DiskCommand
-  | { action: "open"; path: string }
+  /** windowId: show the file in that open viewer (previous/next) instead of a new window. */
+  | { action: "open"; path: string; windowId?: string }
   | { action: "reveal"; path: string };
 
 export type DiskCommand =

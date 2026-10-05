@@ -26,10 +26,15 @@ import {
   openWindow,
   findOpenWindowByApp,
   focusWindow,
+  setWindowFile,
 } from "../db/repositories/WindowRepo.ts";
 
-/** Shared file dispatch: native viewers for content, normal app launch for shortcuts. */
-export async function openDiskFile(path: string) {
+/**
+ * Shared file dispatch: native viewers for content, normal app launch for shortcuts.
+ * A viewer shows the file in place when `windowId` names it (previous/next) or when
+ * it is still empty, so opening the viewer first and then a file is not a dead end.
+ */
+export async function openDiskFile(path: string, windowId?: string) {
   path = canonicalFileCommand({ action: "open", path }).path;
   const absolute = diskPath(path);
   const info = lstatSync(absolute);
@@ -63,6 +68,16 @@ export async function openDiskFile(path: string) {
       : (shortcut?.appId ?? (fileMediaType(path) ? "media-viewer" : "text-viewer")));
   const app = getApp(appId);
   if (!app?.isInstalled) throw new Error("missingApp");
+  const viewers =
+    shortcut || skinFile || bundleApp ? [] : listOpenWindows().filter((w) => w.appId === appId);
+  const viewer = viewers.find((w) => w.id === windowId) ?? viewers.find((w) => !w.filePath);
+  if (viewer) {
+    const updated = (await setWindowFile(viewer.id, path, basename(path))) ?? viewer;
+    broadcast("s2c.window.stateChanged", { window: updated });
+    await focusWindow(viewer.id);
+    broadcast("s2c.window.focused", { windowId: viewer.id });
+    return updated;
+  }
   const existing = app.manifest.singleInstance ? findOpenWindowByApp(appId) : null;
   if (existing) {
     await focusWindow(existing.id);
@@ -166,7 +181,7 @@ async function fileCommand(
     return { path: command.path, windowId: window.id };
   }
   if (command.action === "open") {
-    const window = await openDiskFile(command.path);
+    const window = await openDiskFile(command.path, command.windowId);
     return { path: command.path, windowId: window.id };
   }
   const readOnly =
