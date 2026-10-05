@@ -39,7 +39,26 @@ export const useSkinStore = create<
   draft: (id, text) => set((state) => ({ drafts: { ...state.drafts, [id]: text } })),
 }));
 
+/**
+ * Theme and skin swaps recolor every element at once; with transitions on, each
+ * transition-colors control would fade separately and the switch would smear.
+ */
+export function withoutTransitions(change: () => void): void {
+  const style = document.createElement("style");
+  style.textContent = "*,*::before,*::after{transition:none!important}";
+  document.head.appendChild(style);
+  change();
+  void document.documentElement.offsetHeight;
+  requestAnimationFrame(() => style.remove());
+}
+
 export function applySkin(id: Skin): void {
+  const current = document.documentElement.dataset.selectedSkin;
+  if (current && current !== id) withoutTransitions(() => setSkin(id));
+  else setSkin(id);
+}
+
+function setSkin(id: Skin): void {
   const root = document.documentElement;
   root.dataset.selectedSkin = id;
   const skin = useSkinStore.getState().skins.find((s) => s.id === id);

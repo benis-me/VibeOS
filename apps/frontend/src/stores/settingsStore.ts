@@ -1,4 +1,4 @@
-import { applySkin } from "./skinStore";
+import { applySkin, withoutTransitions } from "./skinStore";
 export { applySkin } from "./skinStore";
 import { create } from "zustand";
 import type { Settings, Theme, Locale } from "@vibeos/shared";
@@ -21,8 +21,9 @@ export const useSettingsStore = create<SettingsStoreState>((set) => ({
 
 export function applyTheme(theme: Theme): void {
   const root = document.documentElement;
-  if (theme === "dark") root.classList.add("dark");
-  else root.classList.remove("dark");
+  const dark = theme === "dark";
+  if (root.classList.contains("dark") !== dark)
+    withoutTransitions(() => root.classList.toggle("dark", dark));
 }
 
 export function applyLocale(locale: Locale): void {
