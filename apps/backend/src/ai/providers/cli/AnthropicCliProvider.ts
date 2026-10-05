@@ -6,10 +6,8 @@ import type {
   RunResult,
   TokenUsage,
 } from "../types.ts";
-import { whichBinary } from "../detect.ts";
+import { newestBinary } from "../detect.ts";
 import { streamJsonl } from "./exec.ts";
-import { cliEnv } from "./env.ts";
-import { scrapeModelList } from "./scrapeModelList.ts";
 import { logger } from "../../../util/log.ts";
 
 export interface AnthropicCliConfig {
@@ -19,19 +17,14 @@ export interface AnthropicCliConfig {
   bin: string;
   /** Models to offer when live discovery yields nothing. */
   fallbackModels?: DiscoveredModel[];
-  /**
-   * Discover models by parsing `<bin> --help` (older CodeBuddy listed its
-   * supported models there as `Currently supported: (id, id, …)`). Claude has no
-   * such list, so it relies on {@link fallbackModels} aliases instead.
-   */
-  discoverViaHelp?: boolean;
-  /**
-   * Provider lists its models only in the interactive `/model list` TUI (current
-   * CodeBuddy). Enables {@link AnthropicCliProvider.discoverModelsLive}, a slow
-   * PTY scrape run ONLY on the user's explicit "Fetch models" click.
-   */
-  liveModelList?: boolean;
 }
+
+/** An SDK `initialize` request; the reply carries the CLI's `/model` menu. */
+const INITIALIZE = `${JSON.stringify({
+  type: "control_request",
+  request_id: "models",
+  request: { subtype: "initialize" },
+})}\n`;
 
 interface MapState {
   text: string;
@@ -53,8 +46,6 @@ export class AnthropicCliProvider implements AiProvider {
   readonly label: string;
   private readonly bin: string;
   private readonly fallbackModels: DiscoveredModel[];
-  private readonly discoverViaHelp: boolean;
-  private readonly liveModelList: boolean;
   private readonly log: ReturnType<typeof logger>;
 
   constructor(cfg: AnthropicCliConfig) {
@@ -62,13 +53,11 @@ export class AnthropicCliProvider implements AiProvider {
     this.label = cfg.label;
     this.bin = cfg.bin;
     this.fallbackModels = cfg.fallbackModels ?? [];
-    this.discoverViaHelp = cfg.discoverViaHelp ?? false;
-    this.liveModelList = cfg.liveModelList ?? false;
     this.log = logger(`provider:${cfg.id}`);
   }
 
   async run(opts: ProviderRunOptions): Promise<RunResult> {
-    const bin = whichBinary(this.bin);
+    const bin = await newestBinary(this.bin);
     if (!bin) return { text: "", ok: false, error: `${this.bin} CLI not found on PATH` };
 
     const args = [
@@ -115,54 +104,61 @@ export class AnthropicCliProvider implements AiProvider {
     return { text: "", ok: false, error, usage: state.usage };
   }
 
-  async discoverModels(): Promise<DiscoveredModel[]> {
-    if (this.discoverViaHelp) {
-      const fromHelp = await discoverFromHelp(this.bin);
-      if (fromHelp.length) return fromHelp;
-    }
-    return this.fallbackModels;
-  }
-
   /**
-   * User-triggered live discovery: scrape the interactive `/model list` TUI via a
-   * PTY (CodeBuddy's only programmatic source). Slow — never call on boot/scan.
-   * Falls back to the cheap path if the provider doesn't advertise a TUI list.
+   * The account's `/model` menu, answered to an `initialize` request with no
+   * prompt sent (nothing is generated). Claude replies with aliases plus a
+   * description naming the version; CodeBuddy with plain ids and names.
    */
-  async discoverModelsLive(): Promise<DiscoveredModel[]> {
-    if (!this.liveModelList) return this.discoverModels();
-    const live = await scrapeModelList(this.bin);
-    return live.length ? live : this.discoverModels();
+  async discoverModels(): Promise<DiscoveredModel[]> {
+    const bin = await newestBinary(this.bin);
+    if (!bin) return this.fallbackModels;
+    const models: DiscoveredModel[] = [];
+    const abort = new AbortController();
+    const kill = setTimeout(() => abort.abort(), 15_000);
+    try {
+      await streamJsonl({
+        bin,
+        args: [
+          "-p",
+          "--input-format",
+          "stream-json",
+          "--output-format",
+          "stream-json",
+          "--verbose",
+          "--setting-sources",
+          "",
+        ],
+        stdin: INITIALIZE,
+        abort,
+        onObject: (o) => {
+          if (o.type !== "control_response") return;
+          const reply = (o.response as { response?: { models?: InitModel[] } } | undefined)
+            ?.response;
+          for (const m of reply?.models ?? []) {
+            const modelId = m.value ?? m.id;
+            const label = m.displayName ?? m.name ?? modelId;
+            const head = m.description?.split(" · ")[0];
+            if (modelId && label) {
+              models.push({ modelId, name: head?.startsWith(label) ? head : label });
+            }
+          }
+        },
+      });
+    } catch (e) {
+      this.log.warn(`model discovery failed: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      clearTimeout(kill);
+    }
+    return models.length ? models : this.fallbackModels;
   }
 }
 
-/**
- * Parse `<bin> --help` for a `Currently supported: (id, id, …)` model list.
- * CodeBuddy advertises its models this way; best-effort, [] on any failure.
- */
-async function discoverFromHelp(bin: string): Promise<DiscoveredModel[]> {
-  const path = whichBinary(bin);
-  if (!path) return [];
-  const proc = Bun.spawn([path, "--help"], {
-    stdout: "pipe",
-    stderr: "ignore",
-    env: cliEnv() as Record<string, string>,
-  });
-  const kill = setTimeout(() => proc.kill(), 10_000);
-  try {
-    const text = await new Response(proc.stdout).text();
-    await proc.exited;
-    const m = /Currently supported:\s*\(([^)]+)\)/.exec(text);
-    if (!m) return [];
-    return m[1]!
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((id) => ({ modelId: id, name: id }));
-  } catch {
-    return [];
-  } finally {
-    clearTimeout(kill);
-  }
+interface InitModel {
+  value?: string;
+  id?: string;
+  displayName?: string;
+  name?: string;
+  description?: string;
 }
 
 function mapAnthropic(

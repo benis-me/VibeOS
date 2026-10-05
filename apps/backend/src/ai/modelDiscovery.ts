@@ -10,10 +10,13 @@ import { logger } from "../util/log.ts";
 
 const log = logger("models");
 
-/** Best-effort capability tags for a discovered model id. */
-export function inferCapabilities(id: string): ModelCapability[] {
-  // A refreshed list must retain verified capabilities instead of labelling every LLM as vision.
-  const known = AI_PROVIDERS.flatMap((p) => p.seedModels ?? []).find((m) => m.id === id);
+/** Best-effort capability tags for a model id discovered from `providerId`. */
+export function inferCapabilities(providerId: ProviderId, id: string): ModelCapability[] {
+  // A refreshed list must retain verified capabilities instead of labelling every LLM as
+  // vision. Only the same provider's catalog counts: CodeBuddy's ImageGen is "default",
+  // which is also Claude Code's default chat model.
+  const seeds = AI_PROVIDERS.find((p) => p.id === providerId)?.seedModels;
+  const known = seeds?.find((m) => m.id === id);
   if (known?.capabilities) return known.capabilities;
   const s = id.toLowerCase();
   if (/image|imagen|flux|dall|nano-banana|ideogram|recraft|seedream|qwen-image/.test(s)) {
@@ -26,12 +29,20 @@ export function inferCapabilities(id: string): ModelCapability[] {
 const TTL = 5 * 60_000;
 const recent = new Map<string, { at: number; models: ProviderModel[] }>();
 
-/** Broadcast a provider's models and remember them for reconnects. */
+/**
+ * Broadcast a provider's models and remember them for reconnects. An empty answer
+ * (no key, offline, CLI error) re-sends the last list instead of wiping it.
+ */
 export function publishModels(providerId: ProviderId, found: { modelId: string; name: string }[]) {
+  if (!found.length) {
+    const models = recent.get(providerId)?.models ?? [];
+    broadcast("s2c.provider.models", { providerId, models });
+    return;
+  }
   const models: ProviderModel[] = found.map((m) => ({
     id: m.modelId,
     name: m.name,
-    capabilities: inferCapabilities(m.modelId),
+    capabilities: inferCapabilities(providerId, m.modelId),
   }));
   recent.set(providerId, { at: Date.now(), models });
   broadcast("s2c.provider.models", { providerId, models });

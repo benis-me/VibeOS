@@ -22,7 +22,6 @@ export const ROLES: AgentRole[] = [
 ];
 export const CAPS: ModelCapability[] = ["text", "vision", "image", "reasoning", "tools"];
 
-/** Merge model lists (seed + discovered + custom); later entries win by id. */
 // — macOS-style building blocks ————————————————————————————————————————
 
 export function Pane({
@@ -155,19 +154,22 @@ export function Switch({
   checked,
   onChange,
   label,
+  disabled,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       role="switch"
       aria-label={label}
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        "vibe-switch relative h-[26px] w-[44px] rounded-full transition-colors",
+        "vibe-switch relative h-[26px] w-[44px] rounded-full transition-colors disabled:opacity-50",
         checked ? "bg-brand" : "bg-muted-foreground/30",
       )}
     >

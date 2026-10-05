@@ -67,14 +67,10 @@ export async function handleProviderFetchModels(
   // ephemeral (not persisted) so they never overwrite user-added models.
   const { providerId } = p;
   try {
-    const provider = await getProvider(providerId);
-    // This is the explicit, user-triggered fetch — prefer heavyweight live
-    // discovery (e.g. CodeBuddy's PTY `/model list` scrape) when the provider
-    // offers it; it never runs on boot/scan.
-    publishModels(providerId, await (provider.discoverModelsLive?.() ?? provider.discoverModels()));
+    publishModels(providerId, await (await getProvider(providerId)).discoverModels());
   } catch (e) {
     log.warn(`fetchModels(${providerId}) failed: ${e instanceof Error ? e.message : e}`);
-    broadcast("s2c.provider.models", { providerId, models: [] });
+    publishModels(providerId, []);
   }
 }
 

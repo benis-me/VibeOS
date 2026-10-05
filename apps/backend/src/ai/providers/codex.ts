@@ -7,7 +7,7 @@ import type {
   RunResult,
   TokenUsage,
 } from "./types.ts";
-import { whichBinary } from "./detect.ts";
+import { newestBinary } from "./detect.ts";
 import { streamJsonl } from "./cli/exec.ts";
 import { logger } from "../../util/log.ts";
 
@@ -51,7 +51,7 @@ class CodexProvider implements AiProvider {
   readonly label = "Codex";
 
   async run(opts: ProviderRunOptions): Promise<RunResult> {
-    const bin = whichBinary("codex");
+    const bin = await newestBinary("codex");
     if (!bin) return { text: "", ok: false, error: "codex CLI not found on PATH" };
 
     const flags = ["--json", "--skip-git-repo-check", "--sandbox", "read-only", "--cd", tmpdir()];
@@ -140,7 +140,7 @@ function mapEffort(effort?: Effort): string | undefined {
  * the CLI's own login). Best-effort: [] on any failure. Mirrors Omakase's daemon.
  */
 async function discoverViaCli(): Promise<DiscoveredModel[]> {
-  const bin = whichBinary("codex");
+  const bin = await newestBinary("codex");
   if (!bin) return [];
   const proc = Bun.spawn([bin, "debug", "models"], {
     stdout: "pipe",

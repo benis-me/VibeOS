@@ -2,8 +2,8 @@ import { AnthropicCliProvider } from "./cli/AnthropicCliProvider.ts";
 
 /**
  * Claude Code — drives the `claude` CLI directly in headless stream-json mode.
- * Auth reuses the CLI login or ANTHROPIC_API_KEY. The CLI exposes no model-list
- * command, so we offer its stable aliases (they resolve to the latest model).
+ * Auth reuses the CLI login or ANTHROPIC_API_KEY. Models come from the CLI's
+ * `/model` menu; the stable aliases below stand in if it can't answer.
  */
 export const claudeProvider = new AnthropicCliProvider({
   id: "claude",

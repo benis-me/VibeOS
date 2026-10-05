@@ -66,7 +66,7 @@ test("all four API providers persist, discover models and stream through their o
   for (const [i, id] of ids.entries()) {
     const catalog = AI_PROVIDERS.find((p) => p.id === id)!;
     for (const model of catalog.seedModels!) {
-      expect(inferCapabilities(model.id)).toEqual(model.capabilities!);
+      expect(inferCapabilities(id, model.id)).toEqual(model.capabilities!);
     }
     const envKey = keys[i]!;
     const previous = process.env[envKey];

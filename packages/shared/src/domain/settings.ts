@@ -67,7 +67,7 @@ export type ProviderField = "apiKey" | "baseUrl";
 
 /** Per-API-provider configuration (key + base url + model list), stored in DB. */
 export interface ApiProviderConfig {
-  /** Defaults to true (treat `!== false` as enabled). */
+  /** Unset means on once a key is set (Settings or env); off without one. */
   enabled?: boolean;
   apiKey?: string;
   baseUrl?: string;
@@ -107,10 +107,8 @@ export const AI_PROVIDERS: readonly ProviderCatalogEntry[] = [
     textCapable: true,
     // CodeBuddy's CLI has a built-in ImageGen tool (text-to-image).
     imageCapable: true,
-    // Account model list (CodeBuddy 2.109, June 2026). It's only exposed in the
-    // interactive `/model list` TUI, so it can't be auto-discovered cheaply —
-    // these are the verified defaults; "Fetch models" refreshes them live via a
-    // PTY scrape, and users can add/remove ids by hand.
+    // Account model list (CodeBuddy 2.109, June 2026). The CLI reports the live
+    // list at start-up and on "Fetch models"; these stand in until it answers.
     seedModels: [
       { id: "claude-opus-4.8", name: "Claude Opus 4.8", capabilities: TEXT },
       { id: "claude-opus-4.8-1m", name: "Claude Opus 4.8 1M", capabilities: TEXT },

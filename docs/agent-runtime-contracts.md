@@ -31,7 +31,9 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   `codex exec --json`; OpenRouter is an HTTP provider (Vercel AI SDK). Active provider:
   Settings → env `VIBEOS_AI_PROVIDER` → `DEFAULT_PROVIDER` (claude); at boot, providers
   whose CLI isn't on PATH (`availableProviderIds()`) are skipped and the choice falls back
-  to an available one (persisted). **UI generation is stateless** — each op is a fresh
+  to an available one (persisted). With several installs of a CLI, the newest one runs
+  (`newestBinary()`): Codex only offers an old client the models it supports.
+  **UI generation is stateless** — each op is a fresh
   conversation (no session resume); the full current UI is sent as context every time
   (`[CURRENT UI]` in `PromptAssembler`, capped by `VIBEOS_SNAPSHOT_BUDGET`, 0 = no cap).
   Cost is taken from the Claude CLI's reported figure, else estimated from tokens
@@ -42,11 +44,14 @@ apps/frontend     Vite + React 19 + Tailwind 4 + Zustand (custom token-based
   place of the CLI's coding-agent prompt; they never bypass permissions. Roles:
   `ui-generation` (first screens, seeds, skins, app versions), `ui-interaction` (updates
   after clicks and data refreshes; follows `ui-generation` until given its own model),
-  `system-event` and `maintenance`. Model discovery results are reused for five minutes
-  across reconnects; fetching a provider's models in Settings refreshes its list. A
-  fetched list replaces the built-in catalog in Settings and the model pickers (catalog
-  image models stay when the fetched list has none); the catalog only stands in until
-  something was discovered.
+  `system-event` and `maintenance`. Model discovery: Claude Code and CodeBuddy answer an
+  SDK `initialize` control request with their `/model` menu (no prompt is sent), Codex
+  runs `codex debug models`, API providers call `/models`. Results are reused for five
+  minutes across reconnects; fetching a provider's models in Settings refreshes its
+  list, and an empty answer keeps the last one. A fetched list replaces the built-in
+  catalog in Settings and the model pickers (catalog image models stay when the fetched
+  list has none); the catalog only stands in until something was discovered. An API
+  provider without a key is off.
 - **Host CSP.** `vite.config.ts` gives `index.html` a resource-only policy: images,
   media and frames load only from the shell, the backend API origin, `data:` and
   `blob:`. Generated HTML therefore cannot send context out through external images,

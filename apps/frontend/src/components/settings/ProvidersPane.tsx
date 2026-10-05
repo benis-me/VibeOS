@@ -29,8 +29,6 @@ export function ProvidersPane() {
   const apiProviders = AI_PROVIDERS.filter((p) => p.kind === "api");
   const [selected, setSelected] = useState<ProviderId>(apiProviders[0]?.id ?? "openai");
   const [fetching, setFetching] = useState<ProviderId | null>(null);
-  // The outcome of the last explicit fetch, so a click visibly says what came back.
-  const [fetched, setFetched] = useState<{ id: ProviderId; count: number } | null>(null);
   const before = useRef<ProviderModel[] | undefined>(undefined);
   type Draft = { original?: string; id: string; name: string; caps: ModelCapability[] };
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -41,21 +39,24 @@ export function ProvidersPane() {
   // Displayed list = the provider's fetched list (else the catalog) + user custom.
   const models = providerModelList(cat?.seedModels, providerModels[selected], custom);
   const isCustom = (id: string) => custom.some((m) => m.id === id);
+  // An API provider is on once it has a key (Settings or env) unless switched off.
+  const hasKey = (id: ProviderId) =>
+    !!(settings.apiProviders[id]?.apiKey || available.includes(id));
+  const isOn = (id: ProviderId) =>
+    AI_PROVIDERS.find((p) => p.id === id)?.kind === "cli"
+      ? available.includes(id)
+      : settings.apiProviders[id]?.enabled !== false && hasKey(id);
 
   // Safety net to clear the fetching spinner if the result broadcast never
-  // arrives. Generous because a Local Agent's live discovery (CodeBuddy's PTY
-  // `/model list` scrape) can take ~40s; normal completion clears it instantly
-  // below the moment fresh models land.
+  // arrives (discovery itself gives up after 15s)…
   useEffect(() => {
     if (!fetching) return;
-    const tmo = setTimeout(() => setFetching(null), 60000);
+    const tmo = setTimeout(() => setFetching(null), 20000);
     return () => clearTimeout(tmo);
   }, [fetching]);
   // …or the moment this provider's answer lands.
   useEffect(() => {
-    if (!fetching || providerModels[fetching] === before.current) return;
-    setFetched({ id: fetching, count: providerModels[fetching]?.length ?? 0 });
-    setFetching(null);
+    if (fetching && providerModels[fetching] !== before.current) setFetching(null);
   }, [providerModels, fetching]);
   // Drop any in-progress model edit when switching providers.
   useEffect(() => setDraft(null), [selected]);
@@ -86,11 +87,7 @@ export function ProvidersPane() {
     patch(selected, { models: custom.filter((m) => m.id !== id) });
 
   const ProviderButton = ({ id, label }: { id: ProviderId; label: string }) => {
-    const isCli = AI_PROVIDERS.find((p) => p.id === id)?.kind === "cli";
-    const on = isCli
-      ? available.includes(id)
-      : settings.apiProviders[id]?.enabled !== false &&
-        !!(settings.apiProviders[id]?.apiKey || available.includes(id));
+    const on = isOn(id);
     return (
       <button
         onClick={() => setSelected(id)}
@@ -119,11 +116,10 @@ export function ProvidersPane() {
         <h2 className="text-[13px] font-medium text-foreground/70">
           {t("settings.providers.models")} · {models.length}
         </h2>
-        {(cat?.modelsEndpoint || cat?.kind === "cli") && (
+        {(cat?.kind === "cli" || (cat?.modelsEndpoint && hasKey(selected))) && (
           <button
             onClick={() => {
               before.current = providerModels[selected];
-              setFetched(null);
               setFetching(selected);
               wsClient.send("c2s.provider.fetchModels", { providerId: selected });
             }}
@@ -134,17 +130,6 @@ export function ProvidersPane() {
           </button>
         )}
       </div>
-      {fetched?.id === selected && (
-        <p
-          role="status"
-          className={cn(
-            "mb-2 ml-1 text-2xs",
-            fetched.count ? "text-muted-foreground" : "text-destructive",
-          )}
-        >
-          {t(fetched.count ? "settings.providers.fetched" : "settings.providers.fetchEmpty")}
-        </p>
-      )}
       {models.length > 0 && (
         <Group>
           {models.map((m) => (
@@ -281,7 +266,8 @@ export function ProvidersPane() {
             {cat?.kind === "api" && (
               <Switch
                 label={cat?.label}
-                checked={cfg.enabled !== false}
+                checked={isOn(selected)}
+                disabled={!hasKey(selected)}
                 onChange={(v) => patch(selected, { enabled: v })}
               />
             )}
