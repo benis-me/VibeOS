@@ -4,7 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ---------------- Light theme — neutral black / white / gray ---------------- */
-:root {
+/* [data-skin="devdock"] lets a preview show DevDock while another skin is on. */
+:root,
+[data-skin="devdock"] {
   /* Native controls (select, checkbox, date) follow the theme too. */
   color-scheme: light;
   --radius: 0.625rem;
@@ -286,6 +288,12 @@ button:not(:disabled),
 
 ::selection {
   background: color-mix(in oklab, var(--foreground) 18%, transparent);
+}
+
+/* The path field suggests folders as you type; Chrome's datalist arrow would
+   sit in the middle of the field (nested selectors cannot reach this pseudo). */
+.vibe-files-location input::-webkit-calendar-picker-indicator {
+  display: none !important;
 }
 
 /* Secondary text on a selected (accent) fill follows that fill's foreground. */

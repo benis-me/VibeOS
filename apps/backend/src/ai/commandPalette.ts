@@ -1,4 +1,4 @@
-import { run, recordSummary, recordStep } from "./SdkManager.ts";
+import { run, recordSummary, recordStep, localSummary } from "./SdkManager.ts";
 import { parseAiOutput } from "./streamParser.ts";
 import { ulid } from "@vibeos/shared/util";
 import { listApps } from "../db/repositories/AppRepo.ts";
@@ -142,9 +142,10 @@ export async function runCommand(text: string, abort?: AbortController): Promise
         results.push(`${clip(command)} → ${clip(value)}`);
       }
     });
+    const calls = syscalls.map((c) => c.type).join(", ");
     await recordSummary(
       result.runId,
-      `"${text}" → ${syscalls.map((c) => c.type).join(", ") || "none"}`,
+      localSummary(`“${text}” → ${calls || "无操作"}`, `"${text}" → ${calls || "none"}`),
     );
     if (!canCommit() || !reads.length) break;
     history.push(

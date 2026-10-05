@@ -48,7 +48,8 @@ test("the DevDock fallback mirrors the CSS defaults", () => {
     "utf8",
   );
   for (const [mode, selector] of [
-    ["light", ":root {"],
+    // The light block also serves [data-skin="devdock"], so built-in previews resolve it.
+    ["light", '[data-skin="devdock"] {'],
     ["dark", ".dark {"],
   ] as const) {
     const block = css.slice(css.indexOf(selector), css.indexOf("}", css.indexOf(selector)));

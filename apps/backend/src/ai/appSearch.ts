@@ -1,7 +1,7 @@
 import type { AppSearchResult } from "@vibeos/shared/protocol";
 import { windowSizeSchema } from "@vibeos/shared/protocol";
 import { emojiFreeLine } from "@vibeos/shared/util";
-import { run, recordSummary } from "./SdkManager.ts";
+import { run, recordSummary, localSummary } from "./SdkManager.ts";
 import { logger } from "../util/log.ts";
 
 const log = logger("app-search");
@@ -103,7 +103,10 @@ export async function searchApps(
   if (abort?.signal.aborted) return [];
   if (!result.ok) throw new Error(result.error ?? "Generation failed");
   const parsed = parseAppSearchResults(result.text);
-  await recordSummary(result.runId, `"${query}" → ${parsed.length} results`);
+  await recordSummary(
+    result.runId,
+    localSummary(`“${query}” → ${parsed.length} 个结果`, `"${query}" → ${parsed.length} results`),
+  );
   log.info(`"${query}" → ${parsed.length} results in ${(performance.now() - t0).toFixed(0)}ms`);
   return parsed;
 }

@@ -30,7 +30,6 @@ import {
   Undo2,
   Upload,
   Send,
-  X,
 } from "lucide-react";
 import {
   FILE_UPLOAD_LIMIT,
@@ -120,6 +119,11 @@ export function FilesApp({
   const requestedFile = useChromeStore((s) => s.states[windowId]?.file ?? "");
   const apps = useAppStore((state) => state.apps);
   const [handoff, setHandoff] = useState<"pending" | "done" | null>(null);
+  useEffect(() => {
+    if (handoff !== "done") return;
+    const timer = setTimeout(() => setHandoff(null), 4000);
+    return () => clearTimeout(timer);
+  }, [handoff]);
   const [history, setHistory] = useState({ paths: [path], index: 0 });
   const [navigating, setNavigating] = useState(false);
   const navigationSequence = useRef(0);
@@ -574,25 +578,6 @@ export function FilesApp({
 
   return (
     <div className="vibe-files @container flex h-full min-w-0 flex-col bg-background text-foreground">
-      {handoff && (
-        <div
-          role="status"
-          className="flex shrink-0 items-center gap-2 border-b bg-card px-3 py-2 text-xs"
-        >
-          <span className="flex-1">
-            {t(handoff === "pending" ? "communication.processing" : "communication.completed")}
-          </span>
-          {handoff === "done" && (
-            <button
-              className={button}
-              onClick={() => setHandoff(null)}
-              aria-label={t("communication.dismiss")}
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
-      )}
       <FilesAddressBar
         path={path}
         busy={busy || navigating}
@@ -1062,7 +1047,18 @@ export function FilesApp({
                 role="status"
                 className="flex shrink-0 items-center gap-2 border-t px-3 py-1.5 text-2xs text-muted-foreground"
               >
-                <span>{busy ? t("files.working") : `${filtered.length} ${t("files.items")}`}</span>
+                {/* A handoff to another app reports here, so nothing above the list moves. */}
+                <span>
+                  {handoff
+                    ? t(
+                        handoff === "pending"
+                          ? "communication.processing"
+                          : "communication.completed",
+                      )
+                    : busy
+                      ? t("files.working")
+                      : `${filtered.length} ${t("files.items")}`}
+                </span>
                 {current && (
                   <span className="ml-auto">{new Date(current.modifiedAt).toLocaleString()}</span>
                 )}

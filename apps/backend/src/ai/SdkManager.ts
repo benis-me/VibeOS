@@ -74,6 +74,14 @@ export async function recordStep(
   broadcast("s2c.activity.changed", { traceId: trace.id });
 }
 
+/**
+ * A summary the system writes itself, when there is no model text to use, in the
+ * language the user reads; the model's own summaries already follow the locale.
+ */
+export function localSummary(zh: string, en: string): string {
+  return (loadSettings().locale ?? DEFAULT_LOCALE) === "en" ? en : zh;
+}
+
 /** Attach a one-line summary of what a run produced, and re-broadcast it. */
 export async function recordSummary(runId: string | undefined, summary: string): Promise<void> {
   if (!runId || !summary.trim()) return;

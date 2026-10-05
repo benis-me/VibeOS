@@ -14,7 +14,12 @@ import { SYSTEM_FOLDERS } from "@vibeos/shared";
 import { useT } from "@/lib/i18n";
 
 const control =
-  "vibe-files-nav-btn grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-30";
+  "vibe-files-nav-btn grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-30";
+/** Inside the 32px location field: 24px, with a radius concentric to the field's 8px. */
+const inner =
+  "grid size-6 shrink-0 place-items-center rounded-[4px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-30";
+const crumb =
+  "flex h-6 shrink-0 items-center gap-1.5 rounded-[4px] px-1.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40";
 
 export function FilesAddressBar({
   path,
@@ -133,8 +138,9 @@ export function FilesAddressBar({
           <ArrowUp className="size-4" />
         </button>
       </div>
-      {/* The location keeps its room; secondary controls give way in a narrow window. */}
-      <div className="vibe-files-location flex h-9 min-w-28 flex-1 items-center rounded-lg border bg-background/70 shadow-xs focus-within:ring-2 focus-within:ring-ring/30">
+      {/* The location keeps its room; secondary controls give way in a narrow window.
+          It matches the toolbar's 32px fields and rings only while a path is typed. */}
+      <div className="vibe-files-location flex h-8 min-w-28 flex-1 items-center gap-1 rounded-md border bg-background pr-1 has-[input:focus]:ring-2 has-[input:focus]:ring-ring/40">
         {editing ? (
           <form
             className="flex min-w-0 flex-1 items-center"
@@ -160,29 +166,36 @@ export function FilesAddressBar({
                   setAddress(`/${path}`);
                 }
               }}
-              className="h-8 min-w-0 flex-1 bg-transparent px-3 font-mono text-xs outline-none"
+              className="h-full min-w-0 flex-1 bg-transparent px-2.5 font-mono text-xs outline-none"
             />
             <datalist id={locationsId}>
               {Array.from(new Set([...SYSTEM_FOLDERS, ...directories])).map((directory) => (
                 <option key={directory} value={`/${directory}`} />
               ))}
             </datalist>
-            <button type="submit" className={control} title={t("files.go")} disabled={busy}>
-              <ArrowRight className="size-4" />
+            <button
+              type="submit"
+              className={inner}
+              title={t("files.go")}
+              aria-label={t("files.go")}
+              disabled={busy}
+            >
+              <ArrowRight className="size-3.5" />
             </button>
           </form>
         ) : (
           <>
             <nav
               aria-label={t("files.breadcrumbs")}
-              className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1 text-xs"
+              className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1 text-xs [scrollbar-width:none]"
               onDoubleClick={edit}
             >
               <button
                 type="button"
-                className="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                className={crumb}
                 disabled={busy}
                 title={t("files.disk")}
+                aria-label={t("files.disk")}
                 onClick={() => void onNavigate("/")}
               >
                 <HardDrive className="size-3.5" />
@@ -200,7 +213,7 @@ export function FilesAddressBar({
                     aria-current={index === parts.length - 1 ? "page" : undefined}
                     title={part}
                     onClick={() => void onNavigate(`/${parts.slice(0, index + 1).join("/")}`)}
-                    className="h-7 max-w-36 truncate rounded-md px-2 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                    className="block h-6 max-w-36 truncate rounded-[4px] px-1.5 leading-6 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
                   >
                     {part}
                   </button>
@@ -209,8 +222,9 @@ export function FilesAddressBar({
             </nav>
             <button
               type="button"
-              className={control}
+              className={inner}
               title={t("files.editPath")}
+              aria-label={t("files.editPath")}
               disabled={busy}
               onClick={edit}
             >

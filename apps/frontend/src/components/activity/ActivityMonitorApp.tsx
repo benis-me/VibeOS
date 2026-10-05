@@ -25,8 +25,11 @@ const DOT: Record<string, string> = {
   aborted: "bg-warn",
 };
 
+// A narrow window keeps app, summary, status and time; model, tokens and cost
+// return from 42rem (and are always in a run's details).
 const COLS =
-  "grid grid-cols-[minmax(90px,1.2fr)_minmax(120px,1.8fr)_minmax(72px,0.9fr)_60px_48px_52px_60px_50px] gap-2";
+  "grid grid-cols-[minmax(80px,1fr)_minmax(0,1.6fr)_56px_44px_auto] gap-2 @2xl:grid-cols-[minmax(90px,1.2fr)_minmax(120px,1.8fr)_minmax(72px,0.9fr)_60px_48px_52px_60px_50px]";
+const WIDE = "hidden @2xl:block";
 
 const tok = (r: AgentRun) => (r.inputTokens ?? 0) + (r.outputTokens ?? 0);
 
@@ -236,7 +239,7 @@ export function ActivityMonitorApp() {
 
         {/* ---- runs table ---- */}
         <div className="min-h-32 flex-1 overflow-auto" onScroll={onScroll}>
-          <div className="min-w-[660px]">
+          <div className="@2xl:min-w-[660px]">
             <div
               className={cn(
                 COLS,
@@ -245,11 +248,11 @@ export function ActivityMonitorApp() {
             >
               <span>{t("activity.col.app")}</span>
               <span>{t("activity.col.summary")}</span>
-              <span>{t("activity.col.model")}</span>
+              <span className={WIDE}>{t("activity.col.model")}</span>
               <span>{t("activity.col.status")}</span>
               <span className="text-right">{t("activity.col.time")}</span>
-              <span className="text-right">{t("activity.col.tokens")}</span>
-              <span className="text-right">{t("activity.col.cost")}</span>
+              <span className={cn(WIDE, "text-right")}>{t("activity.col.tokens")}</span>
+              <span className={cn(WIDE, "text-right")}>{t("activity.col.cost")}</span>
               <span className="text-right">{t("activity.col.action")}</span>
             </div>
 
@@ -316,7 +319,7 @@ function RunRow({ r, t, onSelect }: { r: AgentRun; t: T; onSelect: () => void })
         type="button"
         aria-label={`${t("activity.details")} · ${r.appName ?? t(`activity.role.${r.role}`)}`}
         onClick={onSelect}
-        className="col-span-7 grid cursor-pointer grid-cols-subgrid items-center gap-2 text-left focus-visible:outline focus-visible:outline-ring"
+        className="col-span-4 grid cursor-pointer grid-cols-subgrid items-center gap-2 text-left focus-visible:outline focus-visible:outline-ring @2xl:col-span-7"
       >
         <div className="min-w-0">
           <div className="truncate font-medium">{r.appName ?? t(`activity.role.${r.role}`)}</div>
@@ -332,7 +335,10 @@ function RunRow({ r, t, onSelect }: { r: AgentRun; t: T; onSelect: () => void })
         >
           {r.status === "error" ? r.error : (r.summary ?? "—")}
         </div>
-        <div className="min-w-0 truncate text-2xs text-muted-foreground" title={r.model}>
+        <div
+          className={cn(WIDE, "min-w-0 truncate text-2xs text-muted-foreground")}
+          title={r.model}
+        >
           {r.model ?? "—"}
         </div>
         <div className="flex items-center gap-1.5 text-2xs">
@@ -340,10 +346,10 @@ function RunRow({ r, t, onSelect }: { r: AgentRun; t: T; onSelect: () => void })
           <span className="truncate text-muted-foreground">{t(`activity.status.${r.status}`)}</span>
         </div>
         <div className="text-right tabular-nums text-muted-foreground">{dur}</div>
-        <div className="text-right tabular-nums text-muted-foreground">
+        <div className={cn(WIDE, "text-right tabular-nums text-muted-foreground")}>
           {total ? fmtTokens(total) : "—"}
         </div>
-        <div className="text-right tabular-nums text-muted-foreground">
+        <div className={cn(WIDE, "text-right tabular-nums text-muted-foreground")}>
           {fmtCost(r.costUsd ?? 0)}
         </div>
       </button>

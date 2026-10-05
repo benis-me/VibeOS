@@ -26,7 +26,7 @@ import { openContextMenu } from "@/components/contextmenu/ContextMenu";
 import { useT } from "@/lib/i18n";
 import { buttonVariants } from "@/components/ui/button";
 import { Select } from "@/components/ui/primitives";
-import { clock } from "@/lib/utils";
+import { clock, cn } from "@/lib/utils";
 
 const button = buttonVariants();
 const iconButton = buttonVariants({ size: "icon" });
@@ -213,7 +213,11 @@ export function SkinsApp() {
             <MoreHorizontal className="size-4" />
           </button>
         </div>
-        <SkinPreview skin={skin} dark={dark} />
+        {skin.builtIn ? (
+          <BuiltinPreview skin={skin} dark={dark} />
+        ) : (
+          <SkinPreview skin={skin} dark={dark} />
+        )}
         <input
           ref={fileInput}
           type="file"
@@ -452,6 +456,49 @@ export function SkinsApp() {
 }
 
 const SWATCHES = ["background", "card", "foreground", "brand", "accent", "border"] as const;
+
+/**
+ * A built-in skin's look from its real tokens: the figure carries data-skin (and
+ * .dark for DevDock's dark side), so the stylesheet itself resolves the colors.
+ */
+function BuiltinPreview({ skin, dark }: { skin: SkinRecord; dark: boolean }) {
+  const t = useT();
+  return (
+    <figure
+      aria-label={t("skins.preview")}
+      data-skin={skin.id}
+      className={cn(
+        "vibe-skinpreview relative mt-3 h-[120px] overflow-hidden rounded-lg border",
+        dark && "dark",
+      )}
+      style={{ background: "var(--desktop)" }}
+    >
+      <figcaption
+        className="absolute left-3 top-3 max-w-[70%] truncate rounded-md px-2 py-1 text-sm font-medium"
+        style={{
+          fontFamily: "var(--font-sans)",
+          color: "var(--foreground)",
+          background: "var(--card)",
+        }}
+      >
+        {skin.name}
+      </figcaption>
+      <div
+        className="absolute bottom-3 left-3 flex gap-1.5 rounded-md p-1.5"
+        style={{ background: "var(--card)" }}
+      >
+        {SWATCHES.map((key) => (
+          <span
+            key={key}
+            title={key}
+            className="size-5 rounded-sm"
+            style={{ background: `var(--${key})`, boxShadow: "inset 0 0 0 1px rgb(0 0 0 / 0.15)" }}
+          />
+        ))}
+      </div>
+    </figure>
+  );
+}
 
 /** The skin at a glance, from its definition alone: wallpaper, key colors and title font. */
 function SkinPreview({ skin, dark }: { skin: SkinRecord; dark: boolean }) {

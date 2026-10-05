@@ -22,7 +22,7 @@ import {
 import { kernelState } from "../kernel/kernelState.ts";
 import { loadSettings } from "../db/repositories/SettingsRepo.ts";
 import { assemblePrompt, decideRenderMode } from "../prompt/PromptAssembler.ts";
-import { run, recordSummary, recordStep } from "../ai/SdkManager.ts";
+import { run, recordSummary, recordStep, localSummary } from "../ai/SdkManager.ts";
 import { parseAiOutput, extractStreamingHtml, extractSummary } from "../ai/streamParser.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
 import { extractRegionIds } from "./regionMerge.ts";
@@ -466,7 +466,10 @@ async function generate(
         error instanceof Error
           ? `${error.message}${error.cause ? `: ${String(error.cause)}` : ""}`
           : String(error);
-      await recordSummary(result.runId, `Rejected output: ${repairReason}`);
+      await recordSummary(
+        result.runId,
+        localSummary(`输出未通过校验：${repairReason}`, `Rejected output: ${repairReason}`),
+      );
       await recordStep(
         parsed.syscallError ? "syscall.rejected" : "ui.rejected",
         { windowId, error: repairReason },
@@ -523,7 +526,10 @@ async function generate(
         (call) => call.type === "close" && (call.windowId ?? windowId) === windowId,
       )
     ) {
-      await recordSummary(result.runId, parsed.summary || "Closed window");
+      await recordSummary(
+        result.runId,
+        parsed.summary || localSummary("关闭了窗口", "Closed the window"),
+      );
       return;
     }
     const canPublish = () =>
@@ -639,10 +645,10 @@ async function generate(
     const what =
       parsed.summary ||
       (regions?.length
-        ? `Patched ${regions.length} region(s)`
+        ? localSummary(`更新了 ${regions.length} 个区域`, `Updated ${regions.length} region(s)`)
         : html !== undefined
-          ? "Rendered full window"
-          : "No output");
+          ? localSummary("重新生成了整个窗口", "Rendered the full window")
+          : localSummary("没有生成内容", "No output"));
     log.info(
       `✓ ${app.name} [${windowId.slice(-6)}] ${regions?.length ? `${regions.length} region(s)` : "full"}, ${(performance.now() - t0).toFixed(0)}ms`,
     );

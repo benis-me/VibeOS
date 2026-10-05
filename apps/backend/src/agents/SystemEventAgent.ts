@@ -1,5 +1,5 @@
 import type { TimerAgent } from "./types.ts";
-import { run, recordSummary, recordStep } from "../ai/SdkManager.ts";
+import { run, recordSummary, recordStep, localSummary } from "../ai/SdkManager.ts";
 import { parseAiOutput } from "../ai/streamParser.ts";
 import { kernelState } from "../kernel/kernelState.ts";
 import * as Syscalls from "../syscall/SyscallInterpreter.ts";
@@ -46,7 +46,7 @@ export const SystemEventAgent: TimerAgent = {
       );
       return;
     }
-    await recordSummary(result.runId, parsed.summary || "Ambient event");
+    await recordSummary(result.runId, parsed.summary || localSummary("氛围事件", "Ambient event"));
     // Clicking the notification opens this application, which updates itself.
     const notes = parsed.syscalls.filter((call) => call.type === "notify").slice(0, 1);
     if (notes.length) await Syscalls.execute(notes, { source: "agent", appId: app.id });
