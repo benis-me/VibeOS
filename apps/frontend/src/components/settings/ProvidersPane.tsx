@@ -94,7 +94,7 @@ export function ProvidersPane() {
         aria-current={selected === id || undefined}
         onClick={() => setSelected(id)}
         className={cn(
-          "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors",
+          "flex w-full items-center gap-2 rounded-lg px-2 py-[7px] text-left text-[13px]",
           selected === id
             ? "bg-accent text-accent-foreground"
             : "text-foreground/80 hover:bg-accent/50",
@@ -133,7 +133,7 @@ export function ProvidersPane() {
               setFetching(selected);
               wsClient.send("c2s.provider.fetchModels", { providerId: selected });
             }}
-            className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-xs text-foreground/80 transition-colors hover:bg-accent"
+            className="vibe-btn flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1 text-xs text-foreground/80 hover:bg-accent"
           >
             <RefreshCw className={cn("size-3.5", fetching === selected && "animate-spin")} />
             {t("settings.providers.fetch")}
@@ -154,14 +154,14 @@ export function ProvidersPane() {
                   <button
                     onClick={() => startEdit(m)}
                     title={t("settings.providers.edit")}
-                    className="text-muted-foreground transition-colors hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     <Pencil className="size-3.5" />
                   </button>
                   <button
                     onClick={() => removeModel(m.id)}
                     title={t("settings.providers.remove")}
-                    className="text-muted-foreground transition-colors hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive"
                   >
                     <X className="size-3.5" />
                   </button>
@@ -210,7 +210,7 @@ export function ProvidersPane() {
                   key={c}
                   onClick={() => toggleCap(c)}
                   className={cn(
-                    "rounded-md border px-2 py-1 text-2xs transition-colors",
+                    "rounded-md border px-2 py-1 text-2xs",
                     draft.caps.includes(c)
                       ? "border-brand bg-brand/10 text-foreground"
                       : "text-muted-foreground hover:bg-accent/50",
@@ -224,13 +224,13 @@ export function ProvidersPane() {
           <div className="flex justify-end gap-2 pt-1">
             <button
               onClick={() => setDraft(null)}
-              className="rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent/50"
+              className="rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent/50"
             >
               {t("settings.providers.cancel")}
             </button>
             <button
               onClick={saveDraft}
-              className="vibe-btn rounded-lg border bg-card px-2.5 py-1.5 text-xs text-foreground/80 transition-colors hover:bg-accent"
+              className="vibe-btn rounded-lg border bg-card px-2.5 py-1.5 text-xs text-foreground/80 hover:bg-accent"
             >
               {t("settings.providers.save")}
             </button>
@@ -239,7 +239,7 @@ export function ProvidersPane() {
       ) : (
         <button
           onClick={startAdd}
-          className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+          className="mt-2.5 flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground hover:bg-accent/40 hover:text-foreground"
         >
           <Plus className="size-3.5" />
           {t("settings.providers.addModelBtn")}
@@ -256,7 +256,7 @@ export function ProvidersPane() {
           <div className="w-44 shrink-0 space-y-6 @max-xl:w-full">
             <div>
               <GroupLabel>{t("settings.providers.local")}</GroupLabel>
-              <div className="space-y-0.5 @max-xl:grid @max-xl:grid-cols-2 @max-xl:gap-0.5 @max-xl:space-y-0">
+              <div className="@max-xl:grid @max-xl:grid-cols-2">
                 {cliProviders.map((p) => (
                   <ProviderButton key={p.id} id={p.id} label={p.label} />
                 ))}
@@ -264,7 +264,7 @@ export function ProvidersPane() {
             </div>
             <div>
               <GroupLabel>{t("settings.providers.api")}</GroupLabel>
-              <div className="space-y-0.5 @max-xl:grid @max-xl:grid-cols-2 @max-xl:gap-0.5 @max-xl:space-y-0">
+              <div className="@max-xl:grid @max-xl:grid-cols-2">
                 {apiProviders.map((p) => (
                   <ProviderButton key={p.id} id={p.id} label={p.label} />
                 ))}

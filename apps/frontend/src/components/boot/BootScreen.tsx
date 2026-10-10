@@ -9,7 +9,8 @@ export function BootScreen() {
 
   return (
     <div className="flex h-full w-full flex-col items-center justify-center bg-background text-foreground">
-      <div className="flex flex-col items-center gap-6">
+      {/* Held back 300ms: a quick boot shows only the background, never a flash of the logo. */}
+      <div className="vibe-boot-content flex flex-col items-center gap-6">
         <div className="text-3xl font-semibold tracking-tight">
           Vibe<span className="text-muted-foreground">OS</span>
         </div>

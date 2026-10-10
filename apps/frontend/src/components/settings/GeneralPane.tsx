@@ -7,6 +7,7 @@ import { wsClient, API_BASE } from "@/lib/ws";
 import { fileToWallpaperDataUrl } from "@/lib/image";
 import { isComposing } from "@/lib/fields";
 import { useT, useLocale } from "@/lib/i18n";
+import { playReady } from "@/lib/sound";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Pane,
@@ -37,6 +38,12 @@ export function GeneralPane() {
   const setSkin = (next: Skin) => wsClient.send("c2s.settings.update", { partial: { skin: next } });
   const setProactive = (on: boolean) =>
     wsClient.send("c2s.settings.update", { partial: { prefs: { proactiveAgents: on } } });
+  const sounds = useSettingsStore((s) => s.settings?.prefs.uiSounds !== false);
+  const setSounds = (on: boolean) => {
+    wsClient.send("c2s.settings.update", { partial: { prefs: { uiSounds: on } } });
+    // Turning it on plays the cue once, so you know what you will hear.
+    if (on) playReady();
+  };
 
   return (
     <Pane title={t("settings.cat.general")}>
@@ -97,6 +104,9 @@ export function GeneralPane() {
         </Row>
         <Row label={t("settings.proactive")} hint={t("settings.proactive.hint")}>
           <Switch label={t("settings.proactive")} checked={proactive} onChange={setProactive} />
+        </Row>
+        <Row label={t("settings.sounds")} hint={t("settings.sounds.hint")}>
+          <Switch label={t("settings.sounds")} checked={sounds} onChange={setSounds} />
         </Row>
       </Group>
     </Pane>

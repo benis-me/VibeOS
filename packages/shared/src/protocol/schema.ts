@@ -119,6 +119,7 @@ export const settingsPartialSchema = z
       .object({
         memoryEnabled: z.boolean(),
         proactiveAgents: z.boolean(),
+        uiSounds: z.boolean(),
         wallpaper: z.string().max(2048),
         imageModel: z
           .object({ provider: z.string().max(80), model: z.string().max(300) })

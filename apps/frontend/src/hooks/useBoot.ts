@@ -12,6 +12,7 @@ import { useSettingsStore, applyLocale } from "@/stores/settingsStore";
 import { useActivityStore } from "@/stores/activityStore";
 import { useChromeStore } from "@/stores/chromeStore";
 import { browserLocale, translate } from "@/lib/i18n";
+import { initSounds, playReady, soundsOn } from "@/lib/sound";
 import { ulid } from "@vibeos/shared/util";
 
 /** Connects the websocket and wires every s2c.* frame into the stores. */
@@ -126,11 +127,18 @@ export function useBoot(): void {
       }),
     );
 
+    offs.push(initSounds());
     offs.push(
       wsClient.on("s2c.ui.patch", (p) => {
         const store = useWindowStore.getState();
+        const since = store.progress[p.windowId]?.since;
         store.applyPatch(p);
-        if (p.done) store.setBusy(p.windowId, false);
+        if (!p.done) return;
+        store.setBusy(p.windowId, false);
+        // A long generation that finishes out of view (another window or tab) gets
+        // a quiet cue; one the user is watching needs none.
+        const watched = !document.hidden && store.windows[p.windowId]?.focused;
+        if (since && Date.now() - since > 8000 && !watched && soundsOn()) playReady();
       }),
     );
 

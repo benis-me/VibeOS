@@ -13,7 +13,8 @@ export function Clock() {
   const date = now.toLocaleDateString(bcp, { month: "short", day: "numeric" });
   return (
     <div className="vibe-clock flex flex-col items-end px-3 text-right leading-tight">
-      <span className="text-xs font-medium">{time}</span>
+      {/* Equal-width digits: the centered Dock must not resize as the minutes turn. */}
+      <span className="text-xs font-medium tabular-nums">{time}</span>
       <span className="text-2xs text-muted-foreground">{date}</span>
     </div>
   );

@@ -17,6 +17,10 @@ VibeOS DESIGN SYSTEM — every screen MUST follow this so all apps look like one
   column), vo-scroll (the flexible area that scrolls), vo-card (panel: card background, border,
   var(--radius), 12px padding), vo-row (horizontal flex, centered, 8px gap), vo-muted (secondary text).
 - Corners var(--radius); spacing rhythm 8px / 12px / 16px.
+- Numbers that change or line up (timers, counters, prices, scores, table values) use
+  font-variant-numeric:tabular-nums; right-align numeric columns.
+- Motion: transition transform/opacity with var(--ease-out) in 150–250ms; hover feedback
+  is instant (no transition); anything leaving is quicker than it arrived.
 - Keep it clean, neutral, modern (think macOS/shadcn) — minimal, lots of whitespace,
   thin borders, no gradients unless subtle.
 - ABSOLUTELY NO EMOJI anywhere — not in headings, labels, buttons, list items,

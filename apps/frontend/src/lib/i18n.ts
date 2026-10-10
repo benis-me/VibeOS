@@ -412,6 +412,8 @@ const zh: Dict = {
   "settings.language.hint": "界面与 AI 生成内容的语言。",
   "settings.proactive": "自动产生系统事件",
   "settings.proactive.hint": "开启后，VibeOS 会不时自行产生系统事件和通知。",
+  "settings.sounds": "界面提示音",
+  "settings.sounds.hint": "较长的生成在你看别处时完成，会轻轻提示一声。",
   // Settings — AI engine
   "settings.provider": "引擎",
   "settings.provider.hint": "驱动界面生成的 AI 后端。",
@@ -999,6 +1001,8 @@ const en: Dict = {
   "settings.proactive": "Ambient system events",
   "settings.proactive.hint":
     "When on, VibeOS now and then creates system events and notifications on its own.",
+  "settings.sounds": "Interface sounds",
+  "settings.sounds.hint": "A quiet chime when a long generation finishes while you look elsewhere.",
   "settings.provider": "Engine",
   "settings.provider.hint": "The AI backend that drives generation.",
   "settings.provider.cliHint": "Local CLI subprocess — install and sign in to the matching CLI.",

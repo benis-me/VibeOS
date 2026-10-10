@@ -42,7 +42,9 @@ export function SettingsApp() {
     <div className="@container flex h-full bg-background text-foreground">
       <nav
         aria-label={t("settings.title")}
-        className="flex w-52 shrink-0 flex-col gap-0.5 overflow-auto border-r bg-muted/30 px-2.5 py-4 @max-2xl:w-14 @max-2xl:px-2"
+        // Items touch (no gap) so the pointer never crosses a dead strip between
+        // them; the 1px of extra padding keeps the old rhythm.
+        className="flex w-52 shrink-0 flex-col overflow-auto border-r bg-muted/30 px-2.5 py-4 @max-2xl:w-14 @max-2xl:px-2"
       >
         {CATEGORIES.map((c) => {
           const active = category === c.id;
@@ -54,7 +56,7 @@ export function SettingsApp() {
               title={c.label}
               onClick={() => setCategory(c.id)}
               className={cn(
-                "flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors @max-2xl:justify-center @max-2xl:px-0",
+                "flex items-center gap-2.5 rounded-lg px-2 py-[7px] text-left text-[13px] @max-2xl:justify-center @max-2xl:px-0",
                 active
                   ? "bg-accent text-accent-foreground"
                   : "text-foreground/80 hover:bg-accent/50",

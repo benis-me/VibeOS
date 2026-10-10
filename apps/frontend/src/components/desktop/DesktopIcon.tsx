@@ -1,6 +1,5 @@
 import { useRef } from "react";
-import { FileText, FolderSimple } from "@phosphor-icons/react";
-import { CornerUpRight } from "lucide-react";
+import { ArrowBendUpRight, FileText, FolderSimple } from "@phosphor-icons/react";
 import { AppIcon } from "@/components/AppIcon";
 import type { VfsNode } from "@vibeos/shared";
 import { useAppStore } from "@/stores/appStore";
@@ -86,7 +85,7 @@ export function DesktopIcon({ node }: { node: VfsNode }) {
       }}
       title={node.type === "shortcut" ? `${node.name} · ${t("files.shortcut")}` : node.name}
       onContextMenu={(e) => openContextMenu(e, desktopItemMenu({ t, node }))}
-      className="absolute flex w-20 touch-none flex-col items-center gap-1 rounded-lg p-2 text-center transition-colors hover:bg-foreground/5 focus-visible:bg-foreground/10"
+      className="absolute flex w-20 touch-none flex-col items-center gap-1 rounded-lg p-2 text-center hover:bg-foreground/5 focus-visible:bg-foreground/10"
       style={{ left: node.x ?? 24, top: node.y ?? 24 }}
     >
       <span
@@ -97,15 +96,18 @@ export function DesktopIcon({ node }: { node: VfsNode }) {
       >
         {icon}
         {node.type === "shortcut" && (
-          <CornerUpRight
+          // Same icon family as the glyph it marks; bold so it reads at badge size.
+          <ArrowBendUpRight
             aria-hidden
+            weight="bold"
             className="absolute bottom-0 left-0 size-3.5 rounded-sm border bg-background p-px text-foreground"
           />
         )}
       </span>
       <span
         className={cn(
-          "line-clamp-2 text-2xs",
+          // Two-line names break into even lines, like Finder labels.
+          "line-clamp-2 text-balance text-2xs",
           hasWallpaper ? "desktop-icon-on-wallpaper" : "text-foreground/90 drop-shadow",
         )}
       >

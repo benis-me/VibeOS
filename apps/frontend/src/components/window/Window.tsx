@@ -63,6 +63,13 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
       y: dr.top + dr.height / 2 - (wr.top + wr.height / 2),
     });
   }, [minimized, reduced, win.id]);
+  // Minimize and restore fly to and from the Dock, so they keep the longer move;
+  // opening uses the short window motion and closing its own quicker exit.
+  const wasMinimized = useRef(minimized);
+  useEffect(() => {
+    wasMinimized.current = minimized;
+  });
+  const genie = minimized || wasMinimized.current;
   // Fit the current screen without losing the preferred geometry on a larger screen.
   // CSS keeps this responsive to both viewport and skin/taskbar changes.
   const rect = useWindowStore((s) => s.dragRects[win.id]) ?? win.rect;
@@ -97,17 +104,17 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
             ? { opacity: 1 }
             : { opacity: 1, scale: 1, x: 0, y: 0 }
       }
-      transition={{ duration: reduced ? 0.12 : 0.3, ease: EASE_OUT }}
+      transition={genie ? { duration: reduced ? 0.12 : 0.3, ease: EASE_OUT } : winMotion.transition}
       data-focused={win.focused ? "true" : undefined}
       data-maximized={maximized ? "true" : undefined}
       aria-hidden={minimized || undefined}
       className={cn(
-        "vibe-window group absolute flex flex-col overflow-hidden border sheen transition-shadow",
+        "vibe-window group absolute flex flex-col overflow-hidden border inset-shadow-sheen transition-shadow",
         widget
-          ? "rounded-2xl border-white/20 bg-card/25 shadow-xl backdrop-blur-2xl"
+          ? "rounded-2xl border-white/20 bg-card/25 shadow-window backdrop-blur-2xl"
           : win.focused
-            ? "rounded-xl ring-1 ring-ring/30 win-focused win-glass"
-            : "rounded-xl bg-card win-unfocused",
+            ? "rounded-xl shadow-window-focused win-glass"
+            : "rounded-xl bg-card shadow-window",
       )}
       style={{
         left: maximized ? 0 : `clamp(0px, ${rect.x}px, calc(100vw - ${width}))`,
@@ -163,7 +170,7 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
                 aria-expanded={editing}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => setEditing((v) => !v)}
-                className="vibe-titlebar-action flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition hover:bg-current/10 hover:opacity-100"
+                className="vibe-titlebar-action flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 hover:bg-current/10 hover:opacity-100"
               >
                 <Sparkles className="size-3.5" />
               </button>
@@ -173,7 +180,7 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
                 aria-label={t("win.saveAsApp")}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => wsClient.send("c2s.app.save", { windowId: win.id })}
-                className="vibe-titlebar-action flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 transition hover:bg-current/10 hover:opacity-100"
+                className="vibe-titlebar-action flex size-6 shrink-0 items-center justify-center rounded-md opacity-60 hover:bg-current/10 hover:opacity-100"
               >
                 <Save className="size-3.5" />
               </button>
@@ -219,7 +226,7 @@ export const Window = memo(function Window({ win, layer }: { win: WindowState; l
           <button
             onClick={() => closeWindow(win)}
             title={t("win.close")}
-            className="absolute right-1.5 top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-background/70 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive-fill hover:text-white group-hover:opacity-100"
+            className="absolute right-1.5 top-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-background/70 text-muted-foreground opacity-0 transition-opacity after:absolute after:-inset-0.5 hover:bg-destructive-fill hover:text-white group-hover:opacity-100"
           >
             <X className="size-3" />
           </button>
@@ -342,7 +349,8 @@ function GenerationStatus({ windowId }: { windowId: string }) {
         aria-label={t("win.stop")}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={stop}
-        className="vibe-genstop flex size-4 shrink-0 items-center justify-center rounded-full opacity-70 transition hover:bg-current/15 hover:opacity-100"
+        // 16px to look at, 24px to hit.
+        className="vibe-genstop relative flex size-4 shrink-0 items-center justify-center rounded-full opacity-70 after:absolute after:-inset-1 hover:bg-current/15 hover:opacity-100"
       >
         <Square className="size-2 fill-current" />
       </button>
@@ -413,7 +421,7 @@ function TitleButton({
       onPointerDown={(e) => e.stopPropagation()}
       onClick={onClick}
       className={cn(
-        "vibe-winbtn flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors",
+        "vibe-winbtn flex size-6 items-center justify-center rounded-md text-muted-foreground",
         kind && `vibe-winbtn-${kind}`,
         danger
           ? "hover:bg-destructive-fill hover:text-white"

@@ -53,6 +53,8 @@ test("settings updates accept only known, well-formed fields", () => {
   const update = (partial: unknown) =>
     parseClientMessage({ type: "c2s.settings.update", payload: { partial } });
   expect(update({ theme: "dark", prefs: { proactiveAgents: false } })).not.toBeNull();
+  expect(update({ prefs: { uiSounds: false } })).not.toBeNull();
+  expect(update({ prefs: { uiSounds: "off" } })).toBeNull();
   expect(
     update({ modelOverrides: { "ui-interaction": { provider: "", model: "" } } }),
   ).not.toBeNull();

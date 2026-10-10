@@ -15,6 +15,7 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Select } from "@/components/ui/primitives";
 import { requestFiles } from "@/lib/files";
+import { useTweened } from "@/lib/motion";
 
 type T = (k: string) => string;
 
@@ -101,7 +102,7 @@ export function ActivityMonitorApp() {
         {/* ---- dashboard ---- */}
         <div className="shrink-0 border-b">
           <div className="flex items-center justify-between px-5 pt-4">
-            <h1 className="text-[13px] font-semibold tracking-tight">{t("activity.recent")}</h1>
+            <h1 className="text-[13px] font-semibold">{t("activity.recent")}</h1>
             {summary.running > 0 && (
               <span className="flex items-center gap-1.5 text-2xs text-brand">
                 <span className="size-1.5 animate-pulse rounded-full bg-brand" />
@@ -111,16 +112,26 @@ export function ActivityMonitorApp() {
           </div>
 
           <div className="flex flex-wrap gap-x-7 gap-y-2 px-5 py-3">
-            <Metric label={t("activity.runs")} value={String(summary.count)} />
-            <Metric label={t("activity.tokens")} value={fmtTokens(summary.tokens)} />
-            <Metric label={t("activity.cost")} value={fmtCost(summary.cost)} />
+            <Metric
+              label={t("activity.runs")}
+              value={summary.count}
+              format={(n) => String(Math.round(n))}
+            />
+            <Metric
+              label={t("activity.tokens")}
+              value={summary.tokens}
+              format={(n) => fmtTokens(Math.round(n))}
+            />
+            <Metric label={t("activity.cost")} value={summary.cost} format={fmtCost} />
             <Metric
               label={t("activity.avgLatency")}
-              value={summary.avgMs ? `${(summary.avgMs / 1000).toFixed(1)}s` : "—"}
+              value={summary.avgMs}
+              format={(ms) => (ms ? `${(ms / 1000).toFixed(1)}s` : "—")}
             />
             <Metric
               label={t("activity.errRate")}
-              value={`${(summary.errRate * 100).toFixed(0)}%`}
+              value={summary.errRate}
+              format={(rate) => `${(rate * 100).toFixed(0)}%`}
               warn={summary.errRate > 0.2}
             />
           </div>
@@ -136,6 +147,7 @@ export function ActivityMonitorApp() {
                 </span>
               }
             >
+              {/* Bars grow and shrink to each new scale instead of jumping. */}
               <div className="flex h-[72px] items-end gap-px">
                 {chart.map((r) => {
                   const total = tok(r);
@@ -150,13 +162,13 @@ export function ActivityMonitorApp() {
                     >
                       <div
                         className={cn(
-                          "w-full rounded-[2px] bg-brand/35 transition-colors group-hover:bg-brand/60",
+                          "w-full rounded-[2px] bg-brand/35 transition-[height] duration-500 ease-out group-hover:bg-brand/60",
                           total === 0 && "bg-border",
                         )}
                         style={{ height: `${Math.max(total === 0 ? 6 : 3, h)}%` }}
                       >
                         <div
-                          className="w-full rounded-t-[2px] bg-brand"
+                          className="w-full rounded-t-[2px] bg-brand transition-[height] duration-500 ease-out"
                           style={{ height: `${outShare}%` }}
                         />
                       </div>
@@ -175,7 +187,7 @@ export function ActivityMonitorApp() {
                     </span>
                     <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                       <span
-                        className="block h-full rounded-full bg-brand"
+                        className="block h-full rounded-full bg-brand transition-[width] duration-500 ease-out"
                         style={{ width: `${(n / byModel.max) * 100}%` }}
                       />
                     </span>
@@ -312,7 +324,7 @@ function RunRow({ r, t, onSelect }: { r: AgentRun; t: T; onSelect: () => void })
     <div
       className={cn(
         COLS,
-        "items-center border-b border-border/50 px-5 py-2 text-xs transition-colors hover:bg-accent/30",
+        "items-center border-b border-border/50 px-5 py-2 text-xs hover:bg-accent/30",
       )}
     >
       <button
@@ -361,7 +373,7 @@ function RunRow({ r, t, onSelect }: { r: AgentRun; t: T; onSelect: () => void })
               wsClient.send("c2s.activity.stop", { runId: r.id });
             }}
             title={t("activity.stop")}
-            className="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs text-muted-foreground transition-colors hover:border-destructive hover:bg-destructive-fill hover:text-white"
+            className="flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-2xs text-muted-foreground hover:border-destructive hover:bg-destructive-fill hover:text-white"
           >
             <Square className="size-2.5" fill="currentColor" /> {t("activity.stop")}
           </button>
@@ -711,7 +723,19 @@ function RunDetails({
   );
 }
 
-function Metric({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
+/** A live summary number: it counts to each new value, so a change reads as one. */
+function Metric({
+  label,
+  value,
+  format,
+  warn,
+}: {
+  label: string;
+  value: number;
+  format: (n: number) => string;
+  warn?: boolean;
+}) {
+  const shown = useTweened(value);
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-2xs text-muted-foreground">{label}</span>
@@ -721,7 +745,7 @@ function Metric({ label, value, warn }: { label: string; value: string; warn?: b
           warn && "text-destructive",
         )}
       >
-        {value}
+        {format(shown)}
       </span>
     </div>
   );

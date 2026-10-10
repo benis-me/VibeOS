@@ -89,7 +89,7 @@ export function BrowserChrome({ windowId, children }: { windowId: string; childr
   const canBack = hist.current.idx > 0;
   const canFwd = hist.current.idx < hist.current.stack.length - 1;
   const btn =
-    "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/60 disabled:opacity-40 disabled:hover:bg-transparent";
+    "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/60 disabled:opacity-40 disabled:hover:bg-transparent";
 
   return (
     <div className="flex h-full w-full flex-col">

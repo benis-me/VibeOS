@@ -71,12 +71,16 @@ export async function runtimeTheme(surface: HTMLElement, apiBase: string) {
   };
 }
 
-/** Synchronous tokens prevent a dark/un-styled flash while packaged fonts load. */
+/**
+ * Synchronous tokens prevent a dark/un-styled flash while packaged fonts load.
+ * The host's color-scheme comes along: a light document in a dark host gets an
+ * opaque white canvas from the browser until the theme message lands.
+ */
 export function runtimeBaseStyle(surface: HTMLElement) {
   const computed = getComputedStyle(surface);
   const values = [...computed]
     .filter((key) => key.startsWith("--"))
     .map((key) => `${key}:${computed.getPropertyValue(key)};`)
     .join("");
-  return `:root{${values}} html,body{margin:0;width:100%;height:100%;overflow:hidden} body{font-family:${computed.fontFamily};font-size:${computed.fontSize};color:var(--foreground);background:transparent} #surface{height:100%;width:100%;overflow:auto;contain:layout paint style;isolation:isolate} #surface [hidden]{display:none!important} #surface[data-runtime-paused] *,#surface[data-runtime-paused] *::before,#surface[data-runtime-paused] *::after{animation-play-state:paused!important} @media(prefers-reduced-motion:reduce){#surface *,#surface *::before,#surface *::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}`;
+  return `:root{${values}color-scheme:${computed.colorScheme}} html,body{margin:0;width:100%;height:100%;overflow:hidden} body{font-family:${computed.fontFamily};font-size:${computed.fontSize};color:var(--foreground);background:transparent} #surface{height:100%;width:100%;overflow:auto;contain:layout paint style;isolation:isolate} #surface [hidden]{display:none!important} #surface[data-runtime-paused] *,#surface[data-runtime-paused] *::before,#surface[data-runtime-paused] *::after{animation-play-state:paused!important} @media(prefers-reduced-motion:reduce){#surface *,#surface *::before,#surface *::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important}}`;
 }

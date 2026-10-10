@@ -4,7 +4,6 @@ import { useApplicationStore } from "@/stores/applicationStore";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
-  CornerUpRight,
   Copy,
   Download,
   File,
@@ -31,6 +30,7 @@ import {
   Upload,
   Send,
 } from "lucide-react";
+import { ArrowBendUpRight } from "@phosphor-icons/react";
 import {
   FILE_UPLOAD_LIMIT,
   fileMediaType,
@@ -1003,7 +1003,11 @@ export function FilesApp({
                               className="size-5"
                             />
                             {e.kind === "shortcut" && (
-                              <CornerUpRight className="absolute -bottom-0.5 -left-1 size-2.5 rounded-sm bg-background" />
+                              // The badge is part of the Phosphor app glyph it marks.
+                              <ArrowBendUpRight
+                                weight="bold"
+                                className="absolute -bottom-0.5 -left-1 size-2.5 rounded-sm bg-background"
+                              />
                             )}
                           </span>
                         ) : e.kind === "directory" ? (

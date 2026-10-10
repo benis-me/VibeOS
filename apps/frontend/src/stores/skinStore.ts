@@ -56,6 +56,13 @@ export function applySkin(id: Skin): void {
   const current = document.documentElement.dataset.selectedSkin;
   if (current && current !== id) withoutTransitions(() => setSkin(id));
   else setSkin(id);
+  syncThemeColor();
+}
+
+/** Browser chrome that honors theme-color (Safari's tab bar) matches the page. */
+export function syncThemeColor(): void {
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (meta) meta.content = getComputedStyle(document.body).backgroundColor;
 }
 
 function setSkin(id: Skin): void {

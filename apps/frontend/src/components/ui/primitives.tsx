@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ChevronDown, Search, Check, Eye, EyeOff } from "lucide-react";
 import type { Effort, ThinkingMode, AgentRole, ModelCapability } from "@vibeos/shared";
 import { usePopoverMotion } from "@/lib/motion";
@@ -117,7 +117,7 @@ export function Select({
         {...props}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="vibe-select h-8 w-full appearance-none truncate rounded-md border bg-background pl-2.5 pr-7 text-[13px] outline-none transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
+        className="vibe-select h-8 w-full appearance-none truncate rounded-md border bg-background pl-2.5 pr-7 text-[13px] outline-none hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-50"
       >
         {children}
       </select>
@@ -138,6 +138,10 @@ export function Segmented<T extends string>({
   disabled?: boolean;
 }) {
   const row = useRowLabel();
+  // One pill per control slides to the chosen option, so the eye follows the
+  // change instead of finding the selection again.
+  const pill = useId();
+  const reduced = useReducedMotion();
   return (
     <div
       role="group"
@@ -147,25 +151,39 @@ export function Segmented<T extends string>({
         disabled && "opacity-50",
       )}
     >
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(o.value)}
-          aria-pressed={value === o.value}
-          data-active={value === o.value ? "true" : undefined}
-          className={cn(
-            "vibe-seg-btn flex items-center gap-1.5 rounded-[7px] px-2.5 py-1 text-[13px] transition-colors",
-            value === o.value
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {o.icon}
-          {o.label}
-        </button>
-      ))}
+      {options.map((o) => {
+        const active = value === o.value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(o.value)}
+            aria-pressed={active}
+            data-active={active ? "true" : undefined}
+            className={cn(
+              "vibe-seg-btn relative flex items-center gap-1.5 rounded-[7px] px-2.5 py-1 text-[13px]",
+              active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {active && (
+              <motion.span
+                layoutId={pill}
+                transition={
+                  reduced ? { duration: 0 } : { type: "spring", duration: 0.3, bounce: 0 }
+                }
+                // Radius set as a style so motion keeps it round while the pill stretches.
+                style={{ borderRadius: 7 }}
+                className="vibe-seg-pill absolute inset-0 bg-card shadow-sm"
+              />
+            )}
+            <span className="relative flex items-center gap-1.5">
+              {o.icon}
+              {o.label}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -262,7 +280,7 @@ export function KeyInput({
         aria-pressed={show}
         title={revealLabel}
         onClick={() => setShow((s) => !s)}
-        className="absolute right-1 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="absolute right-1 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         {show ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
       </button>
@@ -426,7 +444,7 @@ export function Combobox({
         aria-expanded={open}
         aria-labelledby={row ? `${row.label} ${valueId}` : undefined}
         onClick={() => setOpen((v) => !v)}
-        className="vibe-combo flex w-full items-center gap-1.5 rounded-lg border bg-background py-1.5 pl-2.5 pr-2 text-left text-[13px] transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="vibe-combo flex w-full items-center gap-1.5 rounded-lg border bg-background py-1.5 pl-2.5 pr-2 text-left text-[13px] hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         <span id={valueId} className="flex-1 truncate" title={selected?.label ?? value}>
           {selected?.label ?? value}
@@ -447,8 +465,11 @@ export function Combobox({
                 top: coords.top,
                 bottom: coords.bottom,
                 maxHeight: coords.maxH,
+                // Grow out of the trigger's corner: it hangs from the trigger's right
+                // edge, below it, or above it when it flips up.
+                transformOrigin: coords.top === undefined ? "bottom right" : "top right",
               }}
-              className="z-[10001] flex flex-col overflow-hidden rounded-lg border bg-popover shadow-xl"
+              className="z-[10001] flex flex-col overflow-hidden rounded-lg border bg-popover shadow-popover"
             >
               <div className="flex shrink-0 items-center gap-2 border-b px-2.5">
                 <Search className="size-3.5 shrink-0 text-muted-foreground" />
@@ -486,7 +507,8 @@ export function Combobox({
                             close();
                           }}
                           className={cn(
-                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+                            // rounded-sm: the popover's radius minus its 4px padding and border.
+                            "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[13px]",
                             o.value === value
                               ? "bg-accent text-accent-foreground"
                               : "hover:bg-accent/60",

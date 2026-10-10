@@ -362,6 +362,8 @@ export interface Preferences {
   wallpaper?: string;
   /** Model used for in-UI image generation. */
   imageModel?: ImageModelRef;
+  /** Quiet interface cues (a long generation finishing out of view). On unless false. */
+  uiSounds?: boolean;
   [key: string]: unknown;
 }
 

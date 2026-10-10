@@ -5,7 +5,7 @@ import type { Notification, NotificationKind } from "@vibeos/shared";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { wsClient } from "@/lib/ws";
 import { useT } from "@/lib/i18n";
-import { EASE_OUT } from "@/lib/motion";
+import { EASE_OUT, EXIT } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 export const NOTIFICATION_ICON: Record<NotificationKind, React.ReactNode> = {
@@ -33,11 +33,16 @@ function Toast({ n }: { n: Notification }) {
       layout
       initial={{ opacity: 0, x: offset }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: offset }}
+      // Arrives with direction; leaves in place, quicker and softer than it came.
+      exit={
+        reduced
+          ? { opacity: 0, transition: EXIT }
+          : { opacity: 0, filter: "blur(2px)", transition: EXIT }
+      }
       transition={{ duration: 0.2, ease: EASE_OUT }}
       role={n.kind === "error" ? "alert" : undefined}
       className={cn(
-        "vibe-notif pointer-events-auto w-80 rounded-xl border bg-card/95 p-3 shadow-xl backdrop-blur sheen",
+        "vibe-notif pointer-events-auto w-80 rounded-xl border bg-card/95 p-3 shadow-popover inset-shadow-sheen backdrop-blur",
       )}
     >
       <div className="flex items-start gap-2.5">
@@ -53,7 +58,11 @@ function Toast({ n }: { n: Notification }) {
           <span className="mt-0.5">{NOTIFICATION_ICON[n.kind]}</span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium">{n.title}</span>
-            {n.body && <span className="mt-0.5 block text-xs text-muted-foreground">{n.body}</span>}
+            {n.body && (
+              <span className="mt-0.5 block text-pretty text-xs text-muted-foreground">
+                {n.body}
+              </span>
+            )}
             {n.action && (
               <span className="mt-1.5 block text-xs font-medium text-brand">{n.action.label}</span>
             )}
@@ -64,7 +73,7 @@ function Toast({ n }: { n: Notification }) {
           aria-label={t("communication.dismiss")}
           title={t("communication.dismiss")}
           onClick={() => dismiss(n.id)}
-          className="-m-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="-m-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <X className="size-3.5" />
         </button>

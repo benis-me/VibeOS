@@ -47,7 +47,9 @@ Useful env: `PORT`, `VIBEOS_DB_PATH`, `VIBEOS_AGENTS_DISABLED=1`, `VIBEOS_LOG_LE
 
 - **NO EMOJI anywhere in generated UI/content.** App icons render via
   `components/AppIcon.tsx` as **Phosphor duotone** (built-in app icons are fixed in
-  code, never from the DB); OS chrome uses **lucide**. Backend strips emoji from AI
+  code, never from the DB); OS chrome uses **lucide**, except glyphs that share a row
+  with app icons (the Dock's Apps/notification buttons) or sit on one (shortcut
+  badges), which use Phosphor so one row speaks one icon language. Backend strips emoji from AI
   text (`stripEmoji` in `@vibeos/shared/util`); the frontend sanitizer strips it too.
   Prompts instruct the AI to use inline SVG, never emoji.
 - Generated UI must be **vertically responsive** — fill the window, no empty gap

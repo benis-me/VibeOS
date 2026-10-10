@@ -95,7 +95,7 @@ export function WelcomeApp({ windowId }: { windowId: string }) {
                   onClick={() =>
                     wsClient.send("c2s.app.launch", { name: t(`${key}.name`), description: text })
                   }
-                  className="group flex items-center gap-2.5 rounded-lg border bg-card px-3 py-3 text-left text-sm transition-colors hover:bg-accent"
+                  className="group flex items-center gap-2.5 rounded-lg border bg-card px-3 py-3 text-left text-sm transition-[scale] duration-100 ease-out hover:bg-accent active:scale-[0.98]"
                 >
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">
                     <Icon weight="duotone" className="size-3.5" />
@@ -115,7 +115,7 @@ export function WelcomeApp({ windowId }: { windowId: string }) {
       <button
         type="button"
         onClick={() => requestSpotlight()}
-        className="mt-7 flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2.5 text-sm font-medium text-brand-foreground transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+        className="mt-7 flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2.5 text-sm font-medium text-brand-foreground transition-[scale] duration-100 ease-out hover:bg-brand/90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
       >
         {t("welcome.start")}
         <ArrowRight weight="bold" className="size-4" />

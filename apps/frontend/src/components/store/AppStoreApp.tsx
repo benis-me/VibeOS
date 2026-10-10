@@ -204,7 +204,8 @@ export function AppStoreApp() {
         </div>
         <nav
           aria-label={t("applications.list")}
-          className="min-h-0 flex-1 space-y-0.5 overflow-auto px-2 pb-2"
+          // Rows touch (no gap): no dead strip for the pointer to fall through.
+          className="min-h-0 flex-1 overflow-auto px-2 pb-2"
         >
           {apps.map((a) => {
             const active = a.id === app?.id;
@@ -216,7 +217,7 @@ export function AppStoreApp() {
                 title={a.name}
                 onClick={() => state.select(a.id)}
                 className={cn(
-                  "flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors @max-xl:justify-center @max-xl:px-0",
+                  "flex w-full items-center gap-2.5 rounded-lg px-2 py-[7px] text-left text-[13px] @max-xl:justify-center @max-xl:px-0",
                   active
                     ? "bg-accent text-accent-foreground"
                     : "text-foreground/80 hover:bg-accent/50",

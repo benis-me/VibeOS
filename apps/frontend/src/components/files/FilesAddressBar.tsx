@@ -12,12 +12,13 @@ import {
 } from "lucide-react";
 import { SYSTEM_FOLDERS } from "@vibeos/shared";
 import { useT } from "@/lib/i18n";
+import { useScrollFade } from "@/hooks/useScrollFade";
 
 const control =
-  "vibe-files-nav-btn grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-30";
+  "vibe-files-nav-btn grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-30";
 /** Inside the 32px location field: 24px, with a radius concentric to the field's 8px. */
 const inner =
-  "grid size-6 shrink-0 place-items-center rounded-[4px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-30";
+  "grid size-6 shrink-0 place-items-center rounded-[4px] text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-30";
 const crumb =
   "flex h-6 shrink-0 items-center gap-1.5 rounded-[4px] px-1.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40";
 
@@ -65,6 +66,13 @@ export function FilesAddressBar({
   useEffect(() => {
     setAddress(`/${path}`);
   }, [path]);
+  // A long path rests on its last crumb, the folder you are in; the fade then
+  // marks the hidden start.
+  const fade = useScrollFade("x");
+  useEffect(() => {
+    const crumbs = root.current?.querySelector("nav");
+    if (crumbs) crumbs.scrollLeft = crumbs.scrollWidth;
+  }, [path, editing]);
   useEffect(() => {
     if (editing) {
       input.current?.focus();
@@ -187,7 +195,8 @@ export function FilesAddressBar({
           <>
             <nav
               aria-label={t("files.breadcrumbs")}
-              className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1 text-xs [scrollbar-width:none]"
+              ref={fade}
+              className="vibe-fade-x flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto px-1 text-xs [--fade:1rem] [scrollbar-width:none]"
               onDoubleClick={edit}
             >
               <button

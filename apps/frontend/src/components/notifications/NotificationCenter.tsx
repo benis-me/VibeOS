@@ -6,6 +6,7 @@ import { wsClient } from "@/lib/ws";
 import { useT } from "@/lib/i18n";
 import { usePopoverMotion } from "@/lib/motion";
 import { useAnchoredPopover } from "@/hooks/useAnchoredPopover";
+import { useScrollFade } from "@/hooks/useScrollFade";
 import { cn } from "@/lib/utils";
 import { NOTIFICATION_ICON } from "./NotificationToasts";
 
@@ -22,6 +23,7 @@ export function NotificationCenter({ open, onClose }: Props) {
   const t = useT();
   const panel = usePopoverMotion();
   const anchor = useAnchoredPopover(open, TRIGGER, "right", 384);
+  const fade = useScrollFade("y");
 
   useEffect(() => {
     if (!open) return;
@@ -50,18 +52,21 @@ export function NotificationCenter({ open, onClose }: Props) {
           ref={ref}
           {...panel}
           style={anchor}
-          className="vibe-notif z-[9999] flex max-h-[70vh] w-96 origin-bottom-right flex-col rounded-xl border bg-popover/95 shadow-2xl backdrop-blur sheen"
+          // 18px corners = the 10px rows + 8px padding + 1px border.
+          className="vibe-notif z-[9999] flex max-h-[min(70vh,var(--anchor-max-h))] w-96 origin-bottom-right flex-col rounded-2xl border bg-popover/95 shadow-popover inset-shadow-sheen backdrop-blur"
         >
           <div className="flex items-center justify-between border-b px-4 py-2.5">
             <span className="text-sm font-medium">{t("notif.title")}</span>
+            {/* Padded past the text so the target is bigger than the words; the
+                negative margin keeps the text where it was. */}
             <button
               onClick={() => wsClient.send("c2s.notification.read", { id: "all" })}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              className="-mx-2 -my-1 flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <CheckCheck className="size-3.5" /> {t("notif.markAllRead")}
             </button>
           </div>
-          <div className="flex-1 overflow-auto p-2">
+          <div ref={fade} className="vibe-fade-y min-h-0 flex-1 overflow-auto p-2">
             {notifications.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">
                 {t("notif.empty")}
@@ -75,7 +80,7 @@ export function NotificationCenter({ open, onClose }: Props) {
                     onClose();
                   }}
                   className={cn(
-                    "flex w-full flex-col items-start rounded-lg px-3 py-2 text-left transition-colors hover:bg-accent",
+                    "flex w-full flex-col items-start rounded-lg px-3 py-2 text-left hover:bg-accent",
                     !n.read && "bg-accent/40",
                   )}
                 >
@@ -83,14 +88,18 @@ export function NotificationCenter({ open, onClose }: Props) {
                     {!n.read && <span className="size-1.5 rounded-full bg-brand" />}
                     <span className="shrink-0">{NOTIFICATION_ICON[n.kind]}</span>
                     <span className="flex-1 truncate text-sm font-medium">{n.title}</span>
-                    <span className="text-2xs text-muted-foreground">
+                    <span className="text-2xs tabular-nums text-muted-foreground">
                       {new Date(n.createdAt).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
                     </span>
                   </div>
-                  {n.body && <span className="mt-0.5 text-xs text-muted-foreground">{n.body}</span>}
+                  {n.body && (
+                    <span className="mt-0.5 text-pretty text-xs text-muted-foreground">
+                      {n.body}
+                    </span>
+                  )}
                 </button>
               ))
             )}

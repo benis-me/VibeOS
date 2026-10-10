@@ -31,6 +31,14 @@ export function Desktop() {
   const theme = useSettingsStore((s) => s.settings?.theme ?? "dark");
   const wallpaper = useSettingsStore((s) => s.settings?.prefs.wallpaper);
   const wallpaperUrl = wallpaper ? `${API_BASE}${wallpaper}` : null;
+  // The desktop mounts once per session, right after boot: its one entrance
+  // (.vibe-desktop[data-reveal]) plays, then the attribute goes so Dock items
+  // added later appear at once.
+  const [reveal, setReveal] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setReveal(false), 700);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Open Spotlight, optionally seeded with a query ("> …" lands in command mode).
   const openSpotlight = (query = "") => {
@@ -76,6 +84,7 @@ export function Desktop() {
   return (
     <div
       className="vibe-desktop relative h-full w-full overflow-hidden bg-desktop"
+      data-reveal={reveal || undefined}
       onContextMenu={(e) =>
         openContextMenu(
           e,

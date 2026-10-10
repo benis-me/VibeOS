@@ -1,4 +1,4 @@
-import { applySkin, withoutTransitions } from "./skinStore";
+import { applySkin, syncThemeColor, withoutTransitions } from "./skinStore";
 export { applySkin } from "./skinStore";
 import { create } from "zustand";
 import type { Settings, Theme, Locale } from "@vibeos/shared";
@@ -24,6 +24,7 @@ export function applyTheme(theme: Theme): void {
   const dark = theme === "dark";
   if (root.classList.contains("dark") !== dark)
     withoutTransitions(() => root.classList.toggle("dark", dark));
+  syncThemeColor();
 }
 
 export function applyLocale(locale: Locale): void {

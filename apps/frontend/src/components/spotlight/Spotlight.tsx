@@ -1,5 +1,4 @@
 import { useEffect, useId, useMemo, useRef, useState, Fragment, type ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { Search, Loader2, LayoutGrid, AppWindow, Sparkles, ChevronRight } from "lucide-react";
 import { AppIcon } from "@/components/AppIcon";
 import type { AppDescriptor, AppSearchResult, WindowState } from "@vibeos/shared";
@@ -7,7 +6,6 @@ import { wsClient } from "@/lib/ws";
 import { ulid } from "@vibeos/shared/util";
 import { appLabel, translate, useLocale, useT } from "@/lib/i18n";
 import { isComposing } from "@/lib/fields";
-import { usePopoverMotion, useOverlayMotion } from "@/lib/motion";
 import { useAppStore } from "@/stores/appStore";
 import { useWindowStore } from "@/stores/windowStore";
 import { cn } from "@/lib/utils";
@@ -130,9 +128,6 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
     return () => clearTimeout(timer);
   }, [q, open]);
 
-  const overlay = useOverlayMotion();
-  const panel = usePopoverMotion();
-
   const run = (i: number) => {
     const match = local[i];
     const idea = results[i - ideasFrom];
@@ -191,184 +186,181 @@ export function Spotlight({ open, onClose, initialQuery = "" }: Props) {
     }
   };
 
+  // A launcher summoned many times a day by its shortcut opens and closes with no
+  // animation (as Raycast does): the user already knows where it appears.
+  if (!open) return null;
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          {...overlay}
-          className="fixed inset-0 z-[10000] flex items-start justify-center bg-black/30 pt-[18vh] backdrop-blur-sm"
-          onPointerDown={onClose}
-        >
-          <motion.div
-            {...panel}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t("startmenu.appSearch")}
-            className="w-[min(620px,92vw)] overflow-hidden rounded-2xl border bg-popover/95 shadow-2xl sheen"
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3 px-4">
-              {running ? (
-                <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" />
-              ) : isCommand ? (
-                <ChevronRight className="size-5 shrink-0 text-brand" />
-              ) : (
-                <Search className="size-5 shrink-0 text-muted-foreground" />
-              )}
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setCmdError("");
-                }}
-                onKeyDown={onKeyDown}
-                role="combobox"
-                aria-expanded={!!q}
-                aria-controls={listId}
-                aria-autocomplete="list"
-                aria-activedescendant={q ? `${listId}-${active}` : undefined}
-                placeholder={t("spotlight.placeholder")}
-                className="h-14 flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
-              />
-            </div>
+    <div
+      className="fixed inset-0 z-[10000] flex items-start justify-center bg-black/30 pt-[18vh] backdrop-blur-sm"
+      onPointerDown={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("startmenu.appSearch")}
+        className="w-[min(620px,92vw)] overflow-hidden rounded-2xl border bg-popover/95 shadow-popover inset-shadow-sheen"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 px-4">
+          {running ? (
+            <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" />
+          ) : isCommand ? (
+            <ChevronRight className="size-5 shrink-0 text-brand" />
+          ) : (
+            <Search className="size-5 shrink-0 text-muted-foreground" />
+          )}
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setCmdError("");
+            }}
+            onKeyDown={onKeyDown}
+            role="combobox"
+            aria-expanded={!!q}
+            aria-controls={listId}
+            aria-autocomplete="list"
+            aria-activedescendant={q ? `${listId}-${active}` : undefined}
+            placeholder={t("spotlight.placeholder")}
+            className="h-14 flex-1 bg-transparent text-lg outline-none placeholder:text-muted-foreground"
+          />
+        </div>
 
-            {isCommand && (
-              <div className="border-t p-1.5">
-                <button
-                  onClick={runCommandPalette}
-                  disabled={!commandText.trim() || running}
-                  className="flex w-full items-center gap-3 rounded-lg bg-accent px-3 py-2.5 text-left text-accent-foreground disabled:opacity-60"
-                >
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">
-                    {running ? (
-                      <Loader2 className="size-3.5 animate-spin" />
-                    ) : (
-                      <Sparkles className="size-3.5" />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium">
-                      {running ? t("spotlight.cmdRunning") : t("spotlight.cmdRun")}
-                    </span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {commandText.trim() || t("spotlight.cmdHint")}
-                    </span>
-                  </span>
-                  <kbd className="rounded border bg-muted px-1 font-sans text-2xs text-muted-foreground">
-                    ↵
-                  </kbd>
-                </button>
-                {cmdError && (
-                  <div role="alert" className="flex items-center gap-2 px-3 pb-1 pt-2 text-xs">
-                    {/* A known reason is shown translated; anything else (model or
+        {isCommand && (
+          <div className="border-t p-1.5">
+            <button
+              onClick={runCommandPalette}
+              disabled={!commandText.trim() || running}
+              className="flex w-full items-center gap-3 rounded-lg bg-accent px-3 py-2.5 text-left text-accent-foreground disabled:opacity-60"
+            >
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">
+                {running ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="size-3.5" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">
+                  {running ? t("spotlight.cmdRunning") : t("spotlight.cmdRun")}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {commandText.trim() || t("spotlight.cmdHint")}
+                </span>
+              </span>
+              <kbd className="rounded border bg-muted px-1 font-sans text-2xs text-muted-foreground">
+                ↵
+              </kbd>
+            </button>
+            {cmdError && (
+              <div role="alert" className="flex items-center gap-2 px-3 pb-1 pt-2 text-xs">
+                {/* A known reason is shown translated; anything else (model or
                         provider failure) points at the model services. */}
-                    <span className="min-w-0 flex-1 text-destructive">
-                      {t(cmdError) === cmdError ? t("spotlight.cmdFailed") : t(cmdError)}
-                    </span>
-                    {t(cmdError) === cmdError && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          wsClient.send("c2s.window.open", { appId: "settings" });
-                          onClose();
-                        }}
-                        className="vibe-btn shrink-0 rounded border px-2 py-1"
-                      >
-                        {t("settings.open")}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {q && (
-              <div
-                id={listId}
-                role="listbox"
-                aria-label={t("startmenu.appSearch")}
-                className="max-h-80 overflow-auto border-t p-1.5"
-              >
-                {local.length > 0 && <Heading icon={AppWindow} label={t("spotlight.local")} />}
-                {local.map(({ app, win }, i) => (
-                  <Row
-                    key={app.id}
-                    id={`${listId}-${i}`}
-                    active={i === active}
-                    onHover={() => setActive(i)}
-                    onClick={() => run(i)}
-                    icon={
-                      <AppIcon
-                        name={app.icon}
-                        presetId={app.presetId}
-                        label={appLabel(t, app)}
-                        className="size-6"
-                      />
-                    }
-                    title={appLabel(t, app)}
-                    detail={app.manifest.description === app.name ? "" : app.manifest.description}
-                    badge={win ? t("spotlight.opened") : ""}
-                  />
-                ))}
-                <Row
-                  id={`${listId}-${local.length}`}
-                  active={active === local.length}
-                  onHover={() => setActive(local.length)}
-                  onClick={() => run(local.length)}
-                  icon={
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">
-                      <Sparkles className="size-3.5" />
-                    </span>
-                  }
-                  title={q}
-                  detail={t("spotlight.generate")}
-                />
-                {results.map((r, j) => {
-                  const isWidget = r.kind === "widget";
-                  return (
-                    <Fragment key={`${r.name}-${j}`}>
-                      {/* results are sorted by kind, so a header shows at each boundary. */}
-                      {results[j - 1]?.kind !== r.kind && (
-                        <Heading
-                          icon={isWidget ? LayoutGrid : AppWindow}
-                          label={isWidget ? t("spotlight.kindWidget") : t("spotlight.kindApp")}
-                        />
-                      )}
-                      <Row
-                        id={`${listId}-${ideasFrom + j}`}
-                        active={ideasFrom + j === active}
-                        onHover={() => setActive(ideasFrom + j)}
-                        onClick={() => run(ideasFrom + j)}
-                        icon={<AppIcon name={r.icon} label={r.name} className="size-6" />}
-                        title={r.name}
-                        detail={r.description}
-                      />
-                    </Fragment>
-                  );
-                })}
-                {(loading || failed) && (
-                  <div
-                    role="status"
-                    className="flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground"
+                <span className="min-w-0 flex-1 text-destructive">
+                  {t(cmdError) === cmdError ? t("spotlight.cmdFailed") : t(cmdError)}
+                </span>
+                {t(cmdError) === cmdError && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      wsClient.send("c2s.window.open", { appId: "settings" });
+                      onClose();
+                    }}
+                    className="vibe-btn shrink-0 rounded border px-2 py-1"
                   >
-                    {loading && <Loader2 className="size-3.5 animate-spin" />}
-                    {loading ? t("spotlight.thinking") : t("spotlight.searchFailed")}
-                  </div>
+                    {t("settings.open")}
+                  </button>
                 )}
               </div>
             )}
+          </div>
+        )}
 
-            {!isCommand && (
-              <div className="flex items-center gap-1.5 border-t px-4 py-1.5 text-2xs text-muted-foreground">
-                <kbd className="rounded border bg-muted px-1 font-sans">&gt;</kbd>
-                {t("spotlight.cmdMode")}
+        {q && (
+          <div
+            id={listId}
+            role="listbox"
+            aria-label={t("startmenu.appSearch")}
+            className="max-h-80 overflow-auto border-t p-1.5"
+          >
+            {local.length > 0 && <Heading icon={AppWindow} label={t("spotlight.local")} />}
+            {local.map(({ app, win }, i) => (
+              <Row
+                key={app.id}
+                id={`${listId}-${i}`}
+                active={i === active}
+                onHover={() => setActive(i)}
+                onClick={() => run(i)}
+                icon={
+                  <AppIcon
+                    name={app.icon}
+                    presetId={app.presetId}
+                    label={appLabel(t, app)}
+                    className="size-6"
+                  />
+                }
+                title={appLabel(t, app)}
+                detail={app.manifest.description === app.name ? "" : app.manifest.description}
+                badge={win ? t("spotlight.opened") : ""}
+              />
+            ))}
+            <Row
+              id={`${listId}-${local.length}`}
+              active={active === local.length}
+              onHover={() => setActive(local.length)}
+              onClick={() => run(local.length)}
+              icon={
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-brand/15 text-brand">
+                  <Sparkles className="size-3.5" />
+                </span>
+              }
+              title={q}
+              detail={t("spotlight.generate")}
+            />
+            {results.map((r, j) => {
+              const isWidget = r.kind === "widget";
+              return (
+                <Fragment key={`${r.name}-${j}`}>
+                  {/* results are sorted by kind, so a header shows at each boundary. */}
+                  {results[j - 1]?.kind !== r.kind && (
+                    <Heading
+                      icon={isWidget ? LayoutGrid : AppWindow}
+                      label={isWidget ? t("spotlight.kindWidget") : t("spotlight.kindApp")}
+                    />
+                  )}
+                  <Row
+                    id={`${listId}-${ideasFrom + j}`}
+                    active={ideasFrom + j === active}
+                    onHover={() => setActive(ideasFrom + j)}
+                    onClick={() => run(ideasFrom + j)}
+                    icon={<AppIcon name={r.icon} label={r.name} className="size-6" />}
+                    title={r.name}
+                    detail={r.description}
+                  />
+                </Fragment>
+              );
+            })}
+            {(loading || failed) && (
+              <div
+                role="status"
+                className="flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground"
+              >
+                {loading && <Loader2 className="size-3.5 animate-spin" />}
+                {loading ? t("spotlight.thinking") : t("spotlight.searchFailed")}
               </div>
             )}
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          </div>
+        )}
+
+        {!isCommand && (
+          <div className="flex items-center gap-1.5 border-t px-4 py-1.5 text-2xs text-muted-foreground">
+            <kbd className="rounded border bg-muted px-1 font-sans">&gt;</kbd>
+            {t("spotlight.cmdMode")}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -404,7 +396,8 @@ function Row(props: {
       onPointerEnter={props.onHover}
       onClick={props.onClick}
       className={cn(
-        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+        // Hover and arrow-key selection move the highlight instantly.
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left",
         props.active ? "bg-accent text-accent-foreground" : "hover:bg-accent/60",
       )}
     >
